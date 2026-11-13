@@ -12,7 +12,7 @@
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 
-const VER = '2026.11.13-12';
+const VER = '2026.11.13-13';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -22,7 +22,7 @@ const JOBS = ['관리', '룸메이드', '정비보조', '하우스키퍼', '하�
 const LINKS = [
   { ic: '🧹', t: '정비 레포트', s: '메이드별 현황 · 룸메이드 명단 · 메이드 화면', href: '../rm/' },
   { ic: '🛏', t: '정비 지원', s: '정비보조 명단 · 정비보조 화면', href: '../dirty/' },
-  { ic: '📝', t: '입퇴사 서류', s: '근로계약서 · 입사서류 · 사직서 (별도 비밀번호)', href: '../unies-contract/' },
+  { ic: '📝', t: '입퇴사 서류', s: '근로계약서 · 입사서류 · 사직서 (별도 비밀번호) · 새 탭', href: '../unies-contract/', tab: true },   // 구글 웹앱이 허브 앱 창(계정 여러 개)에선 안 열려 크롬 새 탭으로 (11/13)
   { ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)', href: '../inventory/' }
 ];
 
@@ -461,7 +461,7 @@ function todayHtml() {
 }
 function linksHtml() {
   return '<div class="card"><h2>바로가기 <small>같은 로그인으로 열려요</small></h2><div class="go-grid">' +
-    LINKS.map(l => '<a class="go" href="' + l.href + '"><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
+    LINKS.map(l => '<a class="go" href="' + l.href + '"' + (l.tab ? ' target="_blank" rel="noopener"' : '') + '><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
 }
 function staffHtml() {
   return '<div class="card"><h2>👥 전 파트 직원 명단</h2><p class="note" style="margin:0 0 12px">룸메이드 · 정비보조 · 미화 · 사우나 · 하우스맨 · 오더테이커를 한곳에서 봐요. 입사일 · 근속 · 재직/퇴사.<br>파트별 관리는 각 앱에서 해도 되고, 여기서 고쳐도 같은 명단이에요.</p>' +
