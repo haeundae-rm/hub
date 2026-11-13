@@ -12,7 +12,7 @@
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 
-const VER = '2026.11.13-13';
+const VER = '2026.11.13-14';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -517,7 +517,19 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'pw') doLogin(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(false); });
+// 새 버전 확인 (11/13): GitHub 가 index.html 을 10분까지 캐시해 예전 화면이 남음 → version.json 을 캐시 없이 읽어 다르면 한 번 새로 고침
+function checkVer() {
+  fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => {
+    if (!j || !j.v || j.v === VER) return;
+    let done = ''; try { done = sessionStorage.getItem('hub_reload') || ''; } catch (e) {}
+    if (done === j.v) return;
+    try { sessionStorage.setItem('hub_reload', j.v); } catch (e) {}
+    if (window.__hubFast) return;
+    location.reload();
+  }).catch(() => {});
+}
+checkVer();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { load(false); checkVer(); } });
 
 S.onUser(u => {
   if (vocOpen && !(u && !u.anon)) closeVoc();
