@@ -3,7 +3,7 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.13-11';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.13-12';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -94,7 +94,7 @@ function run() {
     if (e.data.p != null) { A.prog = e.data.p; const b = document.getElementById('asprog'); if (b) b.style.width = Math.round(A.prog * 100) + '%'; return; }
     w.terminate(); A.worker = null; A.running = false;
     if (e.data.err) { A.err = '배정 계산 오류: ' + e.data.err; draw(); return; }
-    A.res = e.data.done; A.edits = []; A.mv = null; A.open = {};
+    A.res = e.data.done; A.edits = []; A.mv = null; A.open = {}; A.xmsg = '';
     if (A.done) A.cmp = compare(A.done, A.res);
     saveLast(H0);
     draw();
@@ -141,12 +141,29 @@ function moveRoom(room, from, to) {
   A.edits.push(room + ' ' + from + ' → ' + to); A.err = ''; recount();
 }
 
+// ---------- 📄 정비보고서 엑셀 (오더테이커용) — 넣은 원본에 이름·출근 카드를 채워 내려받기 (fillxlsx.js)
+async function downXlsx(quiet) {
+  if (!A.res || !A.buf || A.xbusy) return;
+  A.xbusy = true; A.xmsg = ''; if (!quiet) draw();
+  try {
+    const F = await import(new URL('./fillxlsx.js?v=' + VER, import.meta.url).href);
+    const W = {}; Object.keys(A.res.workers).forEach(n => { const w = A.res.workers[n]; if (w.rooms.length) W[n] = { rooms: w.rooms, load: w.load }; });
+    const { bytes, info } = await F.fillReport(A.buf, A.date, W);
+    const name = 'report_' + A.date.slice(5).replace('-', '') + '_auto.xlsx';   // 한글 파일 이름은 일부 휴대폰·브라우저에서 'download' 로 바뀌어 영문으로
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+    A.xmsg = '📄 ' + name + ' 내려받음 — ' + info.sheet + '일 시트 객실 ' + info.named + '실 · 출근 카드 ' + info.cards + '명' +
+      (info.added.length ? ' · 카드 새로 추가: ' + info.added.join(', ') : '') + (info.noCard && info.noCard.length ? ' · ⚠️ 카드 칸이 없어 못 넣은 분: ' + info.noCard.join(', ') : '') + (info.offs.length ? ' · 휴무 표시: ' + info.offs.join(', ') : '') + (info.missing.length ? ' · 칸 못 찾은 객실: ' + info.missing.join(' ') : '');
+  } catch (e) { A.xmsg = '엑셀을 만들지 못했어요: ' + (e && e.message || e); }
+  A.xbusy = false; if (!quiet) draw();
+}
+
 // ---------- ✅ 확정 → 앱에 올리기 (초안일 때만)
 async function confirmUpload() {
   const R = A.res;
   if (A.done) return;
   if (R.left.length && !confirm('미배정 객실이 ' + R.left.length + '실 있어요 (' + R.left.join(' ') + '). 그래도 올릴까요?')) return;
-  if (!confirm(H.md(A.date) + ' 배정을 앱에 올릴까요?\n\n· 1~2분 안에 메이드 휴대폰에 들어가요\n· 정비 지원 더티 배분도 이 배정으로 불러와요\n· 같은 날 이미 올린 배정이 있으면 바뀌어요 (완료 기록은 그대로)')) return;
+  if (!confirm(H.md(A.date) + ' 배정을 앱에 올릴까요?\n\n· 정비보고서 엑셀(이름·출근 카드 채움)이 내려받아져요\n· 1~2분 안에 메이드 휴대폰에 들어가요\n· 정비 지원 더티 배분도 이 배정으로 불러와요\n· 같은 날 이미 올린 배정이 있으면 바뀌어요 (완료 기록은 그대로)')) return;
   try {
     const E = await import(new URL('../rm/app/engine.js?v=' + VER, import.meta.url).href);
     const ownerOf = {}; Object.keys(R.workers).forEach(n => R.workers[n].rooms.forEach(r => { (ownerOf[r] = ownerOf[r] || []).push(n); }));
@@ -158,6 +175,7 @@ async function confirmUpload() {
     const csv = E._test.toCsv(rows);
     const units = rows.reduce((s, r) => s + (ROYAL.includes(r[2]) ? 2 : 1), 0);
     const summary = { ok: !R.left.length, maids: new Set(rows.map(r => r[1])).size, rooms: rows.length, units, checks: [], tags: {}, groups: [], due: [] };
+    await downXlsx(true);
     H.upload({ date: A.date, file: '자동 배정 · ' + A.file, res: { csv, rows, sheet: A.sheet, summary, data: d2 } });
     const d = Object.assign({}, A.cfgDoc, { lastSent: { date: A.date, edits: A.edits.length, at: Date.now() } });
     H.S.set('meta/assign', d).catch(() => {});
@@ -273,7 +291,10 @@ function resultHtml() {
     (s.three.length ? '<br>3개 층: ' + esc(s.three.join(', ')) : '') + (R.left.length ? '<br><span style="color:var(--warn)">미배정: ' + R.left.map(r => '<button class="asg-chip bad" data-as="room" data-v="' + esc(r) + '" data-f="(미배정)">' + esc(r) + '</button>').join(' ') + '</span>' : '') + '</p>' +
     (A.edits && A.edits.length ? '<p class="note">✏️ 고친 것 ' + A.edits.length + '건: ' + esc(A.edits.slice(-5).join(' / ')) + (A.edits.length > 5 ? ' …' : '') + '</p>' : '') +
     (A.done ? '<p class="note">완성본으로 대조하는 중이라 앱에는 올리지 않아요. 초안을 넣으면 확정 버튼이 생겨요.</p>'
-      : '<button class="big-btn" style="margin-top:10px" data-as="send">✅ 확정 → 앱에 올리기</button><p class="note">메이드별 줄을 눌러 객실을 다른 분에게 옮길 수 있어요. 올리면 허브의 정비보고서 올리기와 같은 길로 메이드 휴대폰·더티 배분에 들어가요.</p>') + '</div>';
+      : '<button class="big-btn" style="margin-top:10px" data-as="send">✅ 확정 → 앱에 올리기 + 엑셀 받기</button>' +
+        '<button class="big-btn sec" style="margin-top:8px" data-as="xlsx"' + (A.xbusy ? ' disabled' : '') + '>' + (A.xbusy ? '엑셀 만드는 중…' : '📄 정비보고서 엑셀만 받기 (오더테이커용)') + '</button>' +
+        (A.xmsg ? '<p class="note">' + esc(A.xmsg) + '</p>' : '') +
+        '<p class="note">메이드별 줄을 눌러 객실을 다른 분에게 옮길 수 있어요. 확정하면 메이드 휴대폰·더티 배분에 들어가고, 넣은 정비보고서 원본에 이름·출근 카드를 채운 엑셀이 내려받아져요 (서식·그림 그대로).</p>') + '</div>';
   if (C) {
     h += '<div class="card"><h2>하우스키퍼와 대조 <small>' + esc(H.md(A.date)) + '</small></h2>' +
       '<div class="kv"><div><b>' + C.pct + '%</b><span>같은 사람 (' + C.same + '/' + C.total + ')</span></div><div><b>' + C.hkAvg.toFixed(2) + ' / ' + s.avgFloors.toFixed(2) + '</b><span>평균 층 HK / 엔진</span></div><div><b>' + C.hkThree.length + ' / ' + s.three.length + '</b><span>3개 층 HK / 엔진</span></div></div>' +
@@ -330,4 +351,5 @@ document.addEventListener('click', e => {
   if (a === 'mvx') { A.mv = null; draw(); return; }
   if (a === 'mvok') { const to = (document.getElementById('asto') || {}).value; if (A.mv) moveRoom(A.mv.room, A.mv.from, to); A.mv = null; draw(); return; }
   if (a === 'send') { confirmUpload(); return; }
+  if (a === 'xlsx') { downXlsx(); return; }
 });
