@@ -1,4 +1,4 @@
-// assign.js — 룸메이드 객실 자동 배정 엔진 (관리자 허브용, 2026-11-13 · 11/14 VIP 분산·신입 VIP 제외·단체 섞기)
+// assign.js — 룸메이드 객실 자동 배정 엔진 (관리자 허브용, 2026-11-13 · 11/14 VIP 분산·신입 VIP 제외·단체 섞기 · 11/15 하우스맨 피드백: 로얄+테마 피하기·벽배딩 A6:B4·2인 1조 층 묶기)
 // claude/assign/assign.mjs (11/6 확정 규칙 + 11/8 '미정비' 제외·덩어리 벌점) 를 브라우저에서 돌게 옮긴 것 — 같은 입력·같은 시드면 같은 결과
 // v2 규칙 (11/8 사용자 확정, opts.v2 !== false 면 켜짐)
 //   · 2901 × 로얄 = 우선순위(금지 아님): 로얄 0실 > 1실 > 2실, 전날 한 분·이번 달 횟수 많은 분 뒤로. 3명(당직·H/U 면 1명)은 항상 채움
@@ -12,6 +12,7 @@ export const DEF_CFG = {
   bKey: { 26: '이서연', 25: '장은미', 24: '임남주', 23: '정미감', 22: '이지우', 21: '자야', 20: '엔주', 19: '김화경', 18: '하랑', 17: '김윤경', 16: '박예린', 15: '이하늘', 14: '나나경', 13: '김나라', 12: '김나라', 11: '이호라', 10: '성락욱', 9: '성락욱', 8: '박효정', 7: '정미감', 6: '조유경', 5: '조유경' },
   royalOk: ['이분남', '김화동', '박순자', '강태금', '최태자'],
   pltBlue: ['양윤복', '오선녀', '곽미혜', '김송심', '전영신'],
+  wallBed: ['2301', '2302', '2303', '2304', '2306', '2401', '2402', '2403', '2404', '2406'],   // 23·24F 01~06 특화 벽배딩 (11/15)
   quota: { 김현지: 8, 이혜진: 8, 문국희: 8, 김윤경: 8, 허슬기: 8, 박창숙: 8, 박선영: 8, 김화경: 7, 장은미: 7, 김득미: 4 }
 };
 
@@ -32,11 +33,21 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
 
   const isTarget = x => (['1', '2', '3', '4'].includes(String(x.st == null ? '' : x.st).trim()) || /간단/.test(String(x.st == null ? '' : x.st))) && !/미정비/.test((x.m1 || '') + (x.m2 || ''));
   const T = rooms.filter(isTarget).map(x => Object.assign({}, x, { room: String(x.room), floor: Number(x.floor) || Math.floor(Number(x.room) / 100), suf: String(x.room).slice(-2),
-    late: /14시|VIP|르씨엘/i.test((x.m1 || '') + (x.m2 || '')), w: ROYAL.includes(String(x.room)) ? 2 : /간단/.test(String(x.st)) ? 0.5 : 1,
+    theme: !!x.theme, late: !!x.theme || /14시|VIP|르씨엘/i.test((x.m1 || '') + (x.m2 || '')), w: ROYAL.includes(String(x.room)) ? 2 : /간단/.test(String(x.st)) ? 0.5 : 1,
     vip: /VIP|르씨엘/i.test((x.m1 || '') + (x.m2 || '')), grp: x.grp ? (Number(x.gh) > 0 ? Number(x.gh) : 17) : 0 }));
   const TX = Object.fromEntries(T.map(x => [x.room, x]));
-  const zone = x => (x.floor >= 27 || x.floor === 4 ? 'A' : B_SUF.includes(x.suf) ? 'B' : 'A');
   const W = {}; Object.keys(HO).forEach(n => { W[n] = { cap: HO[n], load: 0, rooms: [], why: [] }; });
+  // 11/15 특화 벽배딩 (23·24F 01~06): 노동 강도 때문에 그 층 A키 6 : B키 4 정도로 나눔 — 번호 뒤쪽 40% 를 B키 구역으로 봄 (B키가 출근했을 때만)
+  const WB = new Set((cfg.wallBed || []).map(String)), WB_ON = opts.wallBed !== false && WB.size > 0, ZOVR = {};
+  const WB_EXTRA = opts.wbPen != null ? opts.wbPen : 40;
+  if (WB_ON) { const byF = {}; T.filter(x => WB.has(x.room)).forEach(x => (byF[x.floor] = byF[x.floor] || []).push(x));
+    Object.keys(byF).forEach(f => { if (!W[B_KEY[f]] || B_KEY[f] === A_KEY[f]) return; const xs = byF[f].sort((p, q) => p.room - q.room), nA = Math.round(xs.length * 0.6);
+      xs.slice(nA).forEach(x => { ZOVR[x.room] = 'B'; }); }); }
+  const WB_CAP = {}; if (WB_ON) T.filter(x => WB.has(x.room)).forEach(x => { WB_CAP[x.floor] = (WB_CAP[x.floor] || 0) + 1; });
+  const zone = x => (ZOVR[x.room] || (x.floor >= 27 || x.floor === 4 ? 'A' : B_SUF.includes(x.suf) ? 'B' : 'A'));
+  // 11/15 2인 1조 (부부): 두 분 합친 층 수로 셈 — 2개 층 이내가 좋고, 어쩔 수 없으면 3개 층까지 (4개 층은 큰 벌점). 짝의 담당 방은 내 방처럼 봄
+  const MATE = {}, LEAD = {};
+  (opts.teams || []).forEach(p => { const [a, b] = (Array.isArray(p) ? p : String(p).split(',')).map(s => String(s).trim()); if (a && b && a !== b && W[a] && W[b]) { MATE[a] = b; MATE[b] = a; LEAD[a] = true; } });
   const owner = {};
   const floors = n => new Set(W[n].rooms.map(r => Math.floor(r / 100)));
   const rem = n => W[n].cap - W[n].load;
@@ -52,6 +63,7 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   const GRP_SHORT = opts.grpShort != null ? opts.grpShort : 24, GRP_RATIO = 0.2;
   //   신입(입사 3개월 미만 = opts.vipNo, 정량 8 미만 신입 포함)은 VIP 가급적 안 줌 — VIP 1실마다 VIP_NEW 벌점 (11/14 사용자)
   const VIP_NO = new Set([...(opts.vipNo || []), ...STAGE]), VIP_NEW = opts.vipNew != null ? opts.vipNew : 120;
+  const ROY_ON = opts.royPri !== false, ROY_PRI = opts.royPriPen != null ? opts.royPriPen : 40;
   const vipN = n => W[n].rooms.filter(r => TX[r] && TX[r].vip).length;
   const grpOf = n => { let t = 0, g = 0, h = 99; W[n].rooms.forEach(r => { const x = TX[r]; if (!x || r === '2901') return; t++; if (x.grp) { g++; h = Math.min(h, x.grp); } }); return { t, g, h }; };
   const grpShort = n => { const o = grpOf(n); if (o.g < 3) return 0; return Math.max(0, Math.ceil(o.t * GRP_RATIO - 1e-9) - (o.t - o.g)); };
@@ -184,22 +196,32 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   const capF = Object.fromEntries(Object.keys(W).map(n => [n, W[n].cap]));
   const stageBad = r => V2 ? ROYAL.includes(r) : (TX[r] && TX[r].floor >= 30);
   function costOf(n) {
-    const w = W[n], fs = floors(n), k = fs.size; let c = 0;
-    c += (k > 1 ? (k - 1) * 12 : 0) + (k >= 3 ? 150 : 0) + (k > FLOOR_MAX ? 1000 : 0) + (STAGE.includes(n) && k > 1 ? 30 * (k - 1) : 0);
-    if (k > 1) { const a = [...fs].sort((p, q) => p - q); c += (a[a.length - 1] - a[0]) * 0.3; }
+    const w = W[n], m = MATE[n]; let c = 0;
+    if (!m) { const fs = floors(n), k = fs.size;
+      c += (k > 1 ? (k - 1) * 12 : 0) + (k >= 3 ? 150 : 0) + (k > FLOOR_MAX ? 1000 : 0) + (STAGE.includes(n) && k > 1 ? 30 * (k - 1) : 0);
+      if (k > 1) { const a = [...fs].sort((p, q) => p - q); c += (a[a.length - 1] - a[0]) * 0.3; }
+    } else if (LEAD[n]) { const fs = new Set([...floors(n), ...floors(m)]), k = fs.size;   // 조는 앞 분에게 한 번만
+      c += (k > 1 ? (k - 1) * 12 : 0) + (k >= 3 ? 150 : 0) + (k > FLOOR_MAX ? 1000 : 0);
+      if (k > 1) { const a = [...fs].sort((p, q) => p - q); c += (a[a.length - 1] - a[0]) * 0.3; }
+      const kn = floors(n).size, km = floors(m).size; c += (kn > FLOOR_MAX ? 1000 : 0) + (km > FLOOR_MAX ? 1000 : 0); }
     const def = capF[n] - w.load, over = w.load - capF[n];
     if (over > 1e-9) c += 500 * over;
     if (def > 1e-9) c += 200 * def;
     if (STAGE.includes(n)) c += w.rooms.filter(stageBad).length * 30;
-    for (const r of w.rooms) { const x = TX[r]; if (!x || r === '2901') continue; const ko = keyOf(x); if (ko && ko !== n) { const real = (zone(x) === 'A' ? A_KEY : B_KEY)[x.floor] === ko; c += !real ? 1 : zone(x) === 'A' ? 25 : 12; } }
-    if (opts.chunk !== false) { const byF = {}; w.rooms.forEach(r => { const x = TX[r]; if (!x || r === '2901') return; if (keyOf(x) === n) return; byF[x.floor] = (byF[x.floor] || 0) + 1; });
+    for (const r of w.rooms) { const x = TX[r]; if (!x || r === '2901') continue; const ko = keyOf(x); if (ko && ko !== n && ko !== MATE[n]) { const real = (zone(x) === 'A' ? A_KEY : B_KEY)[x.floor] === ko; c += !real ? 1 : zone(x) === 'A' ? 25 : 12; } }
+    if (opts.chunk !== false) { const byF = {}; w.rooms.forEach(r => { const x = TX[r]; if (!x || r === '2901') return; const ko = keyOf(x); if (ko === n || (ko && ko === MATE[n])) return; byF[x.floor] = (byF[x.floor] || 0) + 1; });
       Object.values(byF).forEach(s => { c += s <= 2 ? 10 : s <= 4 ? 4 : 0; }); }
     c += w.rooms.filter(r => FROM_B[r] === n).length * 12;
     if (VIP_ON) { const v = vipN(n); if (v >= 2) c += VIP2; if (v >= 3) c += (v - 2) * VIP3; if (v && VIP_NO.has(n)) c += v * VIP_NEW; }
     if (GRP_ON) { const sh = grpShort(n); if (sh) { const h = grpOf(n).h; c += sh * GRP_SHORT * (h <= 15 ? 1.5 : h <= 16 ? 1.25 : 1); } }
+    // 11/15 로얄(14시까지 우선) 맡은 분은 테마·VIP·14시 같은 다른 우선정비를 가급적 안 받음
+    if (ROY_ON && royalN(n)) c += W[n].rooms.filter(r => !ROYAL.includes(r) && TX[r] && TX[r].late).length * ROY_PRI;
+    if (WB_ON) { const byF = {}; W[n].rooms.forEach(r => { if (WB.has(r) && TX[r]) byF[TX[r].floor] = (byF[TX[r].floor] || 0) + 1; });
+      Object.keys(byF).forEach(f => { const cap = Math.max(1, Math.round((WB_CAP[f] || 0) * 0.6)); if (byF[f] > cap) c += (byF[f] - cap) * WB_EXTRA; }); }
     if (lateN(n) > LATE_MAX) c += 100; if (fakN(n) > (n === A_KEY[18] ? FAK_OWNER_MAX : 1)) c += 300;
     return c;
   }
+  const pc = (a, b) => { const set = new Set([a, b]); if (MATE[a]) set.add(MATE[a]); if (MATE[b]) set.add(MATE[b]); let c = 0; set.forEach(n => { c += costOf(n); }); return c; };
   const PIN = new Set(T.filter(x => x.floor >= 30 && W[A_KEY[x.floor]] && owner[x.room] === A_KEY[x.floor]).map(x => x.room));
   const movable = r => r !== '2901' && TX[r] && !PIN.has(r);
   const okRoyal = (n, r) => !ROYAL.includes(r) || ROYAL_OK.includes(n);
@@ -209,14 +231,14 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   while (improved && iter++ < 200) {
     improved = false;
     for (const x of free()) { let best = null;
-      for (const n of names) { if (!okRoyal(n, x.room)) continue; const before = costOf(n); W[n].rooms.push(x.room); W[n].load += x.w; const d = costOf(n) - before; W[n].rooms.pop(); W[n].load -= x.w; if (!best || d < best.d) best = { n, d }; }
+      for (const n of names) { if (!okRoyal(n, x.room)) continue; const before = pc(n, n); W[n].rooms.push(x.room); W[n].load += x.w; const d = pc(n, n) - before; W[n].rooms.pop(); W[n].load -= x.w; if (!best || d < best.d) best = { n, d }; }
       if (best) { give(best.n, x, '남은 방'); improved = true; } }
     for (const a of names) for (const r of [...W[a].rooms]) { if (!movable(r)) continue;
       for (const b of names) { if (b === a || !okRoyal(b, r) || !W[a].rooms.includes(r)) continue;
-        const c0 = costOf(a) + costOf(b); mv(r, a, b); const c1 = costOf(a) + costOf(b);
+        const c0 = pc(a, b); mv(r, a, b); const c1 = pc(a, b);
         if (c1 < c0 - 1e-9) { improved = true; continue; } mv(r, b, a);
         for (const s2 of [...W[b].rooms]) { if (!movable(s2) || !okRoyal(a, s2)) continue;
-          const d0 = costOf(a) + costOf(b); mv(r, a, b); mv(s2, b, a); const d1 = costOf(a) + costOf(b);
+          const d0 = pc(a, b); mv(r, a, b); mv(s2, b, a); const d1 = pc(a, b);
           if (d1 < d0 - 1e-9) { improved = true; break; } mv(s2, a, b); mv(r, b, a); }
         if (!W[a].rooms.includes(r)) break; } }
   }
@@ -228,8 +250,8 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
         const ra = fa ? BA[fa] : [], rb = fb ? BB[fb] : [];
         if (ra.some(r => !okRoyal(b, r)) || rb.some(r => !okRoyal(a, r))) continue;
         if (!ra.every(r => W[a].rooms.includes(r)) || !rb.every(r => W[b].rooms.includes(r))) continue;
-        const c0 = costOf(a) + costOf(b); ra.forEach(r => mv(r, a, b)); rb.forEach(r => mv(r, b, a));
-        if (costOf(a) + costOf(b) < c0 - 1e-9) { imp = true; break; }
+        const c0 = pc(a, b); ra.forEach(r => mv(r, a, b)); rb.forEach(r => mv(r, b, a));
+        if (pc(a, b) < c0 - 1e-9) { imp = true; break; }
         ra.forEach(r => mv(r, b, a)); rb.forEach(r => mv(r, a, b)); }
     } }
   // 8 무작위 탐색 (담금질) — 시드 고정이면 같은 결과. opts.seeds = [시드, …] 면 같은 출발점에서 여러 번 돌려 가장 낮은 비용 채택
@@ -249,14 +271,14 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
       const a = names[Math.floor(rnd() * names.length)], b = names[Math.floor(rnd() * names.length)]; if (a === b) continue;
       const ra = W[a].rooms.filter(movable); if (!ra.length) continue;
       const kind = rnd(); let undo;
-      const c0 = costOf(a) + costOf(b);
+      const c0 = pc(a, b);
       if (kind < 0.4) { const r = ra[Math.floor(rnd() * ra.length)]; if (!okRoyal(b, r)) continue; mv(r, a, b); undo = () => mv(r, b, a); }
       else if (kind < 0.8) { const rb = W[b].rooms.filter(movable); if (!rb.length) continue; const r = ra[Math.floor(rnd() * ra.length)], q = rb[Math.floor(rnd() * rb.length)];
         if (!okRoyal(b, r) || !okRoyal(a, q)) continue; mv(r, a, b); mv(q, b, a); undo = () => { mv(q, a, b); mv(r, b, a); }; }
       else { const f = TX[ra[Math.floor(rnd() * ra.length)]].floor; const blk = ra.filter(r => TX[r].floor === f); if (blk.some(r => !okRoyal(b, r))) continue;
         const rb = W[b].rooms.filter(movable), g = rb.length && rnd() < 0.7 ? TX[rb[Math.floor(rnd() * rb.length)]].floor : null; const blk2 = g == null ? [] : rb.filter(r => TX[r].floor === g);
         if (blk2.some(r => !okRoyal(a, r))) continue; blk.forEach(r => mv(r, a, b)); blk2.forEach(r => mv(r, b, a)); undo = () => { blk2.forEach(r => mv(r, a, b)); blk.forEach(r => mv(r, b, a)); }; }
-      const d = costOf(a) + costOf(b) - c0;
+      const d = pc(a, b) - c0;
       if (d <= 0 || rnd() < Math.exp(-d / temp)) { cur += d; if (cur < best - 1e-9) { best = cur; bestS = snap(); } } else undo();
     }
     if (best < bestCost - 1e-9) { bestCost = best; bestAll = bestS; } }
@@ -268,6 +290,10 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
     if (w.load > capO[n] + 1e-9) w.why.unshift('+1 (베테랑 우선) ' + capO[n] + '→' + w.load); w.cap = w.load; }
   const left = free().map(x => x.room);
   for (const n of names) { const v = vipN(n), o = grpOf(n);
+    const pr = royalN(n) ? W[n].rooms.filter(r => !ROYAL.includes(r) && TX[r] && TX[r].late) : [];
+    if (pr.length) W[n].why.unshift('로얄 + 다른 우선정비 ' + pr.join('·') + ' (다른 분에게 줄 수 없었음)');
+    const wb = W[n].rooms.filter(r => WB.has(r)); if (WB_ON && wb.length >= 3) W[n].why.unshift('벽배딩 ' + wb.length + '실 (' + wb.join('·') + ')');
+    if (MATE[n]) { const u = new Set([...floors(n), ...floors(MATE[n])]); W[n].why.unshift('2인 1조 (' + MATE[n] + ') 합쳐 ' + u.size + '개 층'); }
     if (v && VIP_NO.has(n)) W[n].why.unshift('신입인데 VIP ' + v + '실 (다른 분에게 줄 수 없었음)');
     if (v >= 2) W[n].why.unshift('VIP ' + v + '실 (동선 때문에 2실' + (v > 2 ? ' 넘음' : '') + ')');
     if (o.g >= 3 && o.t - o.g < Math.ceil(o.t * GRP_RATIO - 1e-9)) W[n].why.unshift('단체 ' + o.g + ' / 일반 ' + (o.t - o.g) + (o.t === o.g ? ' — 단체만 (정비 지원 검토)' : ' — 일반이 적음')); }
@@ -277,6 +303,10 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
     handover: Object.values(HO).reduce((a, b) => a + b, 0), left: left.length, avgFloors: fl.length ? fl.reduce((a, b) => a + b, 0) / fl.length : 0,
     three: names.filter(n => workers[n].floors.length >= 3), plt: owner['2901'] ? owner['2901'].split(', ') : [],
     vip2: names.filter(n => workers[n].vip >= 2), vipNew: names.filter(n => workers[n].vip && VIP_NO.has(n)), vipNo: names.filter(n => VIP_NO.has(n)), vipTotal: T.filter(x => x.vip).length, grpTotal: T.filter(x => x.grp).length,
+    royPri: names.filter(n => royalN(n) && W[n].rooms.some(r => !ROYAL.includes(r) && TX[r] && TX[r].late)).map(n => n + ' ' + W[n].rooms.filter(r => !ROYAL.includes(r) && TX[r] && TX[r].late).join('·')),
+    wallBed: WB_ON ? names.map(n => [n, W[n].rooms.filter(r => WB.has(r))]).filter(([, rs]) => rs.length).map(([n, rs]) => n + ' ' + rs.length) : [],
+    teams: Object.keys(LEAD).map(a => { const u = new Set([...floors(a), ...floors(MATE[a])]); return { a, b: MATE[a], floors: [...u].sort((p, q) => q - p) }; }),
+    themeTotal: T.filter(x => x.theme).length,
     grpHeavy: names.filter(n => workers[n].grp >= 3 && workers[n].gen < Math.ceil((workers[n].grp + workers[n].gen) * GRP_RATIO - 1e-9)),
     down: names.filter(n => workers[n].load < capO[n] - 1e-9), up: names.filter(n => workers[n].load > capO[n] + 1e-9),
     bMove: bMoves.map(m => Object.assign({}, m, { kept: m.rooms.filter(r => owner[r] && m.a.includes(owner[r])).length, keptTo: W[m.b].rooms.filter(r => TX[r] && TX[r].floor === m.to).length, bFloors: [...floors(m.b)].sort((p, q) => q - p) })) };

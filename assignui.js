@@ -3,13 +3,14 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.14-7';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.15-1';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
 let H = null;   // 허브에서 받은 것 { S, esc, ymd, addDays, md, admin, user }
 let A = null;   // 화면 상태
 
+const DEF_TEAMS = ['최태자,성락욱', '김태성,조유경'];
 const isTarget = x => (['1', '2', '3', '4'].includes(String(x.st == null ? '' : x.st).trim()) || /간단/.test(String(x.st == null ? '' : x.st))) && !/미정비/.test((x.m1 || '') + (x.m2 || ''));
 const unitOf = x => (ROYAL.includes(String(x.room)) ? 2 : /간단/.test(String(x.st)) ? 0.5 : 1);
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
@@ -22,8 +23,10 @@ export async function openAssign(hub) {
   A = { date: h >= 15 ? H.addDays(H.ymd(), 1) : H.ymd(), file: '', data: null, done: null, err: '', busy: '', cfgDoc: null, staff: [], rows: [], prev: '', res: null, prog: 0, cmp: null, showAll: false, open: {} };
   const box = document.createElement('div'); box.className = 'vp'; box.id = 'asp'; document.body.appendChild(box); document.body.classList.add('sb-lock');
   draw();
-  const [cfgDoc, staff] = await Promise.all([S.get('meta/assign').catch(() => null), S.getQuery('staff', [['job', '==', '룸메이드']]).catch(() => [])]);
+  const [cfgDoc, staff, teams] = await Promise.all([S.get('meta/assign').catch(() => null), S.getQuery('staff', [['job', '==', '룸메이드']]).catch(() => []), S.get('meta/teams').catch(() => null)]);
   if (!A) return;
+  // 2인 1조 (부부) — 정비 레포트 관리자 '2인 1조' 카드에 저장한 짝 (없으면 기본 두 조)
+  A.teams = ((teams && teams.pairs) || DEF_TEAMS).map(p => String(p).split(',').map(s => s.trim())).filter(p => p.length === 2 && p[0] && p[1]);
   A.cfgDoc = cfgDoc || {};
   A.staff = staff.map(x => x.data).filter(x => (x.status || '재직') !== '퇴사').map(x => x.name);
   A.hired = {}; staff.forEach(x => { const d = x.data || {}; if (d.name && /^\d{4}-\d{2}-\d{2}$/.test(String(d.hired || ''))) A.hired[String(d.name).replace(/\s+/g, '')] = d.hired; });
@@ -87,8 +90,13 @@ function run() {
   // 단체: 상단 '단체 현황' 표의 호실 (입실 시간 → 시각 숫자). 표가 없는 예전 파일은 객실 위 단체 행에 칠한 색
   const G = {}; (A.data.groups || []).forEach(g => { const m = /(\d{1,2})\s*[:시]/.exec(String(g.time || '')); (g.rooms || []).forEach(r => { G[String(r)] = { n: g.name, h: m ? Number(m[1]) : 17 }; }); });
   const noTbl = !(A.data.groups || []).length;
+  // 테마 객실 (상단 '테마 객실' 표) = 우선정비 → 로얄 맡은 분은 가급적 안 받음 (11/15)
+  const TH = new Set((A.data.themes || []).map(t => String(t.room)));
+  // 미정비(이월) 확인 (11/15 하우스맨): 대상 유닛이 인계 유닛보다 많이 넘치면 먼저 물어봄
+  const gap = gapInfo();
+  if (gap && gap.over > 0 && !confirm('정비 대상 ' + gap.units + '유닛이 인계 ' + gap.ho + '유닛보다 ' + gap.over + '유닛 많아요 (한 분당 약 +' + gap.per + ').\n\n미정비(이월) 표시를 먼저 하셨나요?\n· 이월할 객실이 있으면 [취소] → 정비보고서 메모에 \'미정비\' 적고 다시 넣기\n· 넘치는 만큼 모두 배정하려면 [확인]')) return;
   const rooms = A.data.rooms.map(x => { const g = G[String(x.room)] || (noTbl && ['', 'FFFFFFFF', 'THEME0'].indexOf(String(x.grp_fill || '').toUpperCase()) < 0 ? { n: '단체', h: 17 } : null);
-    return { room: x.room, floor: x.floor, st: x.st, m1: x.m1, m2: x.m2, grp: g ? g.n : '', gh: g ? g.h : 0 }; });
+    return { room: x.room, floor: x.floor, st: x.st, m1: x.m1, m2: x.m2, grp: g ? g.n : '', gh: g ? g.h : 0, theme: TH.has(String(x.room)) }; });
   // 신입 = 직원 명단 입사일이 배정 날짜 3개월 안 (11/14 사용자: 3개월 미만은 가급적 VIP 안 줌). 입사일 없는 분은 모름 → 정량 8 미만만 신입으로
   const [yy, mm, dd] = A.date.split('-').map(Number), c3 = new Date(yy, mm - 1 - 3, dd), cut = c3.getFullYear() + '-' + String(c3.getMonth() + 1).padStart(2, '0') + '-' + String(c3.getDate()).padStart(2, '0');
   A.vipNo = Object.keys(H0).filter(n => A.hired && A.hired[n] && A.hired[n] > cut);
@@ -110,7 +118,15 @@ function run() {
     draw();
   };
   w.onerror = e => { if (!A) return; A.worker = null; A.running = false; A.err = '배정 계산을 못 했어요: ' + (e.message || e); draw(); };
-  w.postMessage({ rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo } });
+  w.postMessage({ rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo, teams: A.teams || [] } });
+}
+// 대상 유닛 − 인계 유닛. +1 은 베테랑 몇 분이 받는 게 보통이라 출근자 1/4 까지는 괜찮게 봄
+function gapInfo() {
+  if (!A || !A.data) return null;
+  const T = A.data.rooms.filter(isTarget), H0 = ho(), n = Object.keys(H0).length; if (!n) return null;
+  const units = T.reduce((s, x) => s + (String(x.room) === '2901' ? (/당직|H\/U/i.test((x.m1 || '') + (x.m2 || '')) ? 1 : 3) : unitOf(x)), 0);
+  const hs = Object.values(H0).reduce((a, b) => a + b, 0), d = units - hs, ok = Math.ceil(n / 4);
+  return { units, ho: hs, d, over: d > ok ? d : 0, per: Math.round(d / n * 10) / 10 };
 }
 function saveLast(H0) {
   lsSet('asg_ho', JSON.stringify(H0));
@@ -281,6 +297,7 @@ function draw() {
       '<div class="asg-rows">' + list.map(r => '<div class="asg-r' + (r.on ? '' : ' off') + '"><button data-as="tog" data-v="' + esc(r.name) + '">' + (r.on ? '✅ ' : '휴 ') + esc(r.name) + (q[r.name] != null ? '<small>정량 ' + q[r.name] + '</small>' : '') + '</button>' +
         (r.on ? '<span class="asg-u"><button data-as="u-" data-v="' + esc(r.name) + '">−</button><b>' + r.unit + '</b><button data-as="u+" data-v="' + esc(r.name) + '">+</button></span>' : '') + '</div>').join('') + '</div>' +
       '<div class="btn2"><button class="big-btn sec" data-as="all">' + (A.showAll ? '출근자만 보기' : '휴무자도 보기 (' + (A.rows.length - on.length) + ')') + '</button></div>' +
+      (() => { const g = gapInfo(); return g && g.over ? '<p class="err" style="margin-top:8px">⚠️ 정비 대상 <b>' + g.units + '유닛</b> / 인계 <b>' + g.ho + '유닛</b> → <b>' + g.over + '유닛 넘침</b> (한 분당 약 +' + g.per + '). 이월할 객실은 정비보고서 메모에 <b>미정비</b>를 적고 파일을 다시 넣어 주세요.</p>' : ''; })() +
       '<label class="asg-prev"><span>전날 2901</span><input id="asprev" value="' + esc(A.prev) + '" placeholder="예: 이분남, 강태금, 박순자"></label>' +
       '<p class="note" style="margin-top:0">전날 2901 한 분은 연속 배정을 피해요. 대조 기록을 저장하면 다음 날 자동으로 채워져요.</p>' +
       '<button class="big-btn" style="margin-top:6px" data-as="run"' + (A.running ? ' disabled' : '') + '>' + (A.running ? '배정 계산 중…' : '🧩 배정 돌리기') + '</button>' +
@@ -298,10 +315,19 @@ function mixNote() {
     const v = rs.filter(r => info[r] && /VIP|르씨엘/i.test((info[r].m1 || '') + (info[r].m2 || ''))).length, g = rs.filter(r => gs.has(String(r))).length;
     if (v >= 2) v2.push(n + ' ' + v + '실');
     if (g >= 3 && rs.length - g < Math.ceil(rs.length * 0.2 - 1e-9)) gh.push(n + ' ' + g + ':' + (rs.length - g)); });
+  const TH = new Set((A.data.themes || []).map(t => String(t.room))), pri = r => info[r] && (TH.has(String(r)) || /14시|VIP|르씨엘/i.test((info[r].m1 || '') + (info[r].m2 || '')));
+  const rp = [], wb = [], WB = new Set(cfg().wallBed || DEF_CFG.wallBed || []);
+  Object.keys(R.workers).forEach(n => { const rs = R.workers[n].rooms;
+    if (rs.some(r => ROYAL.includes(r))) { const o = rs.filter(r => !ROYAL.includes(r) && pri(r)); if (o.length) rp.push(n + ' ' + o.join('·')); }
+    const b = rs.filter(r => WB.has(String(r))); if (b.length >= 3) wb.push(n + ' ' + b.length + '실'); });
+  const tm = (A.teams || []).filter(([a, b]) => R.workers[a] && R.workers[b]).map(([a, b]) => { const u = new Set([...R.workers[a].floors, ...R.workers[b].floors]); return { t: a + '·' + b + ' ' + [...u].sort((p, q) => q - p).join('·') + 'F', k: u.size }; });
+  const extra = (rp.length ? '<br><span style="color:var(--warn)">로얄 + 다른 우선정비: ' + esc(rp.join(', ')) + '</span>' : '') +
+    (wb.length ? '<br>벽배딩(23·24F 01~06) 3실 이상: ' + esc(wb.join(', ')) : '') +
+    (tm.length ? '<br>2인 1조: ' + tm.map(x => x.k >= 3 ? '<span style="color:var(--warn)">' + esc(x.t) + '</span>' : esc(x.t)).join(', ') : '');
   const nw = (R.stats.vipNo || []).filter(n => R.workers[n] && R.workers[n].rooms.some(r => info[r] && /VIP|르씨엘/i.test((info[r].m1 || '') + (info[r].m2 || ''))));
   return (nw.length ? '<br><span style="color:var(--warn)">신입(3개월 미만)인데 VIP: ' + esc(nw.join(', ')) + '</span>' : '') +
     ((R.stats.vipNo || []).length ? '<br>VIP 빼는 신입: ' + esc(R.stats.vipNo.join(', ')) : '') +
-    (v2.length ? '<br>VIP 2실 이상: ' + esc(v2.join(', ')) : '') + (gh.length ? '<br>단체 많음 (단체:일반): ' + esc(gh.join(', ')) + ' — 정비 지원 검토' : '');
+    (v2.length ? '<br>VIP 2실 이상: ' + esc(v2.join(', ')) : '') + (gh.length ? '<br>단체 많음 (단체:일반): ' + esc(gh.join(', ')) + ' — 정비 지원 검토' : '') + extra;
 }
 function resultHtml() {
   const esc = H.esc, R = A.res, s = R.stats, C = A.cmp;
