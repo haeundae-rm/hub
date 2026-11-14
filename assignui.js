@@ -3,7 +3,7 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.14-6';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.14-7';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -26,6 +26,7 @@ export async function openAssign(hub) {
   if (!A) return;
   A.cfgDoc = cfgDoc || {};
   A.staff = staff.map(x => x.data).filter(x => (x.status || '재직') !== '퇴사').map(x => x.name);
+  A.hired = {}; staff.forEach(x => { const d = x.data || {}; if (d.name && /^\d{4}-\d{2}-\d{2}$/.test(String(d.hired || ''))) A.hired[String(d.name).replace(/\s+/g, '')] = d.hired; });
   const hist = A.cfgDoc.hist2901 || [];
   const last = hist.filter(x => x.date < A.date).sort((a, b) => (a.date < b.date ? 1 : -1))[0];
   A.prev = last ? last.names.join(', ') : '';
@@ -88,6 +89,9 @@ function run() {
   const noTbl = !(A.data.groups || []).length;
   const rooms = A.data.rooms.map(x => { const g = G[String(x.room)] || (noTbl && ['', 'FFFFFFFF', 'THEME0'].indexOf(String(x.grp_fill || '').toUpperCase()) < 0 ? { n: '단체', h: 17 } : null);
     return { room: x.room, floor: x.floor, st: x.st, m1: x.m1, m2: x.m2, grp: g ? g.n : '', gh: g ? g.h : 0 }; });
+  // 신입 = 직원 명단 입사일이 배정 날짜 3개월 안 (11/14 사용자: 3개월 미만은 가급적 VIP 안 줌). 입사일 없는 분은 모름 → 정량 8 미만만 신입으로
+  const [yy, mm, dd] = A.date.split('-').map(Number), c3 = new Date(yy, mm - 1 - 3, dd), cut = c3.getFullYear() + '-' + String(c3.getMonth() + 1).padStart(2, '0') + '-' + String(c3.getDate()).padStart(2, '0');
+  A.vipNo = Object.keys(H0).filter(n => A.hired && A.hired[n] && A.hired[n] > cut);
   A.grpSet = new Set(rooms.filter(x => x.grp).map(x => String(x.room)));
   const hist = {}; const ym = A.date.slice(0, 7);
   ((A.cfgDoc && A.cfgDoc.hist2901) || []).filter(x => x.date.slice(0, 7) === ym && x.date < A.date).forEach(x => x.names.forEach(n => { hist[n] = (hist[n] || 0) + 1; }));
@@ -106,7 +110,7 @@ function run() {
     draw();
   };
   w.onerror = e => { if (!A) return; A.worker = null; A.running = false; A.err = '배정 계산을 못 했어요: ' + (e.message || e); draw(); };
-  w.postMessage({ rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000 } });
+  w.postMessage({ rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo } });
 }
 function saveLast(H0) {
   lsSet('asg_ho', JSON.stringify(H0));
@@ -294,7 +298,10 @@ function mixNote() {
     const v = rs.filter(r => info[r] && /VIP|르씨엘/i.test((info[r].m1 || '') + (info[r].m2 || ''))).length, g = rs.filter(r => gs.has(String(r))).length;
     if (v >= 2) v2.push(n + ' ' + v + '실');
     if (g >= 3 && rs.length - g < Math.ceil(rs.length * 0.2 - 1e-9)) gh.push(n + ' ' + g + ':' + (rs.length - g)); });
-  return (v2.length ? '<br>VIP 2실 이상: ' + esc(v2.join(', ')) : '') + (gh.length ? '<br>단체 많음 (단체:일반): ' + esc(gh.join(', ')) + ' — 정비 지원 검토' : '');
+  const nw = (R.stats.vipNo || []).filter(n => R.workers[n] && R.workers[n].rooms.some(r => info[r] && /VIP|르씨엘/i.test((info[r].m1 || '') + (info[r].m2 || ''))));
+  return (nw.length ? '<br><span style="color:var(--warn)">신입(3개월 미만)인데 VIP: ' + esc(nw.join(', ')) + '</span>' : '') +
+    ((R.stats.vipNo || []).length ? '<br>VIP 빼는 신입: ' + esc(R.stats.vipNo.join(', ')) : '') +
+    (v2.length ? '<br>VIP 2실 이상: ' + esc(v2.join(', ')) : '') + (gh.length ? '<br>단체 많음 (단체:일반): ' + esc(gh.join(', ')) + ' — 정비 지원 검토' : '');
 }
 function resultHtml() {
   const esc = H.esc, R = A.res, s = R.stats, C = A.cmp;
