@@ -3,7 +3,7 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.13-16';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.14-1';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -68,10 +68,11 @@ function pick() {
       A.data = r.data; A.sheet = r.sheet;
       const named = A.data.rooms.filter(x => x.name && isTarget(x));
       A.done = named.length >= 20 ? A.data.rooms : null;   // 이름이 들어 있으면 하우스키퍼 완성본 → 대조용
-      if (A.done) {   // 완성본의 출근 카드 유닛으로 인계를 채움 (같은 조건으로 비교)
-        const cards = {}; (A.data.cards || []).forEach(c => { const u = parseFloat(String(c.unit == null ? '' : c.unit)); if (u > 0) cards[String(c.name).replace(/\s+/g, '')] = u; });
-        if (Object.keys(cards).length) buildRows(cards);
-      }
+      // 출근 카드 유닛 = 관리자 인계 유닛 (11/14 사용자 결정: 하우스키퍼가 초안 카드에 인계 유닛을 적어 둠 → 따로 입력 안 함)
+      //   숫자 = 출근·유닛, '휴무'·'휴'·'공란'·빈칸 = 휴무. 카드에 숫자가 하나도 없으면 예전처럼 지난 인계·정량으로
+      const cards = {}; (A.data.cards || []).forEach(c => { const u = parseFloat(String(c.unit == null ? '' : c.unit)); if (u > 0) cards[String(c.name).replace(/\s+/g, '')] = u; });
+      A.fromCards = Object.keys(cards).length ? { n: Object.keys(cards).length, u: Object.values(cards).reduce((a, b) => a + b, 0) } : null;
+      if (A.fromCards) buildRows(cards); else buildRows();
     } catch (e) { A.err = String(e && e.message || e); A.data = null; }
     A.busy = ''; draw();
   });
@@ -258,6 +259,8 @@ function draw() {
     const u = T.reduce((s, x) => s + (String(x.room) === '2901' ? 0 : unitOf(x)), 0), has2901 = T.some(x => String(x.room) === '2901');
     h += '<p class="note">' + esc(A.sheet) + '일 시트 · 정비 대상 <b>' + T.length + '실</b> = ' + u + '유닛' + (has2901 ? ' + 2901' : '') + (skip ? ' · 미정비(이월) ' + skip + '실 제외' : '') + '</p>';
     if (A.done) h += '<p class="okbox" style="margin-top:8px">이름이 들어 있는 <b>완성본</b>이에요 → 이름은 빼고 엔진이 새로 배정한 뒤 <b>하우스키퍼 배정과 대조</b>해요. 출근자·유닛은 완성본 카드대로 채웠어요.</p>';
+    else if (A.fromCards) h += '<p class="okbox" style="margin-top:8px">정비보고서 <b>출근 카드</b>의 유닛을 인계 유닛으로 읽었어요 → <b>' + A.fromCards.n + '명 · ' + A.fromCards.u + '유닛</b>. 아래 2번은 따로 고칠 필요 없어요 (바꿀 때만 −/+).</p>';
+    else h += '<p class="err" style="margin-top:8px">출근 카드에 유닛이 없어요 → 아래 2번 출근자·유닛을 인계표대로 맞춰 주세요 (지난번 값으로 채워 둠).</p>';
   }
   h += '</div>';
   // 2 출근자
