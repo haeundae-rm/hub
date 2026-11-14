@@ -3,7 +3,7 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.14-1';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.14-2';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -271,8 +271,7 @@ function draw() {
       '<p class="note" style="margin:0 0 8px">관리자 인계표(RM 방배정표)대로 맞춰 주세요. 이름을 누르면 출근/휴무, 숫자는 인계 유닛이에요. 정량: 8 = 정규A 전환자, 7·4 = 신입.</p>' +
       '<div class="asg-rows">' + list.map(r => '<div class="asg-r' + (r.on ? '' : ' off') + '"><button data-as="tog" data-v="' + esc(r.name) + '">' + (r.on ? '✅ ' : '휴 ') + esc(r.name) + (q[r.name] != null ? '<small>정량 ' + q[r.name] + '</small>' : '') + '</button>' +
         (r.on ? '<span class="asg-u"><button data-as="u-" data-v="' + esc(r.name) + '">−</button><b>' + r.unit + '</b><button data-as="u+" data-v="' + esc(r.name) + '">+</button></span>' : '') + '</div>').join('') + '</div>' +
-      '<div class="btn2"><button class="big-btn sec" data-as="all">' + (A.showAll ? '출근자만 보기' : '휴무자도 보기 (' + (A.rows.length - on.length) + ')') + '</button><button class="big-btn sec" data-as="paste">인계표 붙여넣기</button></div>' +
-      (A.pasteOpen ? '<textarea class="vtxt" id="aspaste" rows="5" style="margin-top:10px" placeholder="이분남 9&#10;김화동 9&#10;…  (이름 유닛, 한 줄에 한 명 — 없는 분은 휴무)"></textarea><button class="big-btn" style="margin-top:8px" data-as="pasteok">이대로 출근자 바꾸기</button>' : '') +
+      '<div class="btn2"><button class="big-btn sec" data-as="all">' + (A.showAll ? '출근자만 보기' : '휴무자도 보기 (' + (A.rows.length - on.length) + ')') + '</button></div>' +
       '<label class="asg-prev"><span>전날 2901</span><input id="asprev" value="' + esc(A.prev) + '" placeholder="예: 이분남, 강태금, 박순자"></label>' +
       '<p class="note" style="margin-top:0">전날 2901 한 분은 연속 배정을 피해요. 대조 기록을 저장하면 다음 날 자동으로 채워져요.</p>' +
       '<button class="big-btn" style="margin-top:6px" data-as="run"' + (A.running ? ' disabled' : '') + '>' + (A.running ? '배정 계산 중…' : '🧩 배정 돌리기') + '</button>' +
@@ -341,13 +340,6 @@ document.addEventListener('click', e => {
   if (a === 'tog') { const r = A.rows.find(x => x.name === v); if (r) { r.on = !r.on; A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'u-' || a === 'u+') { const r = A.rows.find(x => x.name === v); if (r) { r.unit = Math.max(1, Math.min(15, Number(r.unit) + (a === 'u+' ? 1 : -1))); A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'all') { A.showAll = !A.showAll; draw(); return; }
-  if (a === 'paste') { A.pasteOpen = !A.pasteOpen; draw(); return; }
-  if (a === 'pasteok') {
-    const txt = (document.getElementById('aspaste') || {}).value || '', got = {};
-    txt.split(/\n/).forEach(l => { const m = /([가-힣A-Za-z]{2,10})\s*[:\t ,]?\s*(\d{1,2}(?:\.\d)?)/.exec(l.replace(/^\s*\d+[.)]?\s*/, '')); if (m) got[m[1]] = Number(m[2]); });
-    if (!Object.keys(got).length) { A.err = '인계표에서 "이름 유닛"을 못 찾았어요.'; draw(); return; }
-    buildRows(got); A.pasteOpen = false; A.res = null; A.cmp = null; A.err = ''; draw(); return;
-  }
   if (a === 'run') { run(); return; }
   if (a === 'open') { A.open[v] = !A.open[v]; draw(); return; }
   if (a === 'room') { const f = t.getAttribute('data-f'); A.mv = A.mv && A.mv.room === v && A.mv.from === f ? null : { room: v, from: f }; draw(); return; }
