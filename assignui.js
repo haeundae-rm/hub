@@ -3,7 +3,7 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.14-5';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.14-6';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -83,7 +83,12 @@ function pick() {
 function run() {
   if (!A.data || A.worker) return;
   const H0 = ho(); if (!Object.keys(H0).length) { A.err = '출근자를 골라 주세요.'; draw(); return; }
-  const rooms = A.data.rooms.map(x => ({ room: x.room, floor: x.floor, st: x.st, m1: x.m1, m2: x.m2 }));
+  // 단체: 상단 '단체 현황' 표의 호실 (입실 시간 → 시각 숫자). 표가 없는 예전 파일은 객실 위 단체 행에 칠한 색
+  const G = {}; (A.data.groups || []).forEach(g => { const m = /(\d{1,2})\s*[:시]/.exec(String(g.time || '')); (g.rooms || []).forEach(r => { G[String(r)] = { n: g.name, h: m ? Number(m[1]) : 17 }; }); });
+  const noTbl = !(A.data.groups || []).length;
+  const rooms = A.data.rooms.map(x => { const g = G[String(x.room)] || (noTbl && ['', 'FFFFFFFF', 'THEME0'].indexOf(String(x.grp_fill || '').toUpperCase()) < 0 ? { n: '단체', h: 17 } : null);
+    return { room: x.room, floor: x.floor, st: x.st, m1: x.m1, m2: x.m2, grp: g ? g.n : '', gh: g ? g.h : 0 }; });
+  A.grpSet = new Set(rooms.filter(x => x.grp).map(x => String(x.room)));
   const hist = {}; const ym = A.date.slice(0, 7);
   ((A.cfgDoc && A.cfgDoc.hist2901) || []).filter(x => x.date.slice(0, 7) === ym && x.date < A.date).forEach(x => x.names.forEach(n => { hist[n] = (hist[n] || 0) + 1; }));
   const prev = A.prev.split(/[,·\s]+/).map(s => s.trim()).filter(Boolean);
@@ -282,6 +287,15 @@ function draw() {
   box.innerHTML = h + '</div>';
   box.scrollTop = y;
 }
+// VIP 2실 이상 · 단체가 8:2 넘는 분 — 손으로 옮긴 뒤에도 다시 셈 (11/14 규칙)
+function mixNote() {
+  const esc = H.esc, R = A.res, info = roomInfo(), gs = A.grpSet || new Set(), v2 = [], gh = [];
+  Object.keys(R.workers).forEach(n => { const rs = R.workers[n].rooms.filter(r => r !== '2901');
+    const v = rs.filter(r => info[r] && /VIP|르씨엘/i.test((info[r].m1 || '') + (info[r].m2 || ''))).length, g = rs.filter(r => gs.has(String(r))).length;
+    if (v >= 2) v2.push(n + ' ' + v + '실');
+    if (g >= 3 && rs.length - g < Math.ceil(rs.length * 0.2 - 1e-9)) gh.push(n + ' ' + g + ':' + (rs.length - g)); });
+  return (v2.length ? '<br>VIP 2실 이상: ' + esc(v2.join(', ')) : '') + (gh.length ? '<br>단체 많음 (단체:일반): ' + esc(gh.join(', ')) + ' — 정비 지원 검토' : '');
+}
 function resultHtml() {
   const esc = H.esc, R = A.res, s = R.stats, C = A.cmp;
   let h = '<div class="card"><h2>3 · 배정안 <small>앱에는 아직 안 올라가요</small></h2>' +
@@ -290,7 +304,7 @@ function resultHtml() {
     (s.down.length ? '<br>유닛 다운: ' + esc(s.down.map(n => n + ' ' + R.workers[n].ho + '→' + R.workers[n].load).join(', ')) : '') +
     (s.up.length ? '<br>+1: ' + esc(s.up.map(n => n + ' ' + R.workers[n].ho + '→' + R.workers[n].load).join(', ')) : '') +
     (s.bMove && s.bMove.length ? '<br>B키 옮기기: ' + esc(s.bMove.map(m => m.b + ' ' + m.from.join('·') + 'F B ' + m.rooms.length + '실 → ' + m.a.join('·') + ((m.shared || []).length ? '(옆 분 ' + m.shared.length + '실)' : '') + ' / ' + m.b + ' 님은 ' + ((m.bFloors || []).length ? m.bFloors.join('·') + 'F' : m.to + 'F')).join(', ')) : '') +
-    (s.three.length ? '<br>3개 층: ' + esc(s.three.join(', ')) : '') + (R.left.length ? '<br><span style="color:var(--warn)">미배정: ' + R.left.map(r => '<button class="asg-chip bad" data-as="room" data-v="' + esc(r) + '" data-f="(미배정)">' + esc(r) + '</button>').join(' ') + '</span>' : '') + '</p>' +
+    (s.three.length ? '<br>3개 층: ' + esc(s.three.join(', ')) : '') + mixNote() + (R.left.length ? '<br><span style="color:var(--warn)">미배정: ' + R.left.map(r => '<button class="asg-chip bad" data-as="room" data-v="' + esc(r) + '" data-f="(미배정)">' + esc(r) + '</button>').join(' ') + '</span>' : '') + '</p>' +
     (A.edits && A.edits.length ? '<p class="note">✏️ 고친 것 ' + A.edits.length + '건: ' + esc(A.edits.slice(-5).join(' / ')) + (A.edits.length > 5 ? ' …' : '') + '</p>' : '') +
     (A.done ? '<p class="note">완성본으로 대조하는 중이라 앱에는 올리지 않아요. 초안을 넣으면 확정 버튼이 생겨요.</p>'
       : '<button class="big-btn" style="margin-top:10px" data-as="send">✅ 확정 → 앱에 올리기 + 엑셀 받기</button>' +
