@@ -5,10 +5,11 @@
 // · 로그인: 소장·부소장(관리자) 또는 점검자 공용 계정 → 점검자 이름은 버튼으로 (관리자 / 하우스맨)
 // ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
-import { makeCards, makeText } from './card.js?v=2026.11.15-13';
-import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-13';
+import { makeCards, makeText } from './card.js?v=2026.11.15-14';
+import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-14';
+import { openCam, camOk } from './cam.js?v=2026.11.15-14';
 
-const VER = '2026.11.15-13';
+const VER = '2026.11.15-14';
 const ACCOUNTS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com', admin: true },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com', admin: true },
@@ -119,7 +120,7 @@ function homeHtml() {
   if (!b || V.pickBy) return byHtml() + (b ? '<button class="big-btn sec" data-a="bydone">닫기</button>' : '');
   h += '<div class="bybar">점검 <b>' + esc(b.name) + '</b> <small>' + esc(b.g) + '</small><button class="ref" data-a="bychg">바꾸기</button></div>';
   const open = V.drafts.filter(x => x.st !== 'saved');
-  h += '<div class="shoot"><button class="big-btn cam" data-a="cam">📷 새 객실 촬영</button><button class="big-btn sec" data-a="gal">🖼 갤러리에서</button></div>';
+  h += '<div class="shoot"><button class="big-btn cam" data-a="cam">📷 새 객실 촬영</button><button class="big-btn sec" data-a="gal">🖼 갤러리에서</button></div><p class="note" style="margin:-6px 0 12px">📷 연속 촬영: 셔터만 계속 누르고 ‘완료’ · 🖼 갤러리: 사진을 길게 눌러 여러 장 선택</p>';
   if (open.length) h += '<div class="card"><h2>작성 중 <small>이어서 하기</small></h2>' + open.map(x => draftRow(x)).join('') + '</div>';
   const pend = V.drafts.filter(x => x.st === 'saved' && !allUp(x));
   if (pend.length) h += '<p class="waitbox">⏫ 사진 ' + pend.reduce((s, x) => s + x.photos.filter(p => !(x.up && x.up[p.pid])).length, 0) + '장을 아직 못 올렸어요. 인터넷이 되면 자동으로 올려요. <button class="ref" data-a="retry">지금 다시</button></p>';
@@ -159,7 +160,7 @@ function draftHtml() {
   let h = '<div class="card top"><div class="f"><label for="room">객실</label><input id="room" class="roomin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="예: 2217" value="' + esc(x.room) + '"></div>' +
     '<div class="f"><label for="maid">정비자</label><input id="maid" list="maids" autocomplete="off" placeholder="' + (x.maidBusy ? '찾는 중…' : '객실을 넣으면 자동') + '" value="' + esc(x.maid) + '"><datalist id="maids">' + Object.keys(V.plans).sort().map(m => '<option value="' + esc(m) + '">').join('') + '</datalist></div>' +
     (x.maidHow ? '<p class="note" style="margin:0 0 0 72px">' + (x.roomBy === 'AI' ? '🤖 룸넘버 판독 · ' : '') + esc(x.maidHow) + '</p>' : '') + (V.aiMsg ? '<p class="note warn">' + esc(V.aiMsg) + '</p>' : '') + (x.warn ? '<p class="note warn">' + esc(x.warn) + '</p>' : '') + '</div>';
-  if (!x.photos.length) h += '<div class="card"><p class="note" style="margin:0">아래 📷 로 찍거나 🖼 로 갤러리 사진을 골라요. 잘못 찍은 사진은 ✕ 로 빼요.</p></div>';
+  if (!x.photos.length) h += '<div class="card"><p class="note" style="margin:0">📷 를 누르면 연속 촬영 — 셔터만 계속 누르고 ‘완료’. 🖼 갤러리는 사진을 <b>길게 눌러 여러 장</b> 고를 수 있어요. 잘못 찍은 사진은 ✕ 로 빼요.</p></div>';
   h += x.photos.map((p, i) => '<div class="ph' + (p.roomPlate ? ' plate' : '') + '"><div class="pimg"><img src="' + (urls[p.pid] || '') + '" alt="사진 ' + (i + 1) + '"><span class="pno">' + (p.roomPlate ? '🚪' : no(x, i)) + '</span><button class="px" data-a="pdel" data-v="' + i + '" aria-label="사진 빼기">✕</button></div>' +
     aiLine(p, i) + (p.roomPlate ? '<p class="note" style="margin:6px 0 0">룸넘버 사진 — 공유 이미지에 안 들어가요 <button class="ref" data-a="plate" data-v="' + i + '">지적 사진으로</button></p>' :
       '<input class="ptxt" data-p="' + i + '" placeholder="지적 한 줄 (예: 각티슈 세팅 미흡)" value="' + esc(p.t) + '"><div class="chips sm">' + CHIPS.map(c => '<button class="chip" data-a="chip" data-v="' + i + '" data-c="' + esc(c) + '">' + esc(c) + '</button>').join('') +
@@ -217,9 +218,9 @@ async function shrink(file) {
   const blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', JPEG_Q));
   return { blob, w, h };
 }
-async function addPhotos(files) {
+async function addPhotos(files, quiet) {
   if (!V.cur || V.view !== 'draft') await startDraft();
-  const x = V.cur; x.saving = '사진 넣는 중…'; draw();
+  const x = V.cur; x.saving = '사진 넣는 중…'; if (!quiet) draw();
   for (const f of files) {
     try {
       const r = await shrink(f), pid = 'p' + newId();
@@ -232,14 +233,14 @@ async function addPhotos(files) {
       await saveDraft();
     } catch (e) { alert('사진 하나를 못 넣었어요: ' + (e && e.message || e)); }
   }
-  x.saving = ''; draw();
+  x.saving = ''; if (quiet) return; draw();
   setTimeout(() => { const els = document.querySelectorAll('.ptxt'); if (els.length) els[els.length - 1].scrollIntoView({ block: 'center' }); }, 60);
 }
 // ---------- AI 판독 대기열 (동시에 2장)
 const AQ = []; let aRun = 0;
 function aiQueue(x, p) { if (V.aiOff) return; p.aiBusy = 1; AQ.push([x, p]); aiNext(); }
 async function aiNext() {
-  if (aRun >= 2 || !AQ.length) return;
+  if (aRun >= 4 || !AQ.length) return;   // 동시에 4장까지 판독 (11/15 '한세월' → 병렬)
   const [x, p] = AQ.shift(); aRun++;
   try {
     const blob = await idb.get('blobs', p.pid);
@@ -392,7 +393,15 @@ document.addEventListener('click', async e => {
   if (a === 'byadd') { const nm = (prompt(t.getAttribute('data-g') + ' 이름') || '').trim().slice(0, 20); if (!nm) return; const N = names(), g = t.getAttribute('data-g'); if (N[g].indexOf(nm) < 0) N[g].push(nm); lsSet('insp_names', N); lsSet('insp_by', { name: nm, g }); V.pickBy = false; draw(); return; }
   if (a === 'bychg') { V.pickBy = true; draw(); return; }
   if (a === 'bydone') { V.pickBy = false; draw(); return; }
-  if (a === 'cam' || a === 'gal') { if (!byNow()) { V.pickBy = true; go('home'); return; } if (a === 'cam' && V.view === 'done') { V.cur = null; await startDraft(); } pick(a === 'gal'); return; }
+  if (a === 'cam' || a === 'gal' || a === 'cam1') {
+    if (!byNow()) { V.pickBy = true; go('home'); return; }
+    if (V.view === 'done' || (V.view !== 'draft' && a !== 'gal')) { V.cur = null; await startDraft(); draw(); }
+    if (a === 'cam' && camOk()) {   // 앱 안 연속 촬영 — 셔터만 계속, 판독은 뒤에서 바로
+      const ok = await openCam({ onShot: b => addPhotos([b], true), onDone: () => { draw(); setTimeout(() => window.scrollTo(0, 0), 50); } });
+      if (ok) return;
+    }
+    pick(a === 'gal'); return;
+  }
   if (a === 'resume') return openDraft(v);
   if (a === 'home') { await saveDraft(); V.cur = null; await loadDrafts(); go('home'); return; }
   if (a === 'reload') return loadList();

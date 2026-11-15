@@ -5,7 +5,7 @@
 // · App Check(reCAPTCHA) 필수 (2026-07 부터 AI Logic 설정 때 자동 강제) → 사이트 키는 meta/insp_ai.siteKey (관리자 설정 화면)
 // · 모델 이름도 meta/insp_ai.model 로 바꿀 수 있음 (없으면 MODELS 차례로 시도)
 // 시험: window.__fakeAI = async (base64) => ({...})
-import { ZONES, TYPE_KEY } from '../insp_items.js?v=2026.11.15-13';
+import { ZONES, TYPE_KEY } from '../insp_items.js?v=2026.11.15-14';
 
 const FB = 'https://www.gstatic.com/firebasejs/12.19.0/';
 const MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
@@ -64,10 +64,10 @@ async function call(b64) {
   }
   throw err;
 }
-// 긴 쪽 1536 사본 → base64
+// 긴 쪽 1280 사본 → base64 (11/15 속도: 1536 → 1280)
 async function small(blob) {
   const bmp = await createImageBitmap(blob);
-  const s = Math.min(1, 1536 / Math.max(bmp.width, bmp.height)), cv = document.createElement('canvas');
+  const s = Math.min(1, 1280 / Math.max(bmp.width, bmp.height)), cv = document.createElement('canvas');
   cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
   cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
   const u = cv.toDataURL('image/jpeg', 0.8);
