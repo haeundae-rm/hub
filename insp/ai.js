@@ -1,10 +1,11 @@
-// 🔍 인스펙션 ② 사진 판독 (2026-11-15) — Firebase AI Logic(Gemini Developer API) 를 앱에서 바로 부름 (서버 없음)
+// 🔍 인스펙션 ② 사진 판독 (2026-11-15) — Firebase AI Logic 을 앱에서 바로 부름 (서버 없음)
+// 11/15 15:1x: Gemini Developer API 는 선불 크레딧 방식이라 → Vertex AI(Agent Platform) 'global' 로 바꿈 = Firestore 와 같은 후불 청구 (사용자 결정)
 // 사진 한 장 → { kind: 'room'|'fault'|'ok'|'blur', room, text(카톡 문구), zone, part, type, conf }
 // · 공유용 사진은 그대로 두고, AI 에는 긴 쪽 1536px 사본만 보냄
 // · App Check(reCAPTCHA) 필수 (2026-07 부터 AI Logic 설정 때 자동 강제) → 사이트 키는 meta/insp_ai.siteKey (관리자 설정 화면)
 // · 모델 이름도 meta/insp_ai.model 로 바꿀 수 있음 (없으면 MODELS 차례로 시도)
 // 시험: window.__fakeAI = async (base64) => ({...})
-import { ZONES, TYPE_KEY } from '../insp_items.js?v=2026.11.15-12';
+import { ZONES, TYPE_KEY } from '../insp_items.js?v=2026.11.15-13';
 
 const FB = 'https://www.gstatic.com/firebasejs/12.19.0/';
 const MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
@@ -47,7 +48,7 @@ async function getModel(name) {
     try { AC.initializeAppCheck(app, { provider: new P(key), isTokenAutoRefreshEnabled: true }); } catch (e) { console.warn('App Check', e); }
     window.__inspAppCheck = 1;
   }
-  const ai = AI.getAI(app, { backend: new AI.GoogleAIBackend() });
+  const ai = AI.getAI(app, { backend: cfg && cfg.backend === 'dev' ? new AI.GoogleAIBackend() : new AI.VertexAIBackend((cfg && cfg.location) || 'global') });
   return AI.getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', temperature: 0.2 } });
 }
 async function call(b64) {
@@ -59,7 +60,7 @@ async function call(b64) {
       const m = await modelP.m;
       const r = await m.generateContent([PROMPT, { inlineData: { data: b64, mimeType: 'image/jpeg' } }]);
       return r.response.text();
-    } catch (e) { err = e; modelP = null; if (!/not found|404|unsupported|is not supported/i.test(String(e && e.message))) break; }
+    } catch (e) { err = e; modelP = null; if (!/not found|404|unsupported|is not supported|requires the Firebase AI API/i.test(String(e && e.message))) break; }
   }
   throw err;
 }

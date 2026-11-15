@@ -5,10 +5,10 @@
 // · 로그인: 소장·부소장(관리자) 또는 점검자 공용 계정 → 점검자 이름은 버튼으로 (관리자 / 하우스맨)
 // ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
-import { makeCards, makeText } from './card.js?v=2026.11.15-12';
-import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-12';
+import { makeCards, makeText } from './card.js?v=2026.11.15-13';
+import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-13';
 
-const VER = '2026.11.15-12';
+const VER = '2026.11.15-13';
 const ACCOUNTS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com', admin: true },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com', admin: true },

@@ -3,8 +3,8 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.15-12';
-import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-12';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.15-13';
+import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-13';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
