@@ -3,7 +3,7 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.15-1';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.15-2';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -12,6 +12,42 @@ let A = null;   // 화면 상태
 
 const DEF_TEAMS = ['최태자,성락욱', '김태성,조유경'];
 const isTarget = x => (['1', '2', '3', '4'].includes(String(x.st == null ? '' : x.st).trim()) || /간단/.test(String(x.st == null ? '' : x.st))) && !/미정비/.test((x.m1 || '') + (x.m2 || ''));
+// 11/15 미정비 남기기 (하우스맨이 프런트와 타입별 수량 협의 → 수량 입력 → 저층부터 자동으로 고름). A.carry = 남길 객실
+const live = x => isTarget(x) && !(A && A.carry && A.carry.has(String(x.room)));
+// 객실 타입 (claude/객실타입_기준표.md, 417실)
+export function typeOf(room) {
+  const r = String(room), n = +r, f = Math.floor(n / 100), s = n % 100;
+  if (r === '2901') return 'PLT'; if (r === '3001' || r === '3101') return 'RYH'; if (r === '3002' || r === '3102') return 'RYL';
+  if (r === '2909' || r === '2910') return 'HTT'; if (f === 18 && s >= 7 && s <= 11) return 'FAK'; if (r === '1707' || r === '1708') return 'FAW';
+  if (f === 23 || f === 24) { if (f === 24 && s <= 4) return 'FQJ'; if (s <= 6) return 'HTJ'; if (s <= 10) return 'HTP'; return 'FOB'; }
+  if (f >= 4 && f <= 28 && s <= 4) return 'FAQ';
+  if (((f >= 5 && f <= 22) || f === 25 || f === 26) && s >= 12) return 'FOR';
+  return 'HTL';
+}
+const TYPE_NAME = { HTL: '호텔형', FAQ: '아쿠아', FOR: '취사형', FOB: '특화', HTP: '특화', HTJ: '특화', FQJ: '특화', FAK: '키즈', FAW: '워케이션', HTT: 'OTT', RYH: '로얄', RYL: '로얄', PLT: '2901' };
+const TYPE_ORDER = ['HTL', 'FAQ', 'FOR', 'FOB', 'HTP', 'HTJ', 'FQJ', 'FAK', 'FAW', 'HTT', 'RYH', 'RYL'];
+// 남기면 안 되는 객실: 로얄·2901·VIP·테마·단체·시간 지정·당직·재실(2)
+function carryBlock(x) {
+  const m = (x.m1 || '') + ' ' + (x.m2 || ''), r = String(x.room);
+  if (ROYAL.includes(r) || r === '2901') return '로얄·2901';
+  if (/VIP|르씨엘/i.test(m)) return 'VIP';
+  if ((A.data.themes || []).some(t => String(t.room) === r)) return '테마';
+  if ((A.data.groups || []).some(g => (g.rooms || []).map(String).includes(r))) return '단체';
+  if (/\d{1,2}\s*시/.test(m)) return '시간 지정';
+  if (/당직/.test(m)) return '당직';
+  if (String(x.st).trim() === '2') return '재실';
+  return '';
+}
+// 타입별 수량만큼 고르기 — 저층 먼저 (가급적), 어제 이월(3)은 맨 뒤
+function carryPick(qty) {
+  const out = new Set(), short = [];
+  Object.keys(qty).forEach(t => { const q = Number(qty[t]) || 0; if (q <= 0) return;
+    const c = A.data.rooms.filter(x => isTarget(x) && typeOf(x.room) === t && !carryBlock(x))
+      .sort((p, q2) => (String(p.st).trim() === '3' ? 1 : 0) - (String(q2.st).trim() === '3' ? 1 : 0) || p.floor - q2.floor || p.room - q2.room);
+    c.slice(0, q).forEach(x => out.add(String(x.room)));
+    if (c.length < q) short.push(t + ' ' + c.length + '실만'); });
+  return { set: out, short };
+}
 const unitOf = x => (ROYAL.includes(String(x.room)) ? 2 : /간단/.test(String(x.st)) ? 0.5 : 1);
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
@@ -69,7 +105,7 @@ function pick() {
       const E = await import(new URL('../rm/app/engine.js?v=' + VER, import.meta.url).href);
       A.buf = await f.arrayBuffer();
       const r = await E.buildFromXlsx(A.buf, A.date);
-      A.data = r.data; A.sheet = r.sheet;
+      A.data = r.data; A.sheet = r.sheet; A.carry = new Set(); A.cq = null;
       const named = A.data.rooms.filter(x => x.name && isTarget(x));
       A.done = named.length >= 20 ? A.data.rooms : null;   // 이름이 들어 있으면 하우스키퍼 완성본 → 대조용
       // 출근 카드 유닛 = 관리자 인계 유닛 (11/14 사용자 결정: 하우스키퍼가 초안 카드에 인계 유닛을 적어 둠 → 따로 입력 안 함)
@@ -96,7 +132,7 @@ function run() {
   const gap = gapInfo();
   if (gap && gap.over > 0 && !confirm('정비 대상 ' + gap.units + '유닛이 인계 ' + gap.ho + '유닛보다 ' + gap.over + '유닛 많아요 (한 분당 약 +' + gap.per + ').\n\n미정비(이월) 표시를 먼저 하셨나요?\n· 이월할 객실이 있으면 [취소] → 정비보고서 메모에 \'미정비\' 적고 다시 넣기\n· 넘치는 만큼 모두 배정하려면 [확인]')) return;
   const rooms = A.data.rooms.map(x => { const g = G[String(x.room)] || (noTbl && ['', 'FFFFFFFF', 'THEME0'].indexOf(String(x.grp_fill || '').toUpperCase()) < 0 ? { n: '단체', h: 17 } : null);
-    return { room: x.room, floor: x.floor, st: x.st, m1: x.m1, m2: x.m2, grp: g ? g.n : '', gh: g ? g.h : 0, theme: TH.has(String(x.room)) }; });
+    return { room: x.room, floor: x.floor, st: x.st, m1: x.m1, m2: (A.carry && A.carry.has(String(x.room))) ? ((x.m2 || '') + ' 미정비') : x.m2, grp: g ? g.n : '', gh: g ? g.h : 0, theme: TH.has(String(x.room)) }; });
   // 신입 = 직원 명단 입사일이 배정 날짜 3개월 안 (11/14 사용자: 3개월 미만은 가급적 VIP 안 줌). 입사일 없는 분은 모름 → 정량 8 미만만 신입으로
   const [yy, mm, dd] = A.date.split('-').map(Number), c3 = new Date(yy, mm - 1 - 3, dd), cut = c3.getFullYear() + '-' + String(c3.getMonth() + 1).padStart(2, '0') + '-' + String(c3.getDate()).padStart(2, '0');
   A.vipNo = Object.keys(H0).filter(n => A.hired && A.hired[n] && A.hired[n] > cut);
@@ -123,7 +159,7 @@ function run() {
 // 대상 유닛 − 인계 유닛. +1 은 베테랑 몇 분이 받는 게 보통이라 출근자 1/4 까지는 괜찮게 봄
 function gapInfo() {
   if (!A || !A.data) return null;
-  const T = A.data.rooms.filter(isTarget), H0 = ho(), n = Object.keys(H0).length; if (!n) return null;
+  const T = A.data.rooms.filter(live), H0 = ho(), n = Object.keys(H0).length; if (!n) return null;
   const units = T.reduce((s, x) => s + (String(x.room) === '2901' ? (/당직|H\/U/i.test((x.m1 || '') + (x.m2 || '')) ? 1 : 3) : unitOf(x)), 0);
   const hs = Object.values(H0).reduce((a, b) => a + b, 0), d = units - hs, ok = Math.ceil(n / 4);
   return { units, ho: hs, d, over: d > ok ? d : 0, per: Math.round(d / n * 10) / 10 };
@@ -174,12 +210,12 @@ async function downXlsx(quiet) {
   try {
     const F = await import(new URL('./fillxlsx.js?v=' + VER, import.meta.url).href);
     const W = {}; Object.keys(A.res.workers).forEach(n => { const w = A.res.workers[n]; if (w.rooms.length) W[n] = { rooms: w.rooms, load: w.load }; });
-    const { bytes, info } = await F.fillReport(A.buf, A.date, W);
+    const { bytes, info } = await F.fillReport(A.buf, A.date, W, { carry: [...(A.carry || [])] });
     const name = 'report_' + A.date.slice(5).replace('-', '') + '_auto.xlsx';   // 한글 파일 이름은 일부 휴대폰·브라우저에서 'download' 로 바뀌어 영문으로
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
     A.xmsg = '📄 ' + name + ' 내려받음 — ' + info.sheet + '일 시트 객실 ' + info.named + '실 · 출근 카드 ' + info.cards + '명' +
-      (info.added.length ? ' · 카드 새로 추가: ' + info.added.join(', ') : '') + (info.noCard && info.noCard.length ? ' · ⚠️ 카드 칸이 없어 못 넣은 분: ' + info.noCard.join(', ') : '') + (info.offs.length ? ' · 휴무 표시: ' + info.offs.join(', ') : '') + (info.missing.length ? ' · 칸 못 찾은 객실: ' + info.missing.join(' ') : '');
+      (info.added.length ? ' · 카드 새로 추가: ' + info.added.join(', ') : '') + (info.noCard && info.noCard.length ? ' · ⚠️ 카드 칸이 없어 못 넣은 분: ' + info.noCard.join(', ') : '') + (info.carry ? ' · 미정비 메모 ' + info.carry + '실' : '') + (info.offs.length ? ' · 휴무 표시: ' + info.offs.join(', ') : '') + (info.missing.length ? ' · 칸 못 찾은 객실: ' + info.missing.join(' ') : '');
   } catch (e) { A.xmsg = '엑셀을 만들지 못했어요: ' + (e && e.message || e); }
   A.xbusy = false; if (!quiet) draw();
 }
@@ -193,7 +229,7 @@ async function confirmUpload() {
   try {
     const E = await import(new URL('../rm/app/engine.js?v=' + VER, import.meta.url).href);
     const ownerOf = {}; Object.keys(R.workers).forEach(n => R.workers[n].rooms.forEach(r => { (ownerOf[r] = ownerOf[r] || []).push(n); }));
-    const rooms = A.data.rooms.map(x => Object.assign({}, x, { name: ownerOf[String(x.room)] ? ownerOf[String(x.room)].join(', ') : '' }));
+    const rooms = A.data.rooms.map(x => Object.assign({}, x, { name: ownerOf[String(x.room)] ? ownerOf[String(x.room)].join(', ') : '' }, A.carry && A.carry.has(String(x.room)) ? { m2: (x.m2 || '') + ' 미정비' } : {}));
     const order = Object.keys(R.workers).filter(n => R.workers[n].rooms.length).sort((a, b) => (R.workers[b].floors[0] || 0) - (R.workers[a].floors[0] || 0));
     const cards = order.map((n, i) => ({ label: (i + 1) + '] ' + n, name: n, unit: R.workers[n].load, actual: '' }));
     const d2 = { rooms, cards, groups: A.data.groups || [], themes: A.data.themes || [] };
@@ -265,12 +301,45 @@ function cfgHtml() {
   return h;
 }
 
+// ---------- 📦 미정비 남기기
+function carryOpen() {
+  const q = {}; TYPE_ORDER.forEach(t => { q[t] = 0; }); A.carry.forEach(r => { const t = typeOf(r); q[t] = (q[t] || 0) + 1; });
+  A.cq = q; A.cshort = []; A.view = 'carry'; draw(); const b = document.getElementById('asp'); if (b) b.scrollTop = 0;
+}
+function carryRead() { document.querySelectorAll('#asp [data-cq]').forEach(el => { A.cq[el.getAttribute('data-cq')] = Math.max(0, Math.floor(Number(el.value) || 0)); }); }
+function carryHtml() {
+  const esc = H.esc, all = A.data.rooms.filter(isTarget), cnt = {}, ok = {};
+  all.forEach(x => { const t = typeOf(x.room); cnt[t] = (cnt[t] || 0) + 1; if (!carryBlock(x)) ok[t] = (ok[t] || 0) + 1; });
+  const g = gapInfo(), sumQ = Object.values(A.cq).reduce((a, b) => a + (Number(b) || 0), 0);
+  let h = '<div class="card"><h2>📦 미정비 남기기 <small>프런트와 협의한 타입별 수량</small></h2>' +
+    '<p class="note" style="margin:0 0 8px">수량을 적고 <b>고르기</b>를 누르면 <b>저층부터</b> 골라요 (어제 이월된 방은 뒤로). 로얄·2901·VIP·테마·단체·시간 지정·당직·재실은 남기지 않아요.' +
+    (g ? '<br>지금: 대상 <b>' + g.units + '유닛</b> / 인계 <b>' + g.ho + '유닛</b> → ' + (g.d > 0 ? '<b style="color:var(--warn)">' + g.d + ' 넘침</b>' : '넘침 없음') : '') + '</p>' +
+    '<div class="cf-grid" style="grid-template-columns:auto 1fr auto"><b>타입</b><b>대상 (남길 수 있는 방)</b><b>남길 수량</b>';
+  TYPE_ORDER.filter(t => cnt[t]).forEach(t => { const can = ok[t] || 0;
+    h += '<span class="cf-f">' + t + '</span><span>' + esc(TYPE_NAME[t]) + ' ' + cnt[t] + '실 <small style="color:var(--muted)">(' + can + ')</small></span>' +
+      (can ? '<span><input type="number" min="0" max="' + can + '" inputmode="numeric" style="width:64px" data-cq="' + t + '" value="' + (A.cq[t] || 0) + '"></span>' : '<span style="color:var(--muted)">-</span>'); });
+  h += '</div><p class="note">입력 합계 ' + sumQ + '실</p>';
+  if (A.cshort && A.cshort.length) h += '<p class="err">남길 수 있는 방이 모자라요: ' + esc(A.cshort.join(', ')) + '</p>';
+  h += '<div class="btn2"><button class="big-btn sec" data-as="cqclear">모두 0</button><button class="big-btn" data-as="cqpick">고르기</button></div></div>';
+  if (A.carry.size) {
+    const by = {}; [...A.carry].sort((a, b) => a - b).forEach(r => { (by[typeOf(r)] = by[typeOf(r)] || []).push(r); });
+    const fl = {}; A.carry.forEach(r => { const f = Math.floor(r / 100); fl[f] = (fl[f] || 0) + 1; });
+    h += '<div class="card"><h2>남길 객실 ' + A.carry.size + '실 <small>누르면 빼기</small></h2>' +
+      Object.keys(by).map(t => '<p style="margin:6px 0"><b>' + t + '</b> ' + by[t].map(r => '<button class="asg-chip" data-as="cqx" data-v="' + esc(r) + '">' + esc(r) + '</button>').join(' ') + '</p>').join('') +
+      '<p class="note">층별: ' + Object.keys(fl).sort((a, b) => a - b).map(f => f + 'F ' + fl[f]).join(' · ') + '</p>' +
+      '<p class="note">이대로 배정을 돌리면 이 객실은 빼고 배정해요. 엑셀을 받으면 이 객실 메모2에 <b>미정비</b>가 들어가요.</p></div>';
+  }
+  h += '<button class="big-btn" data-as="cqdone">' + (A.carry.size ? '✅ ' + A.carry.size + '실 남기고 돌아가기' : '돌아가기') + '</button>';
+  return h;
+}
+
 // ---------- 그리기
 function draw() {
   const box = document.getElementById('asp'); if (!box || !A) return;
   const esc = H.esc, y = box.scrollTop;
   let h = '<div class="vp-in"><div class="vp-head"><h2>🧩 자동 배정 <small style="font-size:13px;color:var(--muted);font-weight:600">' + (A.view === 'cfg' ? '담당표·정량' : '시험 · 대조') + '</small></h2><button class="vp-x" data-as="' + (A.view === 'cfg' ? 'cfx' : 'close') + '" aria-label="닫기">✕</button></div>';
   if (A.view === 'cfg') { box.innerHTML = h + cfgHtml() + '</div>'; box.scrollTop = y; return; }
+  if (A.view === 'carry') { box.innerHTML = h + carryHtml() + '</div>'; box.scrollTop = y; return; }
   if (A.saved) h += '<p class="okbox">' + esc(A.saved) + '</p>';
   h += '<button class="big-btn sec" style="margin:0 0 12px" data-as="cfg">⚙️ 담당표 · 정량 · 로얄/2901 설정</button>';
   // 1 날짜·파일
@@ -280,9 +349,10 @@ function draw() {
   if (A.busy) h += '<p class="note">' + esc(A.busy) + '</p>';
   if (A.err) h += '<p class="err" style="margin-top:10px">' + esc(A.err) + '</p>';
   if (A.data) {
-    const T = A.data.rooms.filter(isTarget), skip = A.data.rooms.filter(x => /미정비/.test((x.m1 || '') + (x.m2 || ''))).length;
+    const T = A.data.rooms.filter(live), skip = A.data.rooms.filter(x => /미정비/.test((x.m1 || '') + (x.m2 || ''))).length, nc = A.carry ? A.carry.size : 0;
     const u = T.reduce((s, x) => s + (String(x.room) === '2901' ? 0 : unitOf(x)), 0), has2901 = T.some(x => String(x.room) === '2901');
-    h += '<p class="note">' + esc(A.sheet) + '일 시트 · 정비 대상 <b>' + T.length + '실</b> = ' + u + '유닛' + (has2901 ? ' + 2901' : '') + (skip ? ' · 미정비(이월) ' + skip + '실 제외' : '') + '</p>';
+    h += '<p class="note">' + esc(A.sheet) + '일 시트 · 정비 대상 <b>' + T.length + '실</b> = ' + u + '유닛' + (has2901 ? ' + 2901' : '') + (skip ? ' · 미정비(이월) ' + skip + '실 제외' : '') + (nc ? ' · <b>미정비 남기기 ' + nc + '실</b> 제외' : '') + '</p>';
+    if (!A.done) h += '<button class="big-btn sec" style="margin-top:8px" data-as="carry">📦 미정비 남기기 (타입별 수량)' + (nc ? ' — ' + nc + '실' : '') + '</button>';
     if (A.done) h += '<p class="okbox" style="margin-top:8px">이름이 들어 있는 <b>완성본</b>이에요 → 이름은 빼고 엔진이 새로 배정한 뒤 <b>하우스키퍼 배정과 대조</b>해요. 출근자·유닛은 완성본 카드대로 채웠어요.</p>';
     else if (A.fromCards) h += '<p class="okbox" style="margin-top:8px">정비보고서 <b>출근 카드</b>의 유닛을 인계 유닛으로 읽었어요 → <b>' + A.fromCards.n + '명 · ' + A.fromCards.u + '유닛</b>. 아래 2번은 따로 고칠 필요 없어요 (바꿀 때만 −/+).</p>';
     else h += '<p class="err" style="margin-top:8px">출근 카드에 유닛이 없어요 → 아래 2번 출근자·유닛을 인계표대로 맞춰 주세요 (지난번 값으로 채워 둠).</p>';
@@ -383,6 +453,11 @@ document.addEventListener('click', e => {
   if (a === 'cfdef') { if (!confirm('담당표·정량·로얄/2901 을 기본값(26.10~27.3 담당표)으로 되돌릴까요? 저장을 눌러야 바뀌어요.')) return;
     A.cf = { aKey: Object.assign({}, DEF_CFG.aKey), bKey: Object.assign({}, DEF_CFG.bKey), royal: DEF_CFG.royalOk.join(', '), blue: DEF_CFG.pltBlue.join(', '), quota: Object.keys(DEF_CFG.quota).map(n => ({ name: n, v: DEF_CFG.quota[n] })), err: '', saving: false }; draw(); return; }
   if (a === 'pick') { pick(); return; }
+  if (a === 'carry') { carryOpen(); return; }
+  if (a === 'cqclear') { Object.keys(A.cq).forEach(t => { A.cq[t] = 0; }); A.carry = new Set(); A.cshort = []; A.res = null; A.cmp = null; draw(); return; }
+  if (a === 'cqpick') { carryRead(); const r = carryPick(A.cq); A.carry = r.set; A.cshort = r.short; A.res = null; A.cmp = null; draw(); return; }
+  if (a === 'cqx') { A.carry.delete(v); const t = typeOf(v); if (A.cq[t]) A.cq[t]--; A.res = null; A.cmp = null; draw(); return; }
+  if (a === 'cqdone') { carryRead(); A.view = ''; draw(); return; }
   if (a === 'date') { if (A.date === v) return; A.date = v; A.data = null; A.done = null; A.res = null; A.cmp = null; A.file = ''; draw(); return; }
   if (a === 'tog') { const r = A.rows.find(x => x.name === v); if (r) { r.on = !r.on; A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'u-' || a === 'u+') { const r = A.rows.find(x => x.name === v); if (r) { r.unit = Math.max(1, Math.min(15, Number(r.unit) + (a === 'u+' ? 1 : -1))); A.res = null; A.cmp = null; } draw(); return; }

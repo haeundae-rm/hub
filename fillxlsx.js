@@ -63,7 +63,8 @@ const colNum = c => { let n = 0; for (const ch of c) n = n * 26 + ch.charCodeAt(
 const colName = i => { let s = ''; while (i) { const r = (i - 1) % 26; i = Math.floor((i - 1) / 26); s = String.fromCharCode(65 + r) + s; } return s; };
 const numStr = v => (Number.isInteger(+v) ? String(+v) : String(+v));
 
-export async function fillReport(bytes, date, workers) {
+export async function fillReport(bytes, date, workers, opt) {
+  opt = opt || {};
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const z = readZip(u8);
   const wb = await z.text('xl/workbook.xml'), rel = await z.text('xl/_rels/workbook.xml.rels');
@@ -99,6 +100,10 @@ export async function fillReport(bytes, date, workers) {
     else { const cur = String(val(L + (nr + 1)) || ''); if (!/휴|퇴사|공란/.test(cur)) { edits.set(L + (nr + 1), ['s', '휴무']); offs.push(n); } } }
   const added = [];
   Object.keys(workers).filter(n => !cardNames.has(n)).forEach(n => { const e = empties.shift(); if (!e) return; edits.set(e[0] + e[1], ['s', n]); edits.set(e[0] + (e[1] + 1), ['n', workers[n].load]); added.push([n, e[0] + e[1]]); });
+  // 미정비 남기기 (11/15): 그 객실 메모2 칸(이름 칸 두 줄 아래)에 '미정비' — 원래 글이 있으면 뒤에 붙임
+  let carried = 0; const carryRefs = [];
+  (opt.carry || []).forEach(r => { const ref = target[String(r)]; if (!ref) return; const [, L, n] = /([A-Z]+)(\d+)/.exec(ref), m2 = L + (+n + 2), cur = String(val(m2) == null ? '' : val(m2)).trim();
+    if (/미정비/.test(cur)) return; edits.set(m2, ['s', cur ? cur + ' 미정비' : '미정비']); carryRefs.push(m2); });
   const dcache = new Map(); Object.entries(names).forEach(([r, ns]) => { if (maprow[r]) dcache.set('D' + maprow[r], ns.join(', ')); });
 
   const put = (ref, kind, v, a) => { a = a.replace(/\s*t="[^"]*"/, ''); if (kind === 'e') return '<c r="' + ref + '"' + a + '/>'; return kind === 's' ? '<c r="' + ref + '"' + a + ' t="inlineStr"><is><t>' + esc(v) + '</t></is></c>' : '<c r="' + ref + '"' + a + '><v>' + numStr(v) + '</v></c>'; };
@@ -109,13 +114,17 @@ export async function fillReport(bytes, date, workers) {
     return m0; });
   // 원본에 칸 자체가 없는 경우 → 행에 끼워 넣기
   for (const [ref, [k, v]] of [...edits]) { if (k === 'e') { edits.delete(ref); continue; } const [, col, row] = /([A-Z]+)(\d+)/.exec(ref);
-    const rre = new RegExp('<row r="' + row + '"([^>]*?)(/>|>([\\s\\S]*?)</row>)'); const rm = rre.exec(xml); if (!rm) continue;
+    const rre = new RegExp('<row r="' + row + '"([^>]*?)(/>|>([\\s\\S]*?)</row>)'); const rm = rre.exec(xml);
+    if (!rm) { // 행 자체가 없으면 순서에 맞춰 새 행 (미정비 메모 칸 등)
+      let at = xml.indexOf('</sheetData>'); for (const r2 of xml.matchAll(/<row r="(\d+)"/g)) if (+r2[1] > +row) { at = r2.index; break; }
+      if (at < 0) continue; xml = xml.slice(0, at) + '<row r="' + row + '">' + put(ref, k, v, '') + '</row>' + xml.slice(at); edits.delete(ref); continue; }
     const nw = put(ref, k, v, '');
     if (rm[2] === '/>') { xml = xml.slice(0, rm.index) + '<row r="' + row + '"' + rm[1] + '>' + nw + '</row>' + xml.slice(rm.index + rm[0].length); edits.delete(ref); continue; }
     const inner = rm[3]; let pos = inner.length; for (const cm of inner.matchAll(cellre)) if (colNum(cm[1]) > colNum(col)) { pos = cm.index; break; }
     const seg = '<row r="' + row + '"' + rm[1] + '>' + inner.slice(0, pos) + nw + inner.slice(pos) + '</row>';
     xml = xml.slice(0, rm.index) + seg + xml.slice(rm.index + rm[0].length); edits.delete(ref); }
+  carried = carryRefs.filter(r => !edits.has(r)).length;
   let wb2 = wb; if (!/fullCalcOnLoad/.test(wb2)) wb2 = /<calcPr/.test(wb2) ? wb2.replace(/<calcPr([^>]*?)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>') : wb2.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
   const out = await writeZip(z, new Map([[path, xml], ['xl/workbook.xml', wb2]]));
-  return { bytes: out, info: { sheet: pick[0], named: Object.keys(names).length - missing.length, cards: cardsSet + added.filter(x => !edits.has(x[1])).length, added: added.filter(x => !edits.has(x[1])).map(x => x[0]), noCard: added.filter(x => edits.has(x[1])).map(x => x[0]), offs, missing, left: [...edits.keys()] } };
+  return { bytes: out, info: { carry: carried, sheet: pick[0], named: Object.keys(names).length - missing.length, cards: cardsSet + added.filter(x => !edits.has(x[1])).length, added: added.filter(x => !edits.has(x[1])).map(x => x[0]), noCard: added.filter(x => edits.has(x[1])).map(x => x[0]), offs, missing, left: [...edits.keys()] } };
 }
