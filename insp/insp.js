@@ -5,10 +5,10 @@
 // · 로그인: 소장·부소장(관리자) 또는 점검자 공용 계정 → 점검자 이름은 버튼으로 (관리자 / 하우스맨)
 // ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
-import { makeCards, makeText } from './card.js?v=2026.11.15-10';
-import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-10';
+import { makeCards, makeText } from './card.js?v=2026.11.15-11';
+import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-11';
 
-const VER = '2026.11.15-10';
+const VER = '2026.11.15-11';
 const ACCOUNTS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com', admin: true },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com', admin: true },
@@ -134,7 +134,7 @@ function homeHtml() {
   h += L.map(x => '<button class="row' + (x.state === '재정비 대기' ? ' wait' : '') + '" data-a="open" data-v="' + esc(x.id) + '"><span class="rm">' + esc(x.room) + '</span><span class="rt"><b>' + esc(x.maid || '정비자 모름') + '</b><small>' + (x.n ? '지적 ' + x.n + '건' : '이상 없음') + ' · ' + esc(x.by || '') + ' · ' + hm(x.clientAt) + '</small></span><span class="st' + (x.state === '재정비 대기' ? ' w' : '') + '">' + esc(x.close === '재정비' ? x.state : x.n ? '수정완료' : '이상 없음') + '</span></button>').join('');
   h += '</div>';
   if (acct.admin) h += '<details class="aiset"><summary>⚙ AI 판독 설정 (관리자)</summary><div class="f"><label>모델</label><input id="aimodel" placeholder="비우면 자동 (gemini-3.5-flash → 2.5)" value="' + esc(V.aicfg.model || '') + '"></div>' +
-    '<div class="f"><label>App Check 키</label><input id="aikey" placeholder="reCAPTCHA 사이트 키" value="' + esc(V.aicfg.siteKey || '') + '"></div>' +
+    '<div class="f"><label>App Check 키</label><input id="aikey" placeholder="비우면 기본 키 (11/15 만든 것)" value="' + esc(V.aicfg.siteKey || '') + '"></div>' +
     '<div class="f"><label>키 종류</label><select id="aiac"><option value="ent"' + (V.aicfg.acType !== 'v3' ? ' selected' : '') + '>reCAPTCHA Enterprise</option><option value="v3"' + (V.aicfg.acType === 'v3' ? ' selected' : '') + '>reCAPTCHA v3</option></select></div>' +
     '<button class="big-btn sec" data-a="aisave">저장</button>' + (aiErr() ? '<p class="note warn">마지막 오류: ' + esc(aiErr()) + '</p>' : '') + '</details>';
   return h;

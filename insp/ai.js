@@ -4,10 +4,12 @@
 // · App Check(reCAPTCHA) 필수 (2026-07 부터 AI Logic 설정 때 자동 강제) → 사이트 키는 meta/insp_ai.siteKey (관리자 설정 화면)
 // · 모델 이름도 meta/insp_ai.model 로 바꿀 수 있음 (없으면 MODELS 차례로 시도)
 // 시험: window.__fakeAI = async (base64) => ({...})
-import { ZONES, TYPE_KEY } from '../insp_items.js?v=2026.11.15-10';
+import { ZONES, TYPE_KEY } from '../insp_items.js?v=2026.11.15-11';
 
 const FB = 'https://www.gstatic.com/firebasejs/12.19.0/';
 const MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
+// App Check 사이트 키 (11/15 생성: reCAPTCHA Enterprise 'haeundae-rm 웹앱 App Check (인스펙션 AI)', 도메인 haeundae-rm.github.io). 공개돼도 되는 키. meta/insp_ai.siteKey 가 있으면 그걸 씀
+const SITE_KEY = '6LfI2yAuAAAAAEj0vYWJZS1XP7bhatqp7XudI08E';
 const PARTS = ZONES.map(z => z.z + ': ' + z.parts.map(p => p[0]).join(', ')).join('\n');
 const TYPES = Array.from(new Set(Object.values(TYPE_KEY)));
 
@@ -39,9 +41,10 @@ export function setCfg(c) { cfg = c || {}; modelP = null; }
 async function getModel(name) {
   const [A, AI, AC] = await Promise.all([import(FB + 'firebase-app.js'), import(FB + 'firebase-ai.js'), import(FB + 'firebase-app-check.js')]);
   const app = A.getApp();
-  if (cfg && cfg.siteKey && !window.__inspAppCheck) {
-    const P = cfg.acType === 'v3' ? AC.ReCaptchaV3Provider : AC.ReCaptchaEnterpriseProvider;
-    try { AC.initializeAppCheck(app, { provider: new P(cfg.siteKey), isTokenAutoRefreshEnabled: true }); } catch (e) { console.warn('App Check', e); }
+  const key = (cfg && cfg.siteKey) || SITE_KEY;
+  if (key && !window.__inspAppCheck) {
+    const P = cfg && cfg.acType === 'v3' ? AC.ReCaptchaV3Provider : AC.ReCaptchaEnterpriseProvider;
+    try { AC.initializeAppCheck(app, { provider: new P(key), isTokenAutoRefreshEnabled: true }); } catch (e) { console.warn('App Check', e); }
     window.__inspAppCheck = 1;
   }
   const ai = AI.getAI(app, { backend: new AI.GoogleAIBackend() });
