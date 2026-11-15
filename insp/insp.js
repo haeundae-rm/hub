@@ -5,10 +5,10 @@
 // · 로그인: 소장·부소장(관리자) 또는 점검자 공용 계정 → 점검자 이름은 버튼으로 (관리자 / 하우스맨)
 // ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
-import { makeCards, makeText } from './card.js?v=2026.11.15-11';
-import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-11';
+import { makeCards, makeText } from './card.js?v=2026.11.15-12';
+import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-12';
 
-const VER = '2026.11.15-11';
+const VER = '2026.11.15-12';
 const ACCOUNTS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com', admin: true },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com', admin: true },
@@ -89,6 +89,7 @@ function draw() {
   const y = window.scrollY, ae = document.activeElement;
   const fk = ae && ae.tagName === 'INPUT' && m.contains(ae) ? (ae.id ? '#' + ae.id : ae.hasAttribute('data-p') ? '.ptxt[data-p="' + ae.getAttribute('data-p') + '"]' : ae.hasAttribute('data-x') ? '[data-x="' + ae.getAttribute('data-x') + '"]' : '') : '';
   const fs = fk ? [ae.selectionStart, ae.selectionEnd] : null;
+  document.body.classList.toggle('drafting', V.view === 'draft');
   m.innerHTML = V.view === 'draft' ? draftHtml() : V.view === 'done' ? doneHtml() : V.view === 'see' ? seeHtml() : homeHtml();
   if (V.keep === false) window.scrollTo(0, 0); else window.scrollTo(0, y);
   V.keep = true;
@@ -145,6 +146,7 @@ function draftRow(x) {
 }
 function aiLine(p, i) {
   if (p.aiBusy) return '<p class="ai busy">🤖 판독 중…</p>';
+  if (p.aiFail && !p.ai) return '<p class="ai warn">🤖 판독 안 됨 <button class="ref" data-a="aire" data-v="' + i + '">다시 판독</button></p>';
   let h = '';
   if (p.dup || p.blur) h += '<p class="ai warn">' + (p.blur ? '흔들려서 잘 안 보여요' : '바로 앞 사진과 거의 같아요') + ' — <button class="ref" data-a="pdel" data-v="' + i + '">빼기</button> <button class="ref" data-a="keep" data-v="' + i + '">그대로 두기</button></p>';
   if (p.ai && p.ai.kind === 'ok' && !p.roomPlate) h += '<p class="ai">🤖 문제가 잘 안 보여요 — 직접 적어 주세요</p>';
@@ -164,7 +166,7 @@ function draftHtml() {
       '<button class="chip ghost" data-a="plate" data-v="' + i + '">🚪 룸넘버</button></div>') + '</div>').join('');
   h += '<div class="card"><h2>사진 없는 지적 <small>예: 생수 하나 세팅</small></h2>' + (x.extra || []).map((t, i) => '<div class="ex"><input data-x="' + i + '" value="' + esc(t) + '"><button class="vp-x" data-a="xdel" data-v="' + i + '" aria-label="지우기">✕</button></div>').join('') +
     '<button class="ref" data-a="xadd">＋ 한 줄 더하기</button></div>';
-  h += '<div class="bar"><div class="bar1"><button class="big-btn cam" data-a="cam">📷 찍기</button><button class="big-btn sec" data-a="gal">🖼</button><span class="cnt">지적 <b>' + nF + '</b>건</span></div>' +
+  h += '<div class="ibar"><div class="bar1"><button class="big-btn cam" data-a="cam">📷 찍기</button><button class="big-btn sec" data-a="gal">🖼</button><span class="cnt">지적 <b>' + nF + '</b>건</span></div>' +
     (x.saving ? '<button class="big-btn" disabled>' + esc(x.saving) + '</button>' :
       nF ? '<div class="btn2"><button class="big-btn ok" data-a="save" data-v="수정완료">✅ 수정완료</button><button class="big-btn danger" data-a="save" data-v="재정비">🔧 재정비 요청</button></div>'
         : '<button class="big-btn ok" data-a="save" data-v=""' + (x.photos.length ? '' : ' disabled') + '>✅ 이상 없음으로 저장</button>') +
@@ -244,7 +246,7 @@ async function aiNext() {
     const r = blob ? await readPhoto(blob) : null;
     p.aiBusy = 0;
     if (!x.photos.includes(p)) return;
-    if (!r) { p.aiFail = 1; V.aiMsg = 'AI 판독이 안 돼요 — 직접 적어 주세요' + (acct && acct.admin && aiErr() ? ' (' + aiErr().slice(0, 80) + ')' : ''); }
+    if (!r) { p.aiFail = 1; const er = aiErr(); V.aiMsg = 'AI 판독이 안 돼요 — 직접 적어 주세요' + (/prepay|credits/i.test(er) ? ' (Gemini 선불 크레딧 부족 — 관리자가 AI Studio 에서 충전)' : acct && acct.admin && er ? ' (' + er.replace(/^AI: Error fetching from \S+: /, '').slice(0, 140) + ')' : ''); }
     else {
       p.ai = r; V.aiMsg = '';
       if (r.kind === 'room') { p.roomPlate = true; if (!x.room && roomOk(r.room)) { x.room = r.room; x.roomBy = 'AI'; findMaid(x, r.room); } }
@@ -419,6 +421,7 @@ document.addEventListener('click', async e => {
   if (a === 'tcopy2') { copyText(makeText(textOf(V.see))); return; }
   if (!x) return;
   if (a === 'pdel') { const i = Number(v), p = x.photos[i]; if (!p) return; if (p.t && !confirm('이 사진과 문구를 뺄까요?')) return; x.photos.splice(i, 1); idb.del('blobs', p.pid).catch(() => {}); if (x.paths) delete x.paths[p.pid]; await saveDraft(); draw(); return; }
+  if (a === 'aire') { const p = x.photos[Number(v)]; p.aiFail = 0; V.aiMsg = ''; aiQueue(x, p); draw(); return; }
   if (a === 'keep') { const p = x.photos[Number(v)]; p.dup = 0; p.blur = 0; await saveDraft(); draw(); return; }
   if (a === 'plate') { const p = x.photos[Number(v)]; p.roomPlate = !p.roomPlate; await saveDraft(); draw(); return; }
   if (a === 'chip') { const p = x.photos[Number(v)], c = t.getAttribute('data-c'); p.t = (String(p.t || '').trim() + ' ' + c).trim(); await saveDraft(); draw(); const el = document.querySelector('.ptxt[data-p="' + v + '"]'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } return; }

@@ -4,7 +4,7 @@
 // · App Check(reCAPTCHA) 필수 (2026-07 부터 AI Logic 설정 때 자동 강제) → 사이트 키는 meta/insp_ai.siteKey (관리자 설정 화면)
 // · 모델 이름도 meta/insp_ai.model 로 바꿀 수 있음 (없으면 MODELS 차례로 시도)
 // 시험: window.__fakeAI = async (base64) => ({...})
-import { ZONES, TYPE_KEY } from '../insp_items.js?v=2026.11.15-11';
+import { ZONES, TYPE_KEY } from '../insp_items.js?v=2026.11.15-12';
 
 const FB = 'https://www.gstatic.com/firebasejs/12.19.0/';
 const MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
@@ -89,7 +89,7 @@ export async function readPhoto(blob) {
     lastErr = '';
     return clean(Array.isArray(j) ? j[0] : j);
   } catch (e) {
-    lastErr = String(e && (e.code || e.message) || e).slice(0, 200);
+    lastErr = String(e && (e.message || e.code) || e).slice(0, 300);
     console.warn('AI 판독', e);
     return null;
   }
