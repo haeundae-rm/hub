@@ -29,7 +29,7 @@ async function grab() {
 }
 export async function openCam(o) {
   if (!camOk()) return false;
-  const el = document.createElement('div'); el.className = 'cam';
+  const el = document.createElement('div'); el.className = 'camv';
   el.innerHTML = '<video playsinline muted autoplay></video><div class="cam-top"><span class="cam-n">0장</span><span class="cam-msg">계속 눌러 찍어요 · 판독은 뒤에서 바로 시작</span></div>' +
     '<div class="cam-strip"></div><div class="cam-bar"><button class="cam-x" data-c="done">완료</button><button class="cam-shot" data-c="shot" aria-label="찍기"></button><span class="cam-sp"></span></div><div class="cam-flash"></div>';
   document.body.appendChild(el); document.body.classList.add('camming');

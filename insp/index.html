@@ -110,7 +110,7 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 60px}
 .card h2+.row{border-top:0}.row.wait{background:var(--warn-soft);border-radius:10px}
 .row .rm{font:800 19px var(--f-num);min-width:52px}.row .rt{flex:1;min-width:0;display:flex;flex-direction:column}.row .rt b{font-size:15px}.row .rt small{color:var(--muted);font-size:12.5px}
 .row .st{font-size:12.5px;font-weight:800;color:var(--muted);white-space:nowrap}.row .st.w{color:var(--warn)}
-.top-card,.card.top{padding-bottom:10px}.f{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;margin:0 0 8px}.f label{font-weight:800;font-size:14px;color:var(--muted)}
+.card.itop{padding-bottom:10px}.f{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;margin:0 0 8px}.f label{font-weight:800;font-size:14px;color:var(--muted)}
 .f input{width:100%;box-sizing:border-box;min-height:48px;border:1.5px solid var(--line);border-radius:12px;padding:0 12px;font:17px var(--f-body);background:var(--surface);color:var(--ink)}
 .f .roomin{font:800 24px var(--f-num);letter-spacing:2px}.note.warn{color:var(--wait);font-weight:700;margin:6px 0 0}
 .ph{background:var(--surface);border-radius:18px;padding:10px;margin:0 0 12px;box-shadow:var(--shadow)}.ph.plate{opacity:.75}
@@ -129,8 +129,8 @@ body.drafting main{padding-bottom:calc(230px + env(safe-area-inset-bottom))}
 .thumbs{display:grid;grid-template-columns:1fr 1fr;gap:8px}.thumbs figure{margin:0}.thumbs img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:#E4E8EF}.thumbs figcaption{font-size:13px;font-weight:700;margin-top:4px}
 .ai{font-size:13px;font-weight:700;color:var(--brand);margin:6px 0 0}.ai.busy{color:var(--muted)}.ai.warn{color:var(--wait)}
 .aiset{margin-top:16px;font-size:14px}.aiset summary{cursor:pointer;color:var(--muted);margin-bottom:8px}.aiset .f{grid-template-columns:96px 1fr}.aiset select{min-height:44px;border:1.5px solid var(--line);border-radius:12px;font:15px var(--f-body)}
-.cam{position:fixed;inset:0;z-index:80;background:#000;display:flex;flex-direction:column}
-.cam video{flex:1;width:100%;min-height:0;object-fit:cover;background:#000}
+.camv{position:fixed;inset:0;z-index:80;background:#000;display:flex;flex-direction:column}
+.camv video{flex:1;width:100%;min-height:0;object-fit:cover;background:#000}
 .cam-top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:linear-gradient(rgba(0,0,0,.6),transparent);color:#fff}
 .cam-n{font:900 20px var(--f-body);background:var(--warn);border-radius:99px;padding:2px 12px}.cam-msg{font-size:13px;opacity:.9}
 .cam-strip{position:absolute;left:0;right:0;bottom:calc(120px + env(safe-area-inset-bottom));display:flex;gap:6px;overflow-x:auto;padding:0 12px}.cam-strip img{width:56px;height:74px;object-fit:cover;border-radius:8px;border:2px solid #fff;flex:none}
@@ -145,6 +145,6 @@ body.camming{overflow:hidden}
 <body>
 <header class="top"><div class="top-in"><div class="top-row"><div class="tt"><h1>🔍 객실 인스펙션</h1><div class="sub" id="who">한화리조트 해운대</div></div><button class="out" id="out">로그아웃</button></div></div></header>
 <main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
-<script type="module" src="insp.js?v=2026.11.15-14"></script>
+<script type="module" src="insp.js?v=2026.11.15-15"></script>
 </body>
 </html>
