@@ -3,11 +3,12 @@
 // · 작성 중인 점검은 휴대폰(IndexedDB)에 사진째 바로 저장 → 화면이 잠기거나 브라우저가 새로 고쳐도 이어서
 // · 저장: Firestore insp/{날짜_객실_시각} + 사진은 Cloud Storage insp/{날짜}/{id}/{n}.jpg (인터넷이 끊기면 휴대폰에 두었다가 다시 올림)
 // · 로그인: 소장·부소장(관리자) 또는 점검자 공용 계정 → 점검자 이름은 버튼으로 (관리자 / 하우스맨)
-// ② 다음: AI(Gemini)가 사진을 보고 문구·분류를 먼저 써 줌 · 룸넘버 판 읽기
+// ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
-import { makeCards, makeText } from './card.js?v=2026.11.15-9';
+import { makeCards, makeText } from './card.js?v=2026.11.15-10';
+import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-10';
 
-const VER = '2026.11.15-9';
+const VER = '2026.11.15-10';
 const ACCOUNTS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com', admin: true },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com', admin: true },
@@ -52,7 +53,7 @@ function stor() {
 }
 
 let user = null, acct = null, login = { who: 0, err: '', busy: false };
-let V = { view: 'home', d: ymd(), list: null, err: '', drafts: [], cur: null, done: null, msg: '', plans: {} };
+let V = { aicfg: {}, view: 'home', d: ymd(), list: null, err: '', drafts: [], cur: null, done: null, msg: '', plans: {} };
 const urls = {};   // pid → 화면용 주소 (objectURL)
 
 // ---------- 점검자
@@ -131,21 +132,34 @@ function homeHtml() {
   if (!V.list) h += '<p class="note" style="margin:0">읽는 중…</p>';
   else if (!L.length) h += '<p class="note" style="margin:0">아직 없어요.</p>';
   h += L.map(x => '<button class="row' + (x.state === '재정비 대기' ? ' wait' : '') + '" data-a="open" data-v="' + esc(x.id) + '"><span class="rm">' + esc(x.room) + '</span><span class="rt"><b>' + esc(x.maid || '정비자 모름') + '</b><small>' + (x.n ? '지적 ' + x.n + '건' : '이상 없음') + ' · ' + esc(x.by || '') + ' · ' + hm(x.clientAt) + '</small></span><span class="st' + (x.state === '재정비 대기' ? ' w' : '') + '">' + esc(x.close === '재정비' ? x.state : x.n ? '수정완료' : '이상 없음') + '</span></button>').join('');
-  return h + '</div>';
+  h += '</div>';
+  if (acct.admin) h += '<details class="aiset"><summary>⚙ AI 판독 설정 (관리자)</summary><div class="f"><label>모델</label><input id="aimodel" placeholder="비우면 자동 (gemini-3.5-flash → 2.5)" value="' + esc(V.aicfg.model || '') + '"></div>' +
+    '<div class="f"><label>App Check 키</label><input id="aikey" placeholder="reCAPTCHA 사이트 키" value="' + esc(V.aicfg.siteKey || '') + '"></div>' +
+    '<div class="f"><label>키 종류</label><select id="aiac"><option value="ent"' + (V.aicfg.acType !== 'v3' ? ' selected' : '') + '>reCAPTCHA Enterprise</option><option value="v3"' + (V.aicfg.acType === 'v3' ? ' selected' : '') + '>reCAPTCHA v3</option></select></div>' +
+    '<button class="big-btn sec" data-a="aisave">저장</button>' + (aiErr() ? '<p class="note warn">마지막 오류: ' + esc(aiErr()) + '</p>' : '') + '</details>';
+  return h;
 }
 function draftRow(x) {
   const n = x.photos.length;
   return '<button class="row" data-a="resume" data-v="' + esc(x.id) + '"><span class="rm">' + esc(x.room || '----') + '</span><span class="rt"><b>' + esc(x.maid || '정비자 —') + '</b><small>사진 ' + n + '장 · ' + hm(x.at) + ' 마지막</small></span><span class="st w">이어 하기 ›</span></button>';
+}
+function aiLine(p, i) {
+  if (p.aiBusy) return '<p class="ai busy">🤖 판독 중…</p>';
+  let h = '';
+  if (p.dup || p.blur) h += '<p class="ai warn">' + (p.blur ? '흔들려서 잘 안 보여요' : '바로 앞 사진과 거의 같아요') + ' — <button class="ref" data-a="pdel" data-v="' + i + '">빼기</button> <button class="ref" data-a="keep" data-v="' + i + '">그대로 두기</button></p>';
+  if (p.ai && p.ai.kind === 'ok' && !p.roomPlate) h += '<p class="ai">🤖 문제가 잘 안 보여요 — 직접 적어 주세요</p>';
+  if (p.ai && p.ai.kind === 'fault' && p.tAI) h += '<p class="ai' + (p.ai.conf < 0.6 ? ' warn' : '') + '">🤖 AI 문구' + (p.ai.conf < 0.6 ? ' · 확인 필요' : '') + (p.ai.part ? ' · ' + esc(p.ai.zone + ' ' + p.ai.part + ' / ' + p.ai.type) : '') + '</p>';
+  return h;
 }
 function draftHtml() {
   const x = V.cur; if (!x) return '';
   const nF = faults(x);
   let h = '<div class="card top"><div class="f"><label for="room">객실</label><input id="room" class="roomin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="예: 2217" value="' + esc(x.room) + '"></div>' +
     '<div class="f"><label for="maid">정비자</label><input id="maid" list="maids" autocomplete="off" placeholder="' + (x.maidBusy ? '찾는 중…' : '객실을 넣으면 자동') + '" value="' + esc(x.maid) + '"><datalist id="maids">' + Object.keys(V.plans).sort().map(m => '<option value="' + esc(m) + '">').join('') + '</datalist></div>' +
-    (x.maidHow ? '<p class="note" style="margin:0 0 0 72px">' + esc(x.maidHow) + '</p>' : '') + (x.warn ? '<p class="note warn">' + esc(x.warn) + '</p>' : '') + '</div>';
+    (x.maidHow ? '<p class="note" style="margin:0 0 0 72px">' + (x.roomBy === 'AI' ? '🤖 룸넘버 판독 · ' : '') + esc(x.maidHow) + '</p>' : '') + (V.aiMsg ? '<p class="note warn">' + esc(V.aiMsg) + '</p>' : '') + (x.warn ? '<p class="note warn">' + esc(x.warn) + '</p>' : '') + '</div>';
   if (!x.photos.length) h += '<div class="card"><p class="note" style="margin:0">아래 📷 로 찍거나 🖼 로 갤러리 사진을 골라요. 잘못 찍은 사진은 ✕ 로 빼요.</p></div>';
   h += x.photos.map((p, i) => '<div class="ph' + (p.roomPlate ? ' plate' : '') + '"><div class="pimg"><img src="' + (urls[p.pid] || '') + '" alt="사진 ' + (i + 1) + '"><span class="pno">' + (p.roomPlate ? '🚪' : no(x, i)) + '</span><button class="px" data-a="pdel" data-v="' + i + '" aria-label="사진 빼기">✕</button></div>' +
-    (p.roomPlate ? '<p class="note" style="margin:6px 0 0">룸넘버 사진 — 공유 이미지에 안 들어가요 <button class="ref" data-a="plate" data-v="' + i + '">지적 사진으로</button></p>' :
+    aiLine(p, i) + (p.roomPlate ? '<p class="note" style="margin:6px 0 0">룸넘버 사진 — 공유 이미지에 안 들어가요 <button class="ref" data-a="plate" data-v="' + i + '">지적 사진으로</button></p>' :
       '<input class="ptxt" data-p="' + i + '" placeholder="지적 한 줄 (예: 각티슈 세팅 미흡)" value="' + esc(p.t) + '"><div class="chips sm">' + CHIPS.map(c => '<button class="chip" data-a="chip" data-v="' + i + '" data-c="' + esc(c) + '">' + esc(c) + '</button>').join('') +
       '<button class="chip ghost" data-a="plate" data-v="' + i + '">🚪 룸넘버</button></div>') + '</div>').join('');
   h += '<div class="card"><h2>사진 없는 지적 <small>예: 생수 하나 세팅</small></h2>' + (x.extra || []).map((t, i) => '<div class="ex"><input data-x="' + i + '" value="' + esc(t) + '"><button class="vp-x" data-a="xdel" data-v="' + i + '" aria-label="지우기">✕</button></div>').join('') +
@@ -209,13 +223,36 @@ async function addPhotos(files) {
       const r = await shrink(f), pid = 'p' + newId();
       await idb.put('blobs', r.blob, pid);
       urls[pid] = URL.createObjectURL(r.blob);
-      x.photos.push({ pid, w: r.w, h: r.h, t: '', at: Date.now() });
+      const ph = { pid, w: r.w, h: r.h, t: '', at: Date.now() };
+      try { ph.hash = await hashOf(r.blob); const prev = x.photos[x.photos.length - 1]; if (prev && hamming(prev.hash, ph.hash) <= 5) ph.dup = 1; } catch (e) {}
+      x.photos.push(ph); aiQueue(x, ph);
       if (x.st === 'saved') x.dirty = true;
       await saveDraft();
     } catch (e) { alert('사진 하나를 못 넣었어요: ' + (e && e.message || e)); }
   }
   x.saving = ''; draw();
   setTimeout(() => { const els = document.querySelectorAll('.ptxt'); if (els.length) els[els.length - 1].scrollIntoView({ block: 'center' }); }, 60);
+}
+// ---------- AI 판독 대기열 (동시에 2장)
+const AQ = []; let aRun = 0;
+function aiQueue(x, p) { if (V.aiOff) return; p.aiBusy = 1; AQ.push([x, p]); aiNext(); }
+async function aiNext() {
+  if (aRun >= 2 || !AQ.length) return;
+  const [x, p] = AQ.shift(); aRun++;
+  try {
+    const blob = await idb.get('blobs', p.pid);
+    const r = blob ? await readPhoto(blob) : null;
+    p.aiBusy = 0;
+    if (!x.photos.includes(p)) return;
+    if (!r) { p.aiFail = 1; V.aiMsg = 'AI 판독이 안 돼요 — 직접 적어 주세요' + (acct && acct.admin && aiErr() ? ' (' + aiErr().slice(0, 80) + ')' : ''); }
+    else {
+      p.ai = r; V.aiMsg = '';
+      if (r.kind === 'room') { p.roomPlate = true; if (!x.room && roomOk(r.room)) { x.room = r.room; x.roomBy = 'AI'; findMaid(x, r.room); } }
+      else if (r.kind === 'blur') p.blur = 1;
+      else if (r.kind === 'fault' && !String(p.t || '').trim() && r.text) { p.t = r.text; p.tAI = 1; }
+    }
+    if (V.cur === x) { await saveDraft(); draw(); } else await idb.put('drafts', Object.assign({}, x)).catch(() => {});
+  } finally { aRun--; aiNext(); }
 }
 async function startDraft() {
   const b = byNow();
@@ -225,12 +262,13 @@ async function startDraft() {
   await saveDraft();
 }
 let saveT = null;
-function saveDraft() { const x = V.cur; if (!x) return Promise.resolve(); x.at = Date.now(); const c = Object.assign({}, x); delete c.saving; delete c.maidBusy; return idb.put('drafts', c).catch(e => console.warn('임시 저장', e)); }
+function saveDraft() { const x = V.cur; if (!x) return Promise.resolve(); x.at = Date.now(); const c = Object.assign({}, x); delete c.saving; delete c.maidBusy; c.photos = x.photos.map(p => { const q = Object.assign({}, p); delete q.aiBusy; return q; }); return idb.put('drafts', c).catch(e => console.warn('임시 저장', e)); }
 function saveSoon() { clearTimeout(saveT); saveT = setTimeout(saveDraft, 400); }
 async function openDraft(id) {
   const x = await idb.get('drafts', id); if (!x) return;
   for (const p of x.photos) if (!urls[p.pid]) { const b = await idb.get('blobs', p.pid); if (b) urls[p.pid] = URL.createObjectURL(b); }
   V.cur = x; V.view = 'draft'; V.keep = false; V.done = null;
+  x.photos.forEach(p => { p.aiBusy = 0; if (!p.ai && !p.aiFail) aiQueue(x, p); });
   loadPlans(x.date); draw();
 }
 
@@ -262,7 +300,9 @@ async function save(close) {
   if (!x.maid && !confirm('정비자를 모르는 채로 저장할까요? (메이드별 기록에서 빠져요)')) return;
   if (close === '재정비' && !x.maid) { alert('재정비 요청은 정비자가 있어야 해요.'); return; }
   const docId = x.docId || (x.date + '_' + x.room + '_' + newId());
-  const photos = x.photos.map((p, i) => ({ p: 'insp/' + x.date + '/' + docId + '/' + p.pid + '.jpg', t: isF(p) ? String(p.t).trim().slice(0, 100) : '', w: p.w, h: p.h, plate: !!p.roomPlate }));
+  const photos = x.photos.map((p, i) => { const o = { p: 'insp/' + x.date + '/' + docId + '/' + p.pid + '.jpg', t: isF(p) ? String(p.t).trim().slice(0, 100) : '', w: p.w, h: p.h, plate: !!p.roomPlate };
+    if (p.ai) { o.ai = { k: p.ai.kind, t: p.ai.text, z: p.ai.zone, pt: p.ai.part, ty: p.ai.type, c: p.ai.conf }; o.edit = isF(p) && String(p.t).trim() !== p.ai.text; }   // AI 문구를 사람이 고쳤는지 → 나중에 문구 사전·정확도
+    return o; });
   const extra = (x.extra || []).map(t => String(t).trim().slice(0, 100)).filter(Boolean);
   const prev = x.docId ? (V.list || []).filter(y => y.id === docId)[0] : null;
   const doc = { v: 2, date: x.date, room: x.room, maid: String(x.maid || '').trim().slice(0, 20), maidHow: x.maidHand ? '직접' : String(x.maidHow || '').slice(0, 60), by: x.by, grp: x.grp,
@@ -369,11 +409,17 @@ document.addEventListener('click', async e => {
     try { await S.set('insp/' + s.id, doc); s.state = '확인'; go('home'); } catch (err) { alert('저장하지 못했어요: ' + (err && (err.code || err.message) || err)); }
     return;
   }
+  if (a === 'aisave') {
+    const c = { model: ($('#aimodel') || {}).value.trim(), siteKey: ($('#aikey') || {}).value.trim(), acType: ($('#aiac') || {}).value, at: S.SERVER_TIME };
+    try { await S.set('meta/insp_ai', c); V.aicfg = c; setCfg(c); alert('저장했어요. 새로 고침하면 새 설정으로 판독해요.'); } catch (err) { alert('저장하지 못했어요: ' + (err && (err.code || err.message) || err)); }
+    return;
+  }
   if (a === 'share' || a === 'isave') return shareImgs(a);
   if (a === 'tcopy') { if (V.done && V.done.text) copyText(V.done.text); return; }
   if (a === 'tcopy2') { copyText(makeText(textOf(V.see))); return; }
   if (!x) return;
   if (a === 'pdel') { const i = Number(v), p = x.photos[i]; if (!p) return; if (p.t && !confirm('이 사진과 문구를 뺄까요?')) return; x.photos.splice(i, 1); idb.del('blobs', p.pid).catch(() => {}); if (x.paths) delete x.paths[p.pid]; await saveDraft(); draw(); return; }
+  if (a === 'keep') { const p = x.photos[Number(v)]; p.dup = 0; p.blur = 0; await saveDraft(); draw(); return; }
   if (a === 'plate') { const p = x.photos[Number(v)]; p.roomPlate = !p.roomPlate; await saveDraft(); draw(); return; }
   if (a === 'chip') { const p = x.photos[Number(v)], c = t.getAttribute('data-c'); p.t = (String(p.t || '').trim() + ' ' + c).trim(); await saveDraft(); draw(); const el = document.querySelector('.ptxt[data-p="' + v + '"]'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } return; }
   if (a === 'xadd') { x.extra = (x.extra || []).concat(['']); await saveDraft(); draw(); const els = document.querySelectorAll('[data-x]'); if (els.length) els[els.length - 1].focus(); return; }
@@ -395,7 +441,7 @@ document.addEventListener('input', e => {
     return;
   }
   if (el.id === 'maid') { x.maid = el.value.trim(); x.maidHand = true; x.maidHow = ''; saveSoon(); return; }
-  if (el.classList.contains('ptxt')) { const p = x.photos[Number(el.getAttribute('data-p'))]; if (p) { p.t = el.value; saveSoon(); const c = document.querySelector('.cnt b'); if (c) c.textContent = faults(x); } return; }
+  if (el.classList.contains('ptxt')) { const p = x.photos[Number(el.getAttribute('data-p'))]; if (p) { p.t = el.value; p.tAI = 0; saveSoon(); const c = document.querySelector('.cnt b'); if (c) c.textContent = faults(x); } return; }
   if (el.hasAttribute('data-x')) { x.extra[Number(el.getAttribute('data-x'))] = el.value; saveSoon(); const c = document.querySelector('.cnt b'); if (c) c.textContent = faults(x); return; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'pw') doLogin(); });
@@ -425,6 +471,8 @@ S.onUser(async u => {
   if (u && !u.anon && !acct) login.err = '인스펙션 계정이 아니에요. 로그아웃 후 다시 들어와 주세요.';
   draw();
   if (!acct) return;
+  try { const c = await S.get('meta/insp_ai'); V.aicfg = c || {}; } catch (e) { V.aicfg = {}; }
+  setCfg(V.aicfg);
   await loadDrafts();
   // 작성 중이 하나뿐이고 방금(10분 안) 하던 것이면 바로 그 화면으로 (화면 잠김 뒤 이어서)
   const open = V.drafts.filter(x => x.st !== 'saved');
