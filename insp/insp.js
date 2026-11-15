@@ -5,11 +5,11 @@
 // · 로그인: 소장·부소장(관리자) 또는 점검자 공용 계정 → 점검자 이름은 버튼으로 (관리자 / 하우스맨)
 // ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
-import { makeCards, makeText } from './card.js?v=2026.11.15-15';
-import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-15';
-import { openCam, camOk } from './cam.js?v=2026.11.15-15';
+import { makeCards, makeText } from './card.js?v=2026.11.15-16';
+import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.15-16';
+import { openCam, camOk } from './cam.js?v=2026.11.15-16';
 
-const VER = '2026.11.15-15';
+const VER = '2026.11.15-16';
 const ACCOUNTS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com', admin: true },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com', admin: true },
@@ -120,7 +120,7 @@ function homeHtml() {
   if (!b || V.pickBy) return byHtml() + (b ? '<button class="big-btn sec" data-a="bydone">닫기</button>' : '');
   h += '<div class="bybar">점검 <b>' + esc(b.name) + '</b> <small>' + esc(b.g) + '</small><button class="ref" data-a="bychg">바꾸기</button></div>';
   const open = V.drafts.filter(x => x.st !== 'saved');
-  h += '<div class="shoot"><button class="big-btn cam" data-a="cam">📷 새 객실 촬영</button><button class="big-btn sec" data-a="gal">🖼 갤러리에서</button></div><p class="note" style="margin:-6px 0 12px">📷 연속 촬영: 셔터만 계속 누르고 ‘완료’ · 🖼 갤러리: 사진을 길게 눌러 여러 장 선택</p>';
+  h += '<div class="shoot"><button class="big-btn cam" data-a="cam">📷 새 객실 촬영</button><button class="big-btn sec" data-a="gal">🖼 갤러리에서</button></div><p class="note" style="margin:-6px 0 12px">📷 연속 촬영: 셔터만 계속 누르고 ‘완료’ · 🖼 갤러리: 사진을 길게 눌러 여러 장 선택' + galHint() + '</p>';
   if (open.length) h += '<div class="card"><h2>작성 중 <small>이어서 하기</small></h2>' + open.map(x => draftRow(x)).join('') + '</div>';
   const pend = V.drafts.filter(x => x.st === 'saved' && !allUp(x));
   if (pend.length) h += '<p class="waitbox">⏫ 사진 ' + pend.reduce((s, x) => s + x.photos.filter(p => !(x.up && x.up[p.pid])).length, 0) + '장을 아직 못 올렸어요. 인터넷이 되면 자동으로 올려요. <button class="ref" data-a="retry">지금 다시</button></p>';
@@ -141,6 +141,11 @@ function homeHtml() {
     '<button class="big-btn sec" data-a="aisave">저장</button>' + (aiErr() ? '<p class="note warn">마지막 오류: ' + esc(aiErr()) + '</p>' : '') + '</details>';
   return h;
 }
+function galHint() {
+  return lsGet('insp_gal', 'photo') === 'files'
+    ? ' · 지금 <b>파일 방식</b> <button class="ref" data-a="gal1">기본으로</button>'
+    : '<br>갤러리에서 한 장씩만 골라지면 → <button class="ref" data-a="gal2">📂 여러 장 고르기(파일 방식)</button>';
+}
 function draftRow(x) {
   const n = x.photos.length;
   return '<button class="row" data-a="resume" data-v="' + esc(x.id) + '"><span class="rm">' + esc(x.room || '----') + '</span><span class="rt"><b>' + esc(x.maid || '정비자 —') + '</b><small>사진 ' + n + '장 · ' + hm(x.at) + ' 마지막</small></span><span class="st w">이어 하기 ›</span></button>';
@@ -160,7 +165,7 @@ function draftHtml() {
   let h = '<div class="card itop"><div class="f"><label for="room">객실</label><input id="room" class="roomin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="예: 2217" value="' + esc(x.room) + '"></div>' +
     '<div class="f"><label for="maid">정비자</label><input id="maid" list="maids" autocomplete="off" placeholder="' + (x.maidBusy ? '찾는 중…' : '객실을 넣으면 자동') + '" value="' + esc(x.maid) + '"><datalist id="maids">' + Object.keys(V.plans).sort().map(m => '<option value="' + esc(m) + '">').join('') + '</datalist></div>' +
     (x.maidHow ? '<p class="note" style="margin:0 0 0 72px">' + (x.roomBy === 'AI' ? '🤖 룸넘버 판독 · ' : '') + esc(x.maidHow) + '</p>' : '') + (V.aiMsg ? '<p class="note warn">' + esc(V.aiMsg) + '</p>' : '') + (x.warn ? '<p class="note warn">' + esc(x.warn) + '</p>' : '') + '</div>';
-  if (!x.photos.length) h += '<div class="card"><p class="note" style="margin:0">📷 를 누르면 연속 촬영 — 셔터만 계속 누르고 ‘완료’. 🖼 갤러리는 사진을 <b>길게 눌러 여러 장</b> 고를 수 있어요. 잘못 찍은 사진은 ✕ 로 빼요.</p></div>';
+  if (!x.photos.length) h += '<div class="card"><p class="note" style="margin:0">📷 를 누르면 연속 촬영 — 셔터만 계속 누르고 ‘완료’. 🖼 갤러리는 사진을 <b>길게 눌러 여러 장</b> 고를 수 있어요. 잘못 찍은 사진은 ✕ 로 빼요.' + galHint() + '</p></div>';
   h += x.photos.map((p, i) => '<div class="ph' + (p.roomPlate ? ' plate' : '') + '"><div class="pimg"><img src="' + (urls[p.pid] || '') + '" alt="사진 ' + (i + 1) + '"><span class="pno">' + (p.roomPlate ? '🚪' : no(x, i)) + '</span><button class="px" data-a="pdel" data-v="' + i + '" aria-label="사진 빼기">✕</button></div>' +
     aiLine(p, i) + (p.roomPlate ? '<p class="note" style="margin:6px 0 0">룸넘버 사진 — 공유 이미지에 안 들어가요 <button class="ref" data-a="plate" data-v="' + i + '">지적 사진으로</button></p>' :
       '<input class="ptxt" data-p="' + i + '" placeholder="지적 한 줄 (예: 각티슈 세팅 미흡)" value="' + esc(p.t) + '"><div class="chips sm">' + CHIPS.map(c => '<button class="chip" data-a="chip" data-v="' + i + '" data-c="' + esc(c) + '">' + esc(c) + '</button>').join('') +
@@ -204,8 +209,12 @@ async function loadSeeImgs() {
 }
 
 // ---------- 촬영 · 고르기
-function pick(multi) {
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+// 갤러리 여러 장 (11/15): 일부 삼성·안드로이드 크롬은 accept=image/* 로 열면 '사진 선택기'가 한 장만 고르게 됨
+//   → 'files' 방식(확장자로 열기 = 시스템 파일 선택기, 길게 눌러 여러 장)을 따로 두고, 한 번 쓰면 휴대폰이 기억
+function pick(multi, how) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.style.display = 'none';
+  const mode = how || lsGet('insp_gal', 'photo');
+  inp.accept = multi && mode === 'files' ? '.jpg,.jpeg,.png,.webp,.heic,.heif' : 'image/*';
   if (multi) inp.multiple = true; else inp.setAttribute('capture', 'environment');
   inp.addEventListener('change', async () => { const fs = Array.from(inp.files || []); inp.remove(); if (fs.length) await addPhotos(fs); });
   document.body.appendChild(inp); inp.click();
@@ -402,6 +411,8 @@ document.addEventListener('click', async e => {
     }
     pick(a === 'gal'); return;
   }
+  if (a === 'gal2') { lsSet('insp_gal', 'files'); if (!byNow()) { V.pickBy = true; go('home'); return; } if (V.view !== 'draft') { V.cur = null; await startDraft(); draw(); } pick(true, 'files'); return; }
+  if (a === 'gal1') { lsSet('insp_gal', 'photo'); draw(); return; }
   if (a === 'resume') return openDraft(v);
   if (a === 'home') { await saveDraft(); V.cur = null; await loadDrafts(); go('home'); return; }
   if (a === 'reload') return loadList();
