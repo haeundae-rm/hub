@@ -9,10 +9,11 @@
 // 2단계 ④ (2026-11-13): 🗺 객실 활동판 — 정비 지원 화면을 허브 안 전체 창(iframe /dirty/?hub=act)으로 열어 활동판을 바로 띄움.
 //   같은 주소라 로그인 공유, 활동판을 닫으면 정비 지원이 알려 와서(postMessage) 창을 닫고 오늘 한눈에 다시 읽음. 열려 있는 동안만 정비 지원 구독
 // 배정 자동화 1단계 (2026-11-13): 🧩 자동 배정 (시험·대조) — assignui.js · assign.js(엔진) · assign_worker.js. 보기·대조만, 앱에 안 올림
+// 인스펙션 1단계 (2026-11-15): 🔍 객실 인스펙션 — inspui.js · insp_items.js. 입력·등급·정비자 자동·마무리(수정완료/재정비)·카톡 이미지·퀵점검 (insp · insp_quick · insp_sum)
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 
-const VER = '2026.11.15-7';
+const VER = '2026.11.15-8';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -436,6 +437,15 @@ function assignCardHtml() {
   return '<div class="card"><h2>🧩 자동 배정 <small>시험 · 하우스키퍼와 대조</small></h2><p class="note" style="margin:0 0 12px">정비보고서 초안(또는 하우스키퍼 완성본)을 넣고 출근자·인계 유닛을 맞추면 엔진이 배정안을 만들어요. 완성본을 넣으면 하우스키퍼 배정과 바로 비교해요. 아직 메이드 휴대폰에는 안 올라가요.</p>' +
     '<div class="btn2"><button class="big-btn" data-asg="1">자동 배정 열기</button><button class="big-btn sec" data-asg="blocks">🚧 장기 미정비</button></div></div>';
 }
+// 🔍 객실 인스펙션 (1단계, 2026-11-15) — inspui.js · insp_items.js
+async function openInspUI() {
+  try { const m = await import(new URL('./inspui.js?v=' + VER, import.meta.url).href); m.openInsp({ S, esc, ymd, addDays, md, admin: () => admin, user: () => user }); }
+  catch (e) { alert('인스펙션 화면을 못 불러왔어요: ' + (e && e.message || e)); }
+}
+function inspCardHtml() {
+  return '<div class="card"><h2>🔍 객실 인스펙션 <small>1단계</small></h2><p class="note" style="margin:0 0 12px">객실 번호 → 구역 → 부위·유형을 누르면 지적 수·등급이 바로 나와요. 정비자는 그날 완료 기록에서 자동으로 찾고, 카톡 관리자방에 올릴 이미지도 만들어요. 퀵점검 실 수도 여기서 세요.</p>' +
+    '<button class="big-btn" data-insp="1">인스펙션 열기</button></div>';
+}
 function vocCardHtml() {
   return '<div class="card"><h2>📣 고객만족도 VOC</h2><p class="note" style="margin:0 0 12px">카톡으로 받은 고객만족도 공유 글을 붙여넣으면 건별로 나누고 마지막 정비자를 찾아 메이드별 칭찬·불만 누계를 내요. 정비 레포트 VOC 메뉴와 같은 자료예요.</p>' +
     '<button class="big-btn" data-voc="1">VOC 열기</button></div>';
@@ -471,7 +481,7 @@ function draw() {
   head();
   if (user === null) { $('#main').innerHTML = '<div class="card"><p class="note" style="margin:0">여는 중…</p></div>'; return; }
   if (!admin) { $('#main').innerHTML = loginHtml(); return; }
-  $('#main').innerHTML = todayHtml() + assignCardHtml() + vocCardHtml() + linksHtml() + staffHtml() +
+  $('#main').innerHTML = todayHtml() + inspCardHtml() + assignCardHtml() + vocCardHtml() + linksHtml() + staffHtml() +
     '<div class="foot">객실 통합 관리 시스템 ' + VER + ' · <button data-logout="1">로그아웃</button></div>';
 }
 
@@ -491,9 +501,10 @@ function openStaff() {
 
 // ---------- 누르기
 document.addEventListener('click', e => {
-  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg]');
+  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg],[data-insp]');
   if (!t || (t.closest && t.closest('#dz'))) return;
   if (t.hasAttribute('data-voc')) { openVoc(); return; }
+  if (t.hasAttribute('data-insp')) { openInspUI(); return; }
   if (t.hasAttribute('data-act')) { openAct(); return; }
   if (t.hasAttribute('data-asg')) { openAssignUI(t.getAttribute('data-asg') === 'blocks' ? 'blocks' : ''); return; }
   if (t.hasAttribute('data-actclose')) { closeAct(); return; }
