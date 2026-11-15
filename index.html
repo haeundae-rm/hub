@@ -188,40 +188,6 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 60px}
 .vcsv{border:1.5px solid #1f8a4c;color:#1f8a4c;background:var(--surface);border-radius:99px;padding:6px 12px;font:800 13px var(--f-body);cursor:pointer}
 .kpis .kpi.vgood b{color:#1f8a4c}
 
-/* 🔍 인스펙션 (2026-11-15) */
-.ip-date{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}.ip-date b{font-size:17px}.ip-date .vp-x[disabled]{opacity:.3}
-.ip-kv b{font-size:22px}.ip-gr{display:flex;gap:14px;margin-top:10px;font-weight:700;font-size:14px}.ip-gr b{font-variant-numeric:tabular-nums;margin-left:2px}
-.ip-row{display:flex;align-items:center;gap:6px;border-top:1px solid var(--line)}.ip-row:first-of-type{border-top:0}.ip-row.wait{background:var(--warn-soft);border-radius:10px;margin:2px 0}
-.ip-rowb{flex:1;display:flex;align-items:center;gap:10px;border:0;background:none;padding:10px 4px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;min-width:0}
-.ip-room{font:800 19px var(--f-num);min-width:50px}.ip-rt{flex:1;min-width:0;display:flex;flex-direction:column}.ip-rt b{font-size:15px}.ip-rt small{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ip-g{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;color:#fff;font:900 15px var(--f-body);flex:none}.ip-g.big{width:46px;height:46px;font-size:24px}
-.ip-st{font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap}.ip-st.w{color:var(--warn)}
-.ip-fix{flex:none;border:1.5px solid var(--warn);background:var(--surface);color:var(--warn);border-radius:10px;padding:8px 10px;font:800 13px var(--f-body);cursor:pointer;margin-right:6px}
-.ip-q{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line)}.ip-q:first-of-type{border-top:0}.ip-q b{font-size:16px}
-.ip-q .asg-u button{width:44px;height:44px;font-size:20px}.ip-q input{width:64px;min-height:44px;text-align:center;border:1.5px solid var(--line);border-radius:10px;font:800 18px var(--f-num);color:var(--ink);background:var(--surface)}
-.ip-top{padding-bottom:12px}.ip-f{display:grid;grid-template-columns:68px 1fr;gap:8px;align-items:center;margin:0 0 8px}.ip-f label{font-weight:800;font-size:14px;color:var(--muted)}
-.ip-f input{width:100%;box-sizing:border-box;min-height:48px;border:1.5px solid var(--line);border-radius:12px;padding:0 12px;font:17px var(--f-body);background:var(--surface);color:var(--ink)}
-.ip-f .ip-roomin{font:800 24px var(--f-num);letter-spacing:2px}
-.ip-seg{display:flex;flex-wrap:wrap;gap:6px}.ip-seg button{min-height:42px;padding:0 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:700 15px var(--f-body);cursor:pointer}
-.ip-seg button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
-.ip-tabs{position:sticky;top:0;z-index:2;display:flex;gap:6px;overflow-x:auto;padding:8px 0;margin:0 0 8px;background:var(--bg)}
-.ip-tabs button{flex:1 0 auto;min-height:46px;padding:0 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:800 16px var(--f-body);cursor:pointer;position:relative}
-.ip-tabs button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
-.ip-tabs i{font-style:normal;display:inline-block;min-width:20px;margin-left:6px;padding:1px 6px;border-radius:99px;background:var(--warn);color:#fff;font-size:12px}
-.ip-part{padding:9px 0;border-top:1px solid var(--line)}.ip-part:first-child{border-top:0;padding-top:0}.ip-part>b{display:block;font-size:14.5px;margin:0 0 6px}
-.ip-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.ip-chip{min-height:44px;padding:0 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--tile);color:var(--ink);font:700 15px var(--f-body);cursor:pointer;display:inline-flex;align-items:center;gap:6px;-webkit-tap-highlight-color:transparent}
-.ip-chip:active{transform:scale(.96)}.ip-chip.on{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
-.ip-chip i{font-style:normal;min-width:22px;height:22px;border-radius:99px;background:var(--warn);color:#fff;font-size:13px;display:inline-flex;align-items:center;justify-content:center}
-.ip-memo{flex:1 1 180px;min-height:44px;border:1.5px solid var(--line);border-radius:12px;padding:0 12px;font:15px var(--f-body);background:var(--surface);color:var(--ink)}
-.ip-pk{border:1.5px solid var(--warn);background:var(--surface);color:var(--warn);border-radius:99px;padding:6px 10px;font:700 13.5px var(--f-body);cursor:pointer}.ip-pk span{margin-left:4px;font-weight:900}
-.ip-bar{position:sticky;bottom:0;z-index:3;background:var(--surface);border-radius:18px 18px 0 0;box-shadow:0 -4px 16px rgba(17,24,39,.12);padding:12px 14px calc(12px + env(safe-area-inset-bottom));margin:10px -4px 0}
-.ip-sum{display:flex;align-items:center;gap:12px}.ip-sum b{display:block;font-size:18px}.ip-sum small{color:var(--muted);font-size:13px}
-.ip-bar .big-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2}.ip-bar .big-btn small{font-size:11.5px;font-weight:600;opacity:.85}
-.big-btn.ok{background:var(--ok)}
-.ip-bar2{display:flex;justify-content:space-between;margin-top:8px}
-.ip-imgb{display:flex;gap:8px;margin-top:12px}.ip-imgb .big-btn{flex:1;min-height:48px}
-
 @media (max-width:360px){.go-grid{grid-template-columns:1fr}.kv{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -229,7 +195,7 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 60px}
 <header class="top"><div class="top-in"><div class="top-row"><div class="cal" aria-hidden="true"><i id="calm"></i><b id="cald"></b></div><div class="tt"><h1>객실 통합 관리 시스템</h1><div class="sub" id="today">한화리조트 해운대</div></div><div class="ring" id="ring" hidden></div></div><div class="line" id="hline"></div></div></header>
 <main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
 <noscript><div class="card">이 화면은 자바스크립트가 켜져 있어야 해요.</div></noscript>
-<script type="module" src="hub.js?v=2026.11.15-8"></script>
+<script type="module" src="hub.js?v=2026.11.15-9"></script>
 <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); }); }</script>
 </body>
 </html>
