@@ -3,8 +3,8 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.15-4';
-import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-4';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.15-5';
+import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-5';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -349,6 +349,7 @@ function carryHtml() {
 
 // ---------- 🚧 장기 미정비 (보수 블럭) — blocks.js
 const md2 = d => Number(d.slice(5, 7)) + '/' + Number(d.slice(8));
+const dlab = d => { if (!d) return '?'; const w = '일월화수목금토'[new Date(d + 'T00:00:00').getDay()]; return Number(d.slice(5, 7)) + '월 ' + Number(d.slice(8)) + '일(' + w + ')'; };
 const bcolor = b => COLORS[Math.abs([...String(b.id)].reduce((a, c) => a * 31 + c.charCodeAt(0) | 0, 7)) % COLORS.length];
 function bkRead() {
   const B = A.bk; const m = document.getElementById('bkmsg'); if (m) B.msg = m.value;
@@ -384,21 +385,23 @@ function blocksHtml() {
         '<div class="asg-chips" style="margin-top:8px">' + g.rooms.map(r => '<button class="asg-chip" data-as="bkdr" data-v="' + i + ':' + esc(r) + '">' + esc(r) + '</button>').join('') + '</div>' +
         '<p class="note" style="margin:0">' + chk + (g.bad.length ? ' · <span style="color:var(--warn)">없는 객실 번호: ' + esc(g.bad.join(', ')) + '</span>' : '') + (dup.length ? ' · 이미 다른 블럭: ' + esc(dup.join(', ')) : '') + '</p>' +
         '<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap"><input type="date" data-bk="from:' + i + '" value="' + esc(g.from) + '" style="min-height:40px"> ~ <input type="date" data-bk="to:' + i + '" value="' + esc(g.to) + '" style="min-height:40px">' +
-        '<label style="font-weight:700;font-size:14px"><input type="checkbox" data-bk="prio:' + i + '"' + (g.prio ? ' checked' : '') + '> 끝난 다음 날 우선정비</label></div></div>'; });
+        '<label style="font-weight:700;font-size:14px"><input type="checkbox" data-bk="prio:' + i + '"' + (g.prio ? ' checked' : '') + '> 끝난 다음 날 우선정비</label></div>' +
+        '<p class="note" style="margin:4px 0 0">기간: <b>' + dlab(g.from) + (g.to !== g.from ? ' ~ ' + dlab(g.to) : '') + '</b>' + (g.from.slice(0, 7) !== today.slice(0, 7) ? ' <span style="color:var(--warn)">— 이번 달이 아니에요. 맞는지 확인해 주세요</span>' : g.to < today ? ' <span style="color:var(--warn)">— 지난 날짜예요</span>' : '') + '</p></div>'; });
     h += '<div class="btn2"><button class="big-btn sec" data-as="bkcancel">취소</button><button class="big-btn" data-as="bksave"' + (B.saving ? ' disabled' : '') + '>' + (B.saving ? '저장 중…' : '저장') + '</button></div></div>';
   }
   // 2 도면
   const on = blockedOn(A.blocks, B.day), act = [...new Set(Object.values(on))];
-  h += '<div class="card"><h2>🗺 도면 <small>날짜별 막힌 방 · 눌러서 고르기</small></h2>' +
+  const drs = new Set(); (B.draft || []).forEach(g => { if (g.from <= B.day && B.day <= g.to) g.rooms.forEach(r => drs.add(r)); });
+  h += '<div class="card"><h2>🗺 도면 <small>' + dlab(B.day) + ' · 막힌 방 · 눌러서 고르기</small></h2>' +
     '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><input type="date" id="bkday" value="' + esc(B.day) + '" style="min-height:40px"><button class="asg-chip" data-as="bkdd" data-v="-1">◀</button><button class="asg-chip" data-as="bkdd" data-v="1">▶</button>' +
-    '<span class="note" style="margin:0">' + (act.length ? act.map(b => '<i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:' + bcolor(b) + '"></i> ' + esc(b.name) + ' ' + b.rooms.length).join(' · ') : '이날 막힌 방 없음') + '</span></div>' +
+    '<span class="note" style="margin:0">' + (drs.size ? '<b style="color:var(--brand)">▨ 저장 전 ' + drs.size + '실</b> · ' : '') + (act.length ? act.map(b => '<i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:' + bcolor(b) + '"></i> ' + esc(b.name) + ' ' + b.rooms.length).join(' · ') : '이날 막힌 방 없음') + '</span></div>' +
     '<div class="bk-map" id="bkmap">';
   for (let f = 31; f >= 4; f--) {
     h += '<button class="bk-f" data-as="bkfl" data-v="' + f + '">' + f + '</button>';
     for (let s2 = 1; s2 <= 17; s2++) { const r = String(f * 100 + s2);
       if (!FLOORS[f].includes(s2)) { h += '<i></i>'; continue; }
-      const b = on[r], sel = B.sel.has(r);
-      h += '<button class="bk-c' + (sel ? ' sel' : '') + '" data-as="bkcell" data-v="' + r + '" title="' + r + (b ? ' ' + esc(b.name) : '') + '"' + (b ? ' style="background:' + bcolor(b) + ';color:#fff;border-color:' + bcolor(b) + '"' : '') + '>' + s2 + '</button>'; }
+      const b = on[r], sel = B.sel.has(r), dr = drs.has(r);
+      h += '<button class="bk-c' + (sel ? ' sel' : '') + (dr ? ' dr' : '') + '" data-as="bkcell" data-v="' + r + '" title="' + r + (b ? ' ' + esc(b.name) : '') + '"' + (b ? ' style="background:' + bcolor(b) + ';color:#fff;border-color:' + bcolor(b) + '"' : '') + '>' + s2 + '</button>'; }
   }
   h += '</div><p class="note">층 번호를 누르면 그 층 전체. PC는 마우스로 끌어서 여러 방을 한 번에 골라요.</p>' +
     '<div class="btn2"><button class="big-btn sec" data-as="bkclr"' + (B.sel.size ? '' : ' disabled') + '>선택 지우기</button><button class="big-btn" data-as="bknew"' + (B.sel.size ? '' : ' disabled') + '>선택 ' + B.sel.size + '실로 새 블럭</button></div></div>';
@@ -537,13 +540,13 @@ function moveHtml() {
 function bkClick(a, v) {
   const B = A.bk; bkRead(); B.ok = ''; B.err = '';
   if (a === 'bkback') { A.view = ''; draw(); return; }
-  if (a === 'bkparse') { const g = parseMsg(B.msg, H.ymd()); if (!g.length) { B.err = '객실 번호를 찾지 못했어요.'; draw(); return; } B.draft = g; draw(); const d = document.getElementById('bkdraft'); if (d) d.scrollIntoView({ block: 'start' }); return; }
+  if (a === 'bkparse') { const g = parseMsg(B.msg, H.ymd()); if (!g.length) { B.err = '객실 번호를 찾지 못했어요.'; draw(); return; } B.draft = g; B.day = g[0].from; draw(); const d = document.getElementById('bkdraft'); if (d) d.scrollIntoView({ block: 'start' }); return; }
   if (a === 'bkdr') { const [i, r] = v.split(':'); const g = B.draft[+i]; g.rooms = g.rooms.filter(x => x !== r); draw(); return; }
   if (a === 'bkcancel') { B.draft = null; draw(); return; }
   if (a === 'bksave') { const gs = (B.draft || []).filter(g => g.rooms.length);
     for (const g of gs) { if (!g.name) { B.err = '작업명을 적어 주세요.'; draw(); return; } if (!g.from || !g.to || g.to < g.from) { B.err = g.name + ' 날짜를 확인해 주세요.'; draw(); return; } }
     const add = gs.map(g => ({ id: newId(), name: g.name, rooms: g.rooms.slice(), from: g.from, to: g.to, prio: !!g.prio, memo: '', by: H.admin().label }));
-    B.draft = null; B.msg = ''; B.sel = new Set(); bkSave(A.blocks.concat(add), add.map(b => b.name + ' ' + b.rooms.length + '실 (' + md2(b.from) + (b.to !== b.from ? '~' + md2(b.to) : '') + ')').join(', ') + ' 저장했어요. 그 날짜 자동 배정에서 빠져요.'); return; }
+    B.draft = null; B.msg = ''; B.sel = new Set(); if (add.length) B.day = add[0].from; bkSave(A.blocks.concat(add), add.map(b => b.name + ' ' + b.rooms.length + '실 (' + md2(b.from) + (b.to !== b.from ? '~' + md2(b.to) : '') + ')').join(', ') + ' 저장했어요. 그 날짜 자동 배정에서 빠져요.'); return; }
   if (a === 'bkdd') { const d = new Date(B.day + 'T00:00:00'); d.setDate(d.getDate() + Number(v)); B.day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); draw(); return; }
   if (a === 'bkcell') { if (B.skipClick) { B.skipClick = false; return; } B.sel.has(v) ? B.sel.delete(v) : B.sel.add(v); draw(); return; }
   if (a === 'bkfl') { const rs = FLOORS[v].map(s2 => String(v * 100 + s2)); const all = rs.every(r => B.sel.has(r)); rs.forEach(r => (all ? B.sel.delete(r) : B.sel.add(r))); draw(); return; }
