@@ -12,7 +12,7 @@
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 
-const VER = '2026.11.15-3';
+const VER = '2026.11.15-4';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -428,13 +428,13 @@ function closeVoc() {
   try { VOC && VOC.stop(); } catch (e) {}   // 닫으면 voc 구독도 끊음 (읽기 아끼기)
   const p = document.getElementById('vp'); if (p) p.remove(); document.body.classList.remove('sb-lock');
 }
-async function openAssignUI() {
-  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, admin: () => admin, user: () => user, upload: o => { up = { file: o.file, date: o.date, res: o.res, buf: null }; draw(); upSend(true); scrollUp(); } }); }
+async function openAssignUI(view) {
+  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, admin: () => admin, user: () => user, upload: o => { up = { file: o.file, date: o.date, res: o.res, buf: null }; draw(); upSend(true); scrollUp(); } }, { view }); }
   catch (e) { alert('자동 배정 화면을 못 불러왔어요: ' + (e && e.message || e)); }
 }
 function assignCardHtml() {
   return '<div class="card"><h2>🧩 자동 배정 <small>시험 · 하우스키퍼와 대조</small></h2><p class="note" style="margin:0 0 12px">정비보고서 초안(또는 하우스키퍼 완성본)을 넣고 출근자·인계 유닛을 맞추면 엔진이 배정안을 만들어요. 완성본을 넣으면 하우스키퍼 배정과 바로 비교해요. 아직 메이드 휴대폰에는 안 올라가요.</p>' +
-    '<button class="big-btn" data-asg="1">자동 배정 열기</button></div>';
+    '<div class="btn2"><button class="big-btn" data-asg="1">자동 배정 열기</button><button class="big-btn sec" data-asg="blocks">🚧 장기 미정비</button></div></div>';
 }
 function vocCardHtml() {
   return '<div class="card"><h2>📣 고객만족도 VOC</h2><p class="note" style="margin:0 0 12px">카톡으로 받은 고객만족도 공유 글을 붙여넣으면 건별로 나누고 마지막 정비자를 찾아 메이드별 칭찬·불만 누계를 내요. 정비 레포트 VOC 메뉴와 같은 자료예요.</p>' +
@@ -495,7 +495,7 @@ document.addEventListener('click', e => {
   if (!t || (t.closest && t.closest('#dz'))) return;
   if (t.hasAttribute('data-voc')) { openVoc(); return; }
   if (t.hasAttribute('data-act')) { openAct(); return; }
-  if (t.hasAttribute('data-asg')) { openAssignUI(); return; }
+  if (t.hasAttribute('data-asg')) { openAssignUI(t.getAttribute('data-asg') === 'blocks' ? 'blocks' : ''); return; }
   if (t.hasAttribute('data-actclose')) { closeAct(); return; }
   if (t.hasAttribute('data-vclose')) { closeVoc(); load(false); return; }
   if (t.hasAttribute('data-hdist')) { openDist(); return; }

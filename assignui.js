@@ -3,7 +3,8 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.15-3';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.15-4';
+import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-4';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -11,9 +12,11 @@ let H = null;   // 허브에서 받은 것 { S, esc, ymd, addDays, md, admin, us
 let A = null;   // 화면 상태
 
 const DEF_TEAMS = ['최태자,성락욱', '김태성,조유경'];
+function bmapUpd() { if (!A) return; A.bmap = blockedOn(A.blocks || [], A.date); A.bprio = releasedPrio(A.blocks || [], A.date); }
 const isTarget = x => (['1', '2', '3', '4'].includes(String(x.st == null ? '' : x.st).trim()) || /간단/.test(String(x.st == null ? '' : x.st))) && !/미정비/.test((x.m1 || '') + (x.m2 || ''));
 // 11/15 미정비 남기기 (하우스맨이 프런트와 타입별 수량 협의 → 수량 입력 → 저층부터 자동으로 고름). A.carry = 남길 객실
-const live = x => isTarget(x) && !(A && A.carry && A.carry.has(String(x.room)));
+const live = x => isTarget(x) && !(A && A.carry && A.carry.has(String(x.room))) && !blk(x.room);
+const blk = r => (A && A.bmap ? A.bmap[String(r)] : null);   // 그날 장기 미정비 블럭
 // 객실 타입 (claude/객실타입_기준표.md, 417실)
 export function typeOf(room) {
   const r = String(room), n = +r, f = Math.floor(n / 100), s = n % 100;
@@ -50,7 +53,7 @@ function keyOn(x) {
 function carryPick(qty) {
   const out = new Set(), short = [];
   Object.keys(qty).forEach(t => { const q = Number(qty[t]) || 0; if (q <= 0) return;
-    const c = A.data.rooms.filter(x => isTarget(x) && typeOf(x.room) === t && !carryBlock(x))
+    const c = A.data.rooms.filter(x => isTarget(x) && !blk(x.room) && typeOf(x.room) === t && !carryBlock(x))
       .map(x => Object.assign({ on: keyOn(x) }, x)).sort((p, q2) => (p.on ? 1 : 0) - (q2.on ? 1 : 0) || p.floor - q2.floor || p.room - q2.room);
     c.slice(0, q).forEach(x => out.add(String(x.room)));
     if (c.length < q) short.push(t + ' ' + c.length + '실만'); });
@@ -60,15 +63,17 @@ const unitOf = x => (ROYAL.includes(String(x.room)) ? 2 : /간단/.test(String(x
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 
-export async function openAssign(hub) {
+export async function openAssign(hub, o) {
   H = hub;
   const S = H.S;
   const h = Number(new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 13));
   A = { date: h >= 15 ? H.addDays(H.ymd(), 1) : H.ymd(), file: '', data: null, done: null, err: '', busy: '', cfgDoc: null, staff: [], rows: [], prev: '', res: null, prog: 0, cmp: null, showAll: false, open: {} };
   const box = document.createElement('div'); box.className = 'vp'; box.id = 'asp'; document.body.appendChild(box); document.body.classList.add('sb-lock');
   draw();
-  const [cfgDoc, staff, teams] = await Promise.all([S.get('meta/assign').catch(() => null), S.getQuery('staff', [['job', '==', '룸메이드']]).catch(() => []), S.get('meta/teams').catch(() => null)]);
+  if (o && o.view === 'blocks') { A.view = 'blocks'; A.back = 'close'; }
+  const [cfgDoc, staff, teams, bdoc] = await Promise.all([S.get('meta/assign').catch(() => null), S.getQuery('staff', [['job', '==', '룸메이드']]).catch(() => []), S.get('meta/teams').catch(() => null), S.get('meta/blocks').catch(() => null)]);
   if (!A) return;
+  A.blocks = (bdoc && bdoc.list) || []; A.bk = { draft: null, sel: new Set(), day: A.date, open: {}, msg: '' }; bmapUpd();
   // 2인 1조 (부부) — 정비 레포트 관리자 '2인 1조' 카드에 저장한 짝 (없으면 기본 두 조)
   A.teams = ((teams && teams.pairs) || DEF_TEAMS).map(p => String(p).split(',').map(s => s.trim())).filter(p => p.length === 2 && p[0] && p[1]);
   A.cfgDoc = cfgDoc || {};
@@ -140,7 +145,7 @@ function run() {
   const gap = gapInfo();
   if (gap && gap.over > 0 && !confirm('정비 대상 ' + gap.units + '유닛이 인계 ' + gap.ho + '유닛보다 ' + gap.over + '유닛 많아요 (한 분당 약 +' + gap.per + ').\n\n미정비(이월) 표시를 먼저 하셨나요?\n· 이월할 객실이 있으면 [취소] → 정비보고서 메모에 \'미정비\' 적고 다시 넣기\n· 넘치는 만큼 모두 배정하려면 [확인]')) return;
   const rooms = A.data.rooms.map(x => { const g = G[String(x.room)] || (noTbl && ['', 'FFFFFFFF', 'THEME0'].indexOf(String(x.grp_fill || '').toUpperCase()) < 0 ? { n: '단체', h: 17 } : null);
-    return { room: x.room, floor: x.floor, st: x.st, m1: x.m1, m2: (A.carry && A.carry.has(String(x.room))) ? ((x.m2 || '') + ' 미정비') : x.m2, grp: g ? g.n : '', gh: g ? g.h : 0, theme: TH.has(String(x.room)) }; });
+    return { room: x.room, floor: x.floor, st: x.st, m1: A.bprio && A.bprio[String(x.room)] ? ((x.m1 || '') + ' 14시까지') : x.m1, m2: ((A.carry && A.carry.has(String(x.room))) || blk(x.room)) ? ((x.m2 || '') + ' 미정비') : x.m2, grp: g ? g.n : '', gh: g ? g.h : 0, theme: TH.has(String(x.room)) }; });
   // 신입 = 직원 명단 입사일이 배정 날짜 3개월 안 (11/14 사용자: 3개월 미만은 가급적 VIP 안 줌). 입사일 없는 분은 모름 → 정량 8 미만만 신입으로
   const [yy, mm, dd] = A.date.split('-').map(Number), c3 = new Date(yy, mm - 1 - 3, dd), cut = c3.getFullYear() + '-' + String(c3.getMonth() + 1).padStart(2, '0') + '-' + String(c3.getDate()).padStart(2, '0');
   A.vipNo = Object.keys(H0).filter(n => A.hired && A.hired[n] && A.hired[n] > cut);
@@ -218,7 +223,8 @@ async function downXlsx(quiet) {
   try {
     const F = await import(new URL('./fillxlsx.js?v=' + VER, import.meta.url).href);
     const W = {}; Object.keys(A.res.workers).forEach(n => { const w = A.res.workers[n]; if (w.rooms.length) W[n] = { rooms: w.rooms, load: w.load }; });
-    const { bytes, info } = await F.fillReport(A.buf, A.date, W, { carry: [...(A.carry || [])] });
+    const ct = {}; Object.keys(A.bmap || {}).forEach(r => { const b = A.bmap[r]; ct[r] = '미정비 ' + b.name + (b.to > A.date ? ' ~' + Number(b.to.slice(5, 7)) + '/' + Number(b.to.slice(8)) : ''); });
+    const { bytes, info } = await F.fillReport(A.buf, A.date, W, { carry: [...(A.carry || []), ...Object.keys(ct)], carryText: ct });
     const name = 'report_' + A.date.slice(5).replace('-', '') + '_auto.xlsx';   // 한글 파일 이름은 일부 휴대폰·브라우저에서 'download' 로 바뀌어 영문으로
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
@@ -237,7 +243,7 @@ async function confirmUpload() {
   try {
     const E = await import(new URL('../rm/app/engine.js?v=' + VER, import.meta.url).href);
     const ownerOf = {}; Object.keys(R.workers).forEach(n => R.workers[n].rooms.forEach(r => { (ownerOf[r] = ownerOf[r] || []).push(n); }));
-    const rooms = A.data.rooms.map(x => Object.assign({}, x, { name: ownerOf[String(x.room)] ? ownerOf[String(x.room)].join(', ') : '' }, A.carry && A.carry.has(String(x.room)) ? { m2: (x.m2 || '') + ' 미정비' } : {}));
+    const rooms = A.data.rooms.map(x => Object.assign({}, x, { name: ownerOf[String(x.room)] ? ownerOf[String(x.room)].join(', ') : '' }, (A.carry && A.carry.has(String(x.room))) || blk(x.room) ? { m2: (x.m2 || '') + ' 미정비' } : {}, A.bprio && A.bprio[String(x.room)] ? { m1: (x.m1 || '') + ' 14시까지' } : {}));
     const order = Object.keys(R.workers).filter(n => R.workers[n].rooms.length).sort((a, b) => (R.workers[b].floors[0] || 0) - (R.workers[a].floors[0] || 0));
     const cards = order.map((n, i) => ({ label: (i + 1) + '] ' + n, name: n, unit: R.workers[n].load, actual: '' }));
     const d2 = { rooms, cards, groups: A.data.groups || [], themes: A.data.themes || [] };
@@ -316,7 +322,7 @@ function carryOpen() {
 }
 function carryRead() { document.querySelectorAll('#asp [data-cq]').forEach(el => { A.cq[el.getAttribute('data-cq')] = Math.max(0, Math.floor(Number(el.value) || 0)); }); }
 function carryHtml() {
-  const esc = H.esc, all = A.data.rooms.filter(isTarget), cnt = {}, ok = {};
+  const esc = H.esc, all = A.data.rooms.filter(x => isTarget(x) && !blk(x.room)), cnt = {}, ok = {};
   all.forEach(x => { const t = typeOf(x.room); cnt[t] = (cnt[t] || 0) + 1; if (!carryBlock(x)) ok[t] = (ok[t] || 0) + 1; });
   const g = gapInfo(), sumQ = Object.values(A.cq).reduce((a, b) => a + (Number(b) || 0), 0);
   let h = '<div class="card"><h2>📦 미정비 남기기 <small>프런트와 협의한 타입별 수량</small></h2>' +
@@ -341,15 +347,93 @@ function carryHtml() {
   return h;
 }
 
+// ---------- 🚧 장기 미정비 (보수 블럭) — blocks.js
+const md2 = d => Number(d.slice(5, 7)) + '/' + Number(d.slice(8));
+const bcolor = b => COLORS[Math.abs([...String(b.id)].reduce((a, c) => a * 31 + c.charCodeAt(0) | 0, 7)) % COLORS.length];
+function bkRead() {
+  const B = A.bk; const m = document.getElementById('bkmsg'); if (m) B.msg = m.value;
+  const d = document.getElementById('bkday'); if (d && d.value) B.day = d.value;
+  document.querySelectorAll('#asp [data-bk]').forEach(el => { const [k, i] = el.getAttribute('data-bk').split(':'); const g = B.draft && B.draft[+i]; if (!g) return;
+    if (k === 'name') g.name = el.value.trim(); if (k === 'from') g.from = el.value; if (k === 'to') g.to = el.value; if (k === 'prio') g.prio = el.checked; });
+  document.querySelectorAll('#asp [data-bke]').forEach(el => { const [k, id] = el.getAttribute('data-bke').split(':'); const b = A.blocks.find(x => x.id === id); if (!b) return;
+    if (!B.ed) B.ed = {}; const e = B.ed[id] = B.ed[id] || {}; if (k === 'prio') e.prio = el.checked; else e[k] = el.value; });
+}
+async function bkSave(list, msg) {
+  const d = { list: prune(list, H.ymd()), at: H.S.SERVER_TIME, by: H.admin().label };
+  A.bk.saving = true; draw();
+  try { await H.S.set('meta/blocks', d); A.blocks = d.list; A.bk.ok = msg; A.bk.err = ''; } catch (e) { A.bk.err = '저장하지 못했어요: ' + (e && (e.code || e.message) || e); }
+  A.bk.saving = false; bmapUpd(); A.res = null; A.cmp = null; draw();
+}
+function blocksHtml() {
+  const esc = H.esc, B = A.bk, today = H.ymd();
+  let h = '';
+  if (B.ok) h += '<p class="okbox">' + esc(B.ok) + '</p>';
+  if (B.err) h += '<p class="err">' + esc(B.err) + '</p>';
+  // 1 메시지
+  h += '<div class="card"><h2>📋 메시지로 넣기 <small>카톡·텔레그램 그대로</small></h2>' +
+    '<textarea id="bkmsg" rows="6" style="width:100%;box-sizing:border-box;border:1.5px solid var(--line);border-radius:10px;padding:8px;font:15px inherit" placeholder="예)\n타일교체(10실)\n403, 517, 1003 …\n매지하자(4실)\n709, 1009 …\n8일자 미정비 남겨주세요.">' + esc(B.msg || '') + '</textarea>' +
+    '<p class="note">작업명 줄 아래 객실 번호, 날짜(8일 · 11/16~11/30 · 16일부터 20일까지)를 알아서 읽어요. 읽은 뒤 확인하고 저장해요.</p>' +
+    '<button class="big-btn" data-as="bkparse">메시지 읽기</button></div>';
+  // 확인
+  if (B.draft) {
+    h += '<div class="card" id="bkdraft"><h2>확인 후 저장 <small>객실을 누르면 빼기</small></h2>';
+    B.draft.forEach((g, i) => { const chk = g.want ? (g.want === g.rooms.length ? '<span style="color:var(--ok,#2B8A3E)">메시지 ' + g.want + '실 = 읽은 ' + g.rooms.length + '실 ✓</span>' : '<span style="color:var(--warn)">메시지 ' + g.want + '실 ≠ 읽은 ' + g.rooms.length + '실 — 확인해 주세요</span>') : '읽은 ' + g.rooms.length + '실';
+      const dup = g.rooms.filter(r => A.blocks.some(b => b.rooms.includes(r) && b.from <= g.to && g.from <= b.to));
+      h += '<div style="border-top:1px solid var(--line);padding:8px 0">' +
+        '<label class="asg-prev" style="margin-top:0;grid-template-columns:70px 1fr"><span>작업명</span><input data-bk="name:' + i + '" value="' + esc(g.name) + '" placeholder="예: 타일교체"></label>' +
+        '<div class="asg-chips" style="margin-top:8px">' + g.rooms.map(r => '<button class="asg-chip" data-as="bkdr" data-v="' + i + ':' + esc(r) + '">' + esc(r) + '</button>').join('') + '</div>' +
+        '<p class="note" style="margin:0">' + chk + (g.bad.length ? ' · <span style="color:var(--warn)">없는 객실 번호: ' + esc(g.bad.join(', ')) + '</span>' : '') + (dup.length ? ' · 이미 다른 블럭: ' + esc(dup.join(', ')) : '') + '</p>' +
+        '<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap"><input type="date" data-bk="from:' + i + '" value="' + esc(g.from) + '" style="min-height:40px"> ~ <input type="date" data-bk="to:' + i + '" value="' + esc(g.to) + '" style="min-height:40px">' +
+        '<label style="font-weight:700;font-size:14px"><input type="checkbox" data-bk="prio:' + i + '"' + (g.prio ? ' checked' : '') + '> 끝난 다음 날 우선정비</label></div></div>'; });
+    h += '<div class="btn2"><button class="big-btn sec" data-as="bkcancel">취소</button><button class="big-btn" data-as="bksave"' + (B.saving ? ' disabled' : '') + '>' + (B.saving ? '저장 중…' : '저장') + '</button></div></div>';
+  }
+  // 2 도면
+  const on = blockedOn(A.blocks, B.day), act = [...new Set(Object.values(on))];
+  h += '<div class="card"><h2>🗺 도면 <small>날짜별 막힌 방 · 눌러서 고르기</small></h2>' +
+    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><input type="date" id="bkday" value="' + esc(B.day) + '" style="min-height:40px"><button class="asg-chip" data-as="bkdd" data-v="-1">◀</button><button class="asg-chip" data-as="bkdd" data-v="1">▶</button>' +
+    '<span class="note" style="margin:0">' + (act.length ? act.map(b => '<i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:' + bcolor(b) + '"></i> ' + esc(b.name) + ' ' + b.rooms.length).join(' · ') : '이날 막힌 방 없음') + '</span></div>' +
+    '<div class="bk-map" id="bkmap">';
+  for (let f = 31; f >= 4; f--) {
+    h += '<button class="bk-f" data-as="bkfl" data-v="' + f + '">' + f + '</button>';
+    for (let s2 = 1; s2 <= 17; s2++) { const r = String(f * 100 + s2);
+      if (!FLOORS[f].includes(s2)) { h += '<i></i>'; continue; }
+      const b = on[r], sel = B.sel.has(r);
+      h += '<button class="bk-c' + (sel ? ' sel' : '') + '" data-as="bkcell" data-v="' + r + '" title="' + r + (b ? ' ' + esc(b.name) : '') + '"' + (b ? ' style="background:' + bcolor(b) + ';color:#fff;border-color:' + bcolor(b) + '"' : '') + '>' + s2 + '</button>'; }
+  }
+  h += '</div><p class="note">층 번호를 누르면 그 층 전체. PC는 마우스로 끌어서 여러 방을 한 번에 골라요.</p>' +
+    '<div class="btn2"><button class="big-btn sec" data-as="bkclr"' + (B.sel.size ? '' : ' disabled') + '>선택 지우기</button><button class="big-btn" data-as="bknew"' + (B.sel.size ? '' : ' disabled') + '>선택 ' + B.sel.size + '실로 새 블럭</button></div></div>';
+  // 3 목록
+  const list = A.blocks.filter(b => b.to >= today).sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : a.name < b.name ? -1 : 1));
+  h += '<div class="card"><h2>목록 <small>지금·앞으로 ' + list.length + '건</small></h2>' + (list.length ? '' : '<p class="note">없어요.</p>') + '<div class="asg-list">' +
+    list.map(b => { const op = B.open[b.id], live2 = b.from <= today;
+      return '<button class="asg-m" data-as="bkopen" data-v="' + b.id + '"><span class="n"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:' + bcolor(b) + '"></i> <b>' + esc(b.name) + '</b> <small>' + b.rooms.length + '실' + (b.prio ? ' · 끝나면 우선' : '') + '</small></span><span class="f">' + md2(b.from) + (b.to !== b.from ? '~' + md2(b.to) : '') + (live2 ? '<small>진행 중</small>' : '') + '</span></button>' +
+        (op ? '<div class="asg-why"><div class="asg-chips">' + b.rooms.slice().sort((p, q) => p - q).map(r => '<button class="asg-chip" data-as="bkrm" data-v="' + b.id + ':' + r + '">' + r + '</button>').join('') + '</div>' +
+          '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="date" data-bke="from:' + b.id + '" value="' + b.from + '"> ~ <input type="date" data-bke="to:' + b.id + '" value="' + b.to + '"><label style="font-weight:700"><input type="checkbox" data-bke="prio:' + b.id + '"' + (b.prio ? ' checked' : '') + '> 끝나면 우선정비</label></div>' +
+          '<div class="btn2" style="margin-top:8px"><button class="big-btn sec" data-as="bkdel" data-v="' + b.id + '">해제(삭제)</button><button class="big-btn" data-as="bkupd" data-v="' + b.id + '">날짜 저장</button></div>' +
+          '<small>객실을 누르면 그 방만 먼저 해제 · 입력: ' + esc(b.by || '') + '</small></div>' : ''); }).join('') + '</div></div>';
+  if (A.back !== 'close') h += '<button class="big-btn sec" data-as="bkback">← 자동 배정으로</button>';
+  return h;
+}
+// PC 마우스로 끌어서 고르기 (휴대폰은 탭)
+let bkDrag = null;
+document.addEventListener('pointerdown', e => { if (!A || A.view !== 'blocks' || e.pointerType !== 'mouse') return; const c = e.target.closest && e.target.closest('#bkmap [data-as="bkcell"]'); if (!c) return;
+  e.preventDefault(); bkRead(); const r = c.getAttribute('data-v'); bkDrag = { add: !A.bk.sel.has(r), moved: false, first: r }; });
+document.addEventListener('pointerover', e => { if (!bkDrag || !A) return; const c = e.target.closest && e.target.closest('#bkmap [data-as="bkcell"]'); if (!c) return;
+  const r = c.getAttribute('data-v'); if (!bkDrag.moved) { bkDrag.moved = true; bkDrag.add ? A.bk.sel.add(bkDrag.first) : A.bk.sel.delete(bkDrag.first); const f = document.querySelector('#bkmap [data-v="' + bkDrag.first + '"]'); if (f) f.classList.toggle('sel', bkDrag.add); }
+  bkDrag.add ? A.bk.sel.add(r) : A.bk.sel.delete(r); c.classList.toggle('sel', bkDrag.add); });
+document.addEventListener('change', e => { if (!A || A.view !== 'blocks' || !e.target || e.target.id !== 'bkday') return; bkRead(); draw(); });
+document.addEventListener('pointerup', () => { if (!bkDrag || !A) return; const m = bkDrag.moved; bkDrag = null; if (m) { A.bk.skipClick = true; draw(); } });
+
 // ---------- 그리기
 function draw() {
   const box = document.getElementById('asp'); if (!box || !A) return;
   const esc = H.esc, y = box.scrollTop;
-  let h = '<div class="vp-in"><div class="vp-head"><h2>🧩 자동 배정 <small style="font-size:13px;color:var(--muted);font-weight:600">' + (A.view === 'cfg' ? '담당표·정량' : '시험 · 대조') + '</small></h2><button class="vp-x" data-as="' + (A.view === 'cfg' ? 'cfx' : 'close') + '" aria-label="닫기">✕</button></div>';
+  let h = '<div class="vp-in"><div class="vp-head"><h2>🧩 자동 배정 <small style="font-size:13px;color:var(--muted);font-weight:600">' + (A.view === 'cfg' ? '담당표·정량' : A.view === 'blocks' ? '장기 미정비' : '시험 · 대조') + '</small></h2><button class="vp-x" data-as="' + (A.view === 'cfg' ? 'cfx' : 'close') + '" aria-label="닫기">✕</button></div>';
   if (A.view === 'cfg') { box.innerHTML = h + cfgHtml() + '</div>'; box.scrollTop = y; return; }
   if (A.view === 'carry') { box.innerHTML = h + carryHtml() + '</div>'; box.scrollTop = y; return; }
+  if (A.view === 'blocks') { box.innerHTML = h.replace('data-as="close"', 'data-as="' + (A.back === 'close' ? 'close' : 'bkback') + '"') + blocksHtml() + '</div>'; box.scrollTop = y; return; }
   if (A.saved) h += '<p class="okbox">' + esc(A.saved) + '</p>';
-  h += '<button class="big-btn sec" style="margin:0 0 12px" data-as="cfg">⚙️ 담당표 · 정량 · 로얄/2901 설정</button>';
+  h += '<div class="btn2" style="margin:0 0 12px"><button class="big-btn sec" data-as="cfg">⚙️ 담당표·정량</button><button class="big-btn sec" data-as="blocks">🚧 장기 미정비</button></div>';
   // 1 날짜·파일
   const t0 = H.ymd(), t1 = H.addDays(t0, 1);
   h += '<div class="card"><h2>1 · 정비보고서</h2><div class="seg2">' + [[t0, '오늘'], [t1, '내일']].map(([d, l]) => '<button data-as="date" data-v="' + d + '" aria-pressed="' + (A.date === d) + '">' + l + ' ' + H.md(d) + '</button>').join('') + '</div>' +
@@ -360,6 +444,10 @@ function draw() {
     const T = A.data.rooms.filter(live), skip = A.data.rooms.filter(x => /미정비/.test((x.m1 || '') + (x.m2 || ''))).length, nc = A.carry ? A.carry.size : 0;
     const u = T.reduce((s, x) => s + (String(x.room) === '2901' ? 0 : unitOf(x)), 0), has2901 = T.some(x => String(x.room) === '2901');
     h += '<p class="note">' + esc(A.sheet) + '일 시트 · 정비 대상 <b>' + T.length + '실</b> = ' + u + '유닛' + (has2901 ? ' + 2901' : '') + (skip ? ' · 미정비(이월) ' + skip + '실 제외' : '') + (nc ? ' · <b>미정비 남기기 ' + nc + '실</b> 제외' : '') + '</p>';
+    const bl = {}; A.data.rooms.filter(isTarget).forEach(x => { const b = blk(x.room); if (b) bl[b.name] = (bl[b.name] || 0) + 1; });
+    const bn = Object.values(bl).reduce((a, b) => a + b, 0), pr = A.data.rooms.filter(x => isTarget(x) && A.bprio && A.bprio[String(x.room)]).length;
+    if (bn) h += '<p class="note">🚧 장기 미정비 <b>' + bn + '실</b> 자동 제외 (' + esc(Object.keys(bl).map(k => k + ' ' + bl[k]).join(' · ')) + ')</p>';
+    if (pr) h += '<p class="note">🔔 보수 끝 우선정비 <b>' + pr + '실</b> (14시까지)</p>';
     if (!A.done) h += '<button class="big-btn sec" style="margin-top:8px" data-as="carry">📦 미정비 남기기 (타입별 수량)' + (nc ? ' — ' + nc + '실' : '') + '</button>';
     if (A.done) h += '<p class="okbox" style="margin-top:8px">이름이 들어 있는 <b>완성본</b>이에요 → 이름은 빼고 엔진이 새로 배정한 뒤 <b>하우스키퍼 배정과 대조</b>해요. 출근자·유닛은 완성본 카드대로 채웠어요.</p>';
     else if (A.fromCards) h += '<p class="okbox" style="margin-top:8px">정비보고서 <b>출근 카드</b>의 유닛을 인계 유닛으로 읽었어요 → <b>' + A.fromCards.n + '명 · ' + A.fromCards.u + '유닛</b>. 아래 2번은 따로 고칠 필요 없어요 (바꿀 때만 −/+).</p>';
@@ -446,6 +534,29 @@ function moveHtml() {
     '<button class="big-btn" data-as="mvok">옮기기</button><button class="big-btn sec" data-as="mvx">취소</button></div>';
 }
 
+function bkClick(a, v) {
+  const B = A.bk; bkRead(); B.ok = ''; B.err = '';
+  if (a === 'bkback') { A.view = ''; draw(); return; }
+  if (a === 'bkparse') { const g = parseMsg(B.msg, H.ymd()); if (!g.length) { B.err = '객실 번호를 찾지 못했어요.'; draw(); return; } B.draft = g; draw(); const d = document.getElementById('bkdraft'); if (d) d.scrollIntoView({ block: 'start' }); return; }
+  if (a === 'bkdr') { const [i, r] = v.split(':'); const g = B.draft[+i]; g.rooms = g.rooms.filter(x => x !== r); draw(); return; }
+  if (a === 'bkcancel') { B.draft = null; draw(); return; }
+  if (a === 'bksave') { const gs = (B.draft || []).filter(g => g.rooms.length);
+    for (const g of gs) { if (!g.name) { B.err = '작업명을 적어 주세요.'; draw(); return; } if (!g.from || !g.to || g.to < g.from) { B.err = g.name + ' 날짜를 확인해 주세요.'; draw(); return; } }
+    const add = gs.map(g => ({ id: newId(), name: g.name, rooms: g.rooms.slice(), from: g.from, to: g.to, prio: !!g.prio, memo: '', by: H.admin().label }));
+    B.draft = null; B.msg = ''; B.sel = new Set(); bkSave(A.blocks.concat(add), add.map(b => b.name + ' ' + b.rooms.length + '실 (' + md2(b.from) + (b.to !== b.from ? '~' + md2(b.to) : '') + ')').join(', ') + ' 저장했어요. 그 날짜 자동 배정에서 빠져요.'); return; }
+  if (a === 'bkdd') { const d = new Date(B.day + 'T00:00:00'); d.setDate(d.getDate() + Number(v)); B.day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); draw(); return; }
+  if (a === 'bkcell') { if (B.skipClick) { B.skipClick = false; return; } B.sel.has(v) ? B.sel.delete(v) : B.sel.add(v); draw(); return; }
+  if (a === 'bkfl') { const rs = FLOORS[v].map(s2 => String(v * 100 + s2)); const all = rs.every(r => B.sel.has(r)); rs.forEach(r => (all ? B.sel.delete(r) : B.sel.add(r))); draw(); return; }
+  if (a === 'bkclr') { B.sel = new Set(); draw(); return; }
+  if (a === 'bknew') { B.draft = [{ name: '', rooms: [...B.sel].sort((p, q) => p - q), want: 0, bad: [], from: B.day, to: B.day, prio: false }]; draw(); const d = document.getElementById('bkdraft'); if (d) d.scrollIntoView({ block: 'start' }); return; }
+  if (a === 'bkopen') { B.open[v] = !B.open[v]; draw(); return; }
+  if (a === 'bkupd') { const b = A.blocks.find(x => x.id === v), e = (B.ed || {})[v] || {}; if (!b) return; const nb = Object.assign({}, b, e.from ? { from: e.from } : {}, e.to ? { to: e.to } : {}, 'prio' in e ? { prio: e.prio } : {});
+    if (nb.to < nb.from) { B.err = '끝나는 날이 시작보다 빨라요.'; draw(); return; } delete B.ed[v];
+    bkSave(A.blocks.map(x => (x.id === v ? nb : x)), nb.name + ' 날짜를 ' + md2(nb.from) + '~' + md2(nb.to) + '로 바꿨어요.'); return; }
+  if (a === 'bkdel') { const b = A.blocks.find(x => x.id === v); if (!b || !confirm(b.name + ' ' + b.rooms.length + '실 블럭을 해제할까요? (자동 배정에 다시 들어가요)')) return; bkSave(A.blocks.filter(x => x.id !== v), b.name + ' 블럭을 해제했어요.'); return; }
+  if (a === 'bkrm') { const [id, r] = v.split(':'); const b = A.blocks.find(x => x.id === id); if (!b || !confirm(r + '호만 먼저 해제할까요?')) return;
+    const nb = Object.assign({}, b, { rooms: b.rooms.filter(x => x !== r) }); bkSave(nb.rooms.length ? A.blocks.map(x => (x.id === id ? nb : x)) : A.blocks.filter(x => x.id !== id), r + '호를 ' + b.name + '에서 뺐어요.'); return; }
+}
 document.addEventListener('click', e => {
   if (!A) return;
   const t = e.target.closest && e.target.closest('#asp [data-as]'); if (!t) return;
@@ -461,12 +572,14 @@ document.addEventListener('click', e => {
   if (a === 'cfdef') { if (!confirm('담당표·정량·로얄/2901 을 기본값(26.10~27.3 담당표)으로 되돌릴까요? 저장을 눌러야 바뀌어요.')) return;
     A.cf = { aKey: Object.assign({}, DEF_CFG.aKey), bKey: Object.assign({}, DEF_CFG.bKey), royal: DEF_CFG.royalOk.join(', '), blue: DEF_CFG.pltBlue.join(', '), quota: Object.keys(DEF_CFG.quota).map(n => ({ name: n, v: DEF_CFG.quota[n] })), err: '', saving: false }; draw(); return; }
   if (a === 'pick') { pick(); return; }
+  if (a === 'blocks') { A.view = 'blocks'; A.back = ''; A.bk.ok = ''; A.bk.day = A.date; draw(); const bx = document.getElementById('asp'); if (bx) bx.scrollTop = 0; return; }
+  if (a && a.startsWith('bk')) { bkClick(a, v, t); return; }
   if (a === 'carry') { carryOpen(); return; }
   if (a === 'cqclear') { Object.keys(A.cq).forEach(t => { A.cq[t] = 0; }); A.carry = new Set(); A.cshort = []; A.res = null; A.cmp = null; draw(); return; }
   if (a === 'cqpick') { carryRead(); const r = carryPick(A.cq); A.carry = r.set; A.cshort = r.short; A.res = null; A.cmp = null; draw(); return; }
   if (a === 'cqx') { A.carry.delete(v); const t = typeOf(v); if (A.cq[t]) A.cq[t]--; A.res = null; A.cmp = null; draw(); return; }
   if (a === 'cqdone') { carryRead(); A.view = ''; draw(); return; }
-  if (a === 'date') { if (A.date === v) return; A.date = v; A.data = null; A.done = null; A.res = null; A.cmp = null; A.file = ''; draw(); return; }
+  if (a === 'date') { if (A.date === v) return; A.date = v; bmapUpd(); A.data = null; A.done = null; A.res = null; A.cmp = null; A.file = ''; draw(); return; }
   if (a === 'tog') { const r = A.rows.find(x => x.name === v); if (r) { r.on = !r.on; A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'u-' || a === 'u+') { const r = A.rows.find(x => x.name === v); if (r) { r.unit = Math.max(1, Math.min(15, Number(r.unit) + (a === 'u+' ? 1 : -1))); A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'all') { A.showAll = !A.showAll; draw(); return; }

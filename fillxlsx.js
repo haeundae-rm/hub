@@ -103,7 +103,7 @@ export async function fillReport(bytes, date, workers, opt) {
   // 미정비 남기기 (11/15): 그 객실 메모2 칸(이름 칸 두 줄 아래)에 '미정비' — 원래 글이 있으면 뒤에 붙임
   let carried = 0; const carryRefs = [];
   (opt.carry || []).forEach(r => { const ref = target[String(r)]; if (!ref) return; const [, L, n] = /([A-Z]+)(\d+)/.exec(ref), m2 = L + (+n + 2), cur = String(val(m2) == null ? '' : val(m2)).trim();
-    if (/미정비/.test(cur)) return; edits.set(m2, ['s', cur ? cur + ' 미정비' : '미정비']); carryRefs.push(m2); });
+    if (/미정비/.test(cur)) return; const tx = (opt.carryText || {})[String(r)] || '미정비'; edits.set(m2, ['s', cur ? cur + ' ' + tx : tx]); carryRefs.push(m2); });
   const dcache = new Map(); Object.entries(names).forEach(([r, ns]) => { if (maprow[r]) dcache.set('D' + maprow[r], ns.join(', ')); });
 
   const put = (ref, kind, v, a) => { a = a.replace(/\s*t="[^"]*"/, ''); if (kind === 'e') return '<c r="' + ref + '"' + a + '/>'; return kind === 's' ? '<c r="' + ref + '"' + a + ' t="inlineStr"><is><t>' + esc(v) + '</t></is></c>' : '<c r="' + ref + '"' + a + '><v>' + numStr(v) + '</v></c>'; };
