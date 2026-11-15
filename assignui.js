@@ -3,8 +3,8 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.15-6';
-import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-6';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.15-7';
+import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-7';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -444,6 +444,7 @@ function draw() {
   const t0 = H.ymd(), t1 = H.addDays(t0, 1);
   h += '<div class="card"><h2>1 · 정비보고서</h2><div class="seg2">' + [[t0, '오늘'], [t1, '내일']].map(([d, l]) => '<button data-as="date" data-v="' + d + '" aria-pressed="' + (A.date === d) + '">' + l + ' ' + H.md(d) + '</button>').join('') + '</div>' +
     '<button class="big-btn' + (A.data ? ' sec' : '') + '" style="margin-top:10px" data-as="pick">' + (A.data ? '📄 ' + esc(A.file) + ' — 다른 파일' : '정비보고서 파일 고르기 (초안 또는 완성본)') + '</button>';
+  if (!A.data && !A.busy) h += '<p class="note">파일을 넣으면 아래에 <b>📦 미정비 남기기</b>(타입별 수량) 버튼이 생겨요. 장기 미정비(시설 작업)는 위 <b>🚧 장기 미정비</b>에서.</p>';
   if (A.busy) h += '<p class="note">' + esc(A.busy) + '</p>';
   if (A.err) h += '<p class="err" style="margin-top:10px">' + esc(A.err) + '</p>';
   if (A.data) {
@@ -455,6 +456,7 @@ function draw() {
     if (bn) h += '<p class="note">🚧 장기 미정비 <b>' + bn + '실</b> 자동 제외 (' + esc(Object.keys(bl).map(k => k + ' ' + bl[k]).join(' · ')) + ')</p>';
     if (pr) h += '<p class="note">🔔 보수 끝 우선정비 <b>' + pr + '실</b> (14시까지)</p>';
     if (!A.done) h += '<button class="big-btn sec" style="margin-top:8px" data-as="carry">📦 미정비 남기기 (타입별 수량)' + (nc ? ' — ' + nc + '실' : '') + '</button>';
+    else h += '<button class="big-btn sec" style="margin-top:8px" disabled>📦 미정비 남기기 — 초안(이름 없는 파일)에서만</button>';
     if (A.done) h += '<p class="okbox" style="margin-top:8px">이름이 들어 있는 <b>완성본</b>이에요 → 이름은 빼고 엔진이 새로 배정한 뒤 <b>하우스키퍼 배정과 대조</b>해요. 출근자·유닛은 완성본 카드대로 채웠어요.</p>';
     else if (A.fromCards) h += '<p class="okbox" style="margin-top:8px">정비보고서 <b>출근 카드</b>의 유닛을 인계 유닛으로 읽었어요 → <b>' + A.fromCards.n + '명 · ' + A.fromCards.u + '유닛</b>. 아래 2번은 따로 고칠 필요 없어요 (바꿀 때만 −/+).</p>';
     else h += '<p class="err" style="margin-top:8px">출근 카드에 유닛이 없어요 → 아래 2번 출근자·유닛을 인계표대로 맞춰 주세요 (지난번 값으로 채워 둠).</p>';
