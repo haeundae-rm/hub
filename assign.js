@@ -46,7 +46,7 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   const WB_CAP = {}; if (WB_ON) T.filter(x => WB.has(x.room)).forEach(x => { WB_CAP[x.floor] = (WB_CAP[x.floor] || 0) + 1; });
   const zone = x => (ZOVR[x.room] || (x.floor >= 27 || x.floor === 4 ? 'A' : B_SUF.includes(x.suf) ? 'B' : 'A'));
   // 11/15 2인 1조 (부부): 두 분 합친 층 수로 셈 — 2개 층 이내가 좋고, 어쩔 수 없으면 3개 층까지 (4개 층은 큰 벌점). 짝의 담당 방은 내 방처럼 봄
-  const MATE = {}, LEAD = {};
+  const MATE = {}, LEAD = {}, TEAM3 = opts.team3 != null ? opts.team3 : 250;
   (opts.teams || []).forEach(p => { const [a, b] = (Array.isArray(p) ? p : String(p).split(',')).map(s => String(s).trim()); if (a && b && a !== b && W[a] && W[b]) { MATE[a] = b; MATE[b] = a; LEAD[a] = true; } });
   const owner = {};
   const floors = n => new Set(W[n].rooms.map(r => Math.floor(r / 100)));
@@ -63,6 +63,7 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   const GRP_SHORT = opts.grpShort != null ? opts.grpShort : 24, GRP_RATIO = 0.2;
   //   신입(입사 3개월 미만 = opts.vipNo, 정량 8 미만 신입 포함)은 VIP 가급적 안 줌 — VIP 1실마다 VIP_NEW 벌점 (11/14 사용자)
   const VIP_NO = new Set([...(opts.vipNo || []), ...STAGE]), VIP_NEW = opts.vipNew != null ? opts.vipNew : 120;
+  const KEEP_PRI = opts.keepPri != null ? opts.keepPri : 10;
   const ROY_ON = opts.royPri !== false, ROY_PRI = opts.royPriPen != null ? opts.royPriPen : 40;
   const vipN = n => W[n].rooms.filter(r => TX[r] && TX[r].vip).length;
   const grpOf = n => { let t = 0, g = 0, h = 99; W[n].rooms.forEach(r => { const x = TX[r]; if (!x || r === '2901') return; t++; if (x.grp) { g++; h = Math.min(h, x.grp); } }); return { t, g, h }; };
@@ -201,14 +202,15 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
       c += (k > 1 ? (k - 1) * 12 : 0) + (k >= 3 ? 150 : 0) + (k > FLOOR_MAX ? 1000 : 0) + (STAGE.includes(n) && k > 1 ? 30 * (k - 1) : 0);
       if (k > 1) { const a = [...fs].sort((p, q) => p - q); c += (a[a.length - 1] - a[0]) * 0.3; }
     } else if (LEAD[n]) { const fs = new Set([...floors(n), ...floors(m)]), k = fs.size;   // 조는 앞 분에게 한 번만
-      c += (k > 1 ? (k - 1) * 12 : 0) + (k >= 3 ? 150 : 0) + (k > FLOOR_MAX ? 1000 : 0);
+      c += (k > 1 ? (k - 1) * 12 : 0) + (k >= 3 ? TEAM3 : 0) + (k > FLOOR_MAX ? 1000 : 0);
       if (k > 1) { const a = [...fs].sort((p, q) => p - q); c += (a[a.length - 1] - a[0]) * 0.3; }
       const kn = floors(n).size, km = floors(m).size; c += (kn > FLOOR_MAX ? 1000 : 0) + (km > FLOOR_MAX ? 1000 : 0); }
     const def = capF[n] - w.load, over = w.load - capF[n];
     if (over > 1e-9) c += 500 * over;
     if (def > 1e-9) c += 200 * def;
     if (STAGE.includes(n)) c += w.rooms.filter(stageBad).length * 30;
-    for (const r of w.rooms) { const x = TX[r]; if (!x || r === '2901') continue; const ko = keyOf(x); if (ko && ko !== n && ko !== MATE[n]) { const real = (zone(x) === 'A' ? A_KEY : B_KEY)[x.floor] === ko; c += !real ? 1 : zone(x) === 'A' ? 25 : 12; } }
+    for (const r of w.rooms) { const x = TX[r]; if (!x || r === '2901') continue; const ko = keyOf(x); if (ko && ko !== n && ko !== MATE[n]) { const real = (zone(x) === 'A' ? A_KEY : B_KEY)[x.floor] === ko; c += !real ? 1 : zone(x) === 'A' ? 25 : 12;
+        if (real && x.late) c += KEEP_PRI; } }   // 11/15 담당이 출근했으면 그 층 우선정비·테마(FAW 1707·1708 등)는 담당이 갖고, 남는 일반 방을 남이 받음
     if (opts.chunk !== false) { const byF = {}; w.rooms.forEach(r => { const x = TX[r]; if (!x || r === '2901') return; const ko = keyOf(x); if (ko === n || (ko && ko === MATE[n])) return; byF[x.floor] = (byF[x.floor] || 0) + 1; });
       Object.values(byF).forEach(s => { c += s <= 2 ? 10 : s <= 4 ? 4 : 0; }); }
     c += w.rooms.filter(r => FROM_B[r] === n).length * 12;

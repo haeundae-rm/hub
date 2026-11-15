@@ -3,8 +3,8 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.15-5';
-import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-5';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.15-6';
+import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.15-6';
 
 const VER = '2026.11.13-8';
 const ROYAL = ['3001', '3002', '3101', '3102'];
@@ -41,7 +41,7 @@ function carryBlock(x) {
   if (String(x.st).trim() === '2') return '재실';
   return '';
 }
-// 타입별 수량만큼 고르기 (11/15 사용자): ① 그 객실 담당(A·B키)이 쉬는 층 먼저 ② 저층 먼저 (가급적). 어제 이월(3)도 그대로 남겨도 됨
+// 타입별 수량만큼 고르기 (11/15 사용자): 저층 먼저 (가급적), 담당(A·B키) 출근 층은 뒤로. 어제 이월(3)도 그대로 남겨도 됨
 //   담당이 출근한 층의 방은 담당에게 배정하고 다른 층을 남기는 쪽
 const B_SUF = ['10', '11', '15', '16', '17'];
 function keyOn(x) {
@@ -50,11 +50,14 @@ function keyOn(x) {
   const k = zoneB ? (c.bKey[f] || c.aKey[f]) : c.aKey[f];
   return !!(k && H0[k]);
 }
+// 11/15 하우스키퍼 실제(68실)와 대조: '담당 쉬는 층 먼저'는 27/68 + 14개 층에 흩어짐, '저층 먼저'는 47/68.
+//   → 저층 먼저, 담당이 출근한 층의 방은 3개 층 높은 것처럼 봄 (48/68)
+const KEY_ON_FLOORS = 3;
 function carryPick(qty) {
   const out = new Set(), short = [];
   Object.keys(qty).forEach(t => { const q = Number(qty[t]) || 0; if (q <= 0) return;
     const c = A.data.rooms.filter(x => isTarget(x) && !blk(x.room) && typeOf(x.room) === t && !carryBlock(x))
-      .map(x => Object.assign({ on: keyOn(x) }, x)).sort((p, q2) => (p.on ? 1 : 0) - (q2.on ? 1 : 0) || p.floor - q2.floor || p.room - q2.room);
+      .map(x => Object.assign({ sc: x.floor + (keyOn(x) ? KEY_ON_FLOORS : 0) }, x)).sort((p, q2) => p.sc - q2.sc || p.room - q2.room);
     c.slice(0, q).forEach(x => out.add(String(x.room)));
     if (c.length < q) short.push(t + ' ' + c.length + '실만'); });
   return { set: out, short };
@@ -326,7 +329,7 @@ function carryHtml() {
   all.forEach(x => { const t = typeOf(x.room); cnt[t] = (cnt[t] || 0) + 1; if (!carryBlock(x)) ok[t] = (ok[t] || 0) + 1; });
   const g = gapInfo(), sumQ = Object.values(A.cq).reduce((a, b) => a + (Number(b) || 0), 0);
   let h = '<div class="card"><h2>📦 미정비 남기기 <small>프런트와 협의한 타입별 수량</small></h2>' +
-    '<p class="note" style="margin:0 0 8px">수량을 적고 <b>고르기</b>를 누르면 <b>담당이 쉬는 층 → 저층</b> 순으로 골라요 (담당이 출근한 층은 그분께 배정). 로얄·2901·VIP·테마·단체·시간 지정·당직·재실은 남기지 않아요.' +
+    '<p class="note" style="margin:0 0 8px">수량을 적고 <b>고르기</b>를 누르면 <b>저층부터</b> 골라요. 담당이 출근한 층은 조금 뒤로 미뤄요 (그분께 배정). 로얄·2901·VIP·테마·단체·시간 지정·당직·재실은 남기지 않아요.' +
     (g ? '<br>지금: 대상 <b>' + g.units + '유닛</b> / 인계 <b>' + g.ho + '유닛</b> → ' + (g.d > 0 ? '<b style="color:var(--warn)">' + g.d + ' 넘침</b>' : '넘침 없음') : '') + '</p>' +
     '<div class="cf-grid" style="grid-template-columns:auto 1fr auto"><b>타입</b><b>대상 (남길 수 있는 방)</b><b>남길 수량</b>';
   TYPE_ORDER.filter(t => cnt[t]).forEach(t => { const can = ok[t] || 0;
