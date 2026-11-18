@@ -11,10 +11,11 @@
 // 배정 자동화 1단계 (2026-11-13): 🧩 자동 배정 (시험·대조) — assignui.js · assign.js(엔진) · assign_worker.js. 보기·대조만, 앱에 안 올림
 // 인스펙션 (2026-11-15 ① 새 구조): 🔍 hub/insp/ 따로 쪽 — 사진·사진별 지적·카톡 이미지 (insp · Storage insp/). 처음 만든 체크 버튼 방식(inspui.js)은 사용자 요청으로 중단·삭제
 // 입퇴사 부분 연결 (2026-11-18): 🧾 바로가기는 새 창 + '오늘 한눈에' 입퇴사 진행 카드 — staff 에서 '입사 진행'·퇴사일 있는 분만 골라 읽음 (서류·개인정보는 입퇴사 앱에 그대로)
+// 룸메이드 연차 Firebase 전환 (2026-11-18): 📋 바로가기 → hub/leave/ 따로 쪽 (옛 Apps Script 연차 관리 페이지를 옮김, leave_* 컬렉션)
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 
-const VER = '2026.11.18-2';
+const VER = '2026.11.18-3';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -25,6 +26,7 @@ const LINKS = [
   { ic: '🧹', t: '정비 레포트', s: '메이드별 현황 · 룸메이드 명단 · 메이드 화면', href: '../rm/' },
   { ic: '🛏', t: '정비 지원', s: '정비보조 명단 · 정비보조 화면', href: '../dirty/' },
   { ic: '🧾', t: '입퇴사 서류', s: '근로계약서 · 입사서류 · 사직서 (별도 비밀번호 · 새 창)', href: '../unies-contract/', tab: 1 },
+  { ic: '📋', t: '연차 관리', s: '룸메이드 연차 · 휴가신청서 승인 · 내 근무 휴대폰 승인', href: './leave/' },
   { ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)', href: '../inventory/' }
 ];
 
