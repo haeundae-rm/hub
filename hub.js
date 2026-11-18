@@ -20,13 +20,17 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import { setupNotice } from './notice.js?v=2026.11.18-7';
-import * as PIN from './pin.js?v=2026.11.18-7';
+import { setupNotice } from './notice.js?v=2026.11.18-8';
+import * as PIN from './pin.js?v=2026.11.18-8';
 
-const VER = '2026.11.18-7';
+const VER = '2026.11.18-8';
+const HK_UID = '';
+const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
-  { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
+  { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' },
+  // 하우스키퍼 공용 계정 (2026-11-18): 야간 방배정 · 오더테이커. 인사 · 연차는 안 보임 (규칙 v15 로도 막힘). uid 는 계정 만든 뒤 채움
+  { uid: HK_UID, label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', hk: true }
 ];
 const ROYAL = { '3001': 1, '3002': 1, '3101': 1, '3102': 1 };   // 로얄 = 2실 (레포트 앱과 같음)
 const JOBS = ['관리', '룸메이드', '정비보조', '하우스키퍼', '하우스맨', '오더테이커', '미화', '사우나', '기타'];
@@ -76,7 +80,7 @@ function loginHtml() {
     '<input id="pw" type="password" autocomplete="current-password" placeholder="비밀번호">' +
     (login.err ? '<p class="err">' + esc(login.err) + '</p>' : '') +
     '<button class="big-btn" data-login="1"' + (login.busy ? ' disabled' : '') + '>' + (login.busy ? '확인 중…' : '들어가기') + '</button>' +
-    '<p class="note">정비 레포트 관리자와 같은 비밀번호예요. 한 번 들어가면 정비 레포트 · 정비 지원도 관리자로 열려요.</p></div>';
+    '<p class="note">' + (ADMINS[login.who].hk ? '하우스키퍼 공용 계정 비밀번호예요. 인사 · 연차 화면은 안 보여요.' : '정비 레포트 관리자와 같은 비밀번호예요. 한 번 들어가면 정비 레포트 · 정비 지원도 관리자로 열려요.') + '</p></div>';
 }
 async function doLogin() {
   const pw = ($('#pw') || {}).value || '';
@@ -94,7 +98,7 @@ async function load(force) {
   if (!force && view.at && Date.now() - view.at < 120000) return;
   view.busy = true; draw();
   const d = ymd(), tm = ymd(Date.now() + 864e5);
-  const hrP = hrLoad(d);
+  const hrP = isHk() ? Promise.resolve(null) : hrLoad(d);
   const [up, rl, srl, cmp, sup, day, recs, errs] = await Promise.all([
     safe(S.get('uploads/latest')), safe(S.get('meta/relay')), safe(S.get('sup_meta/relay')), safe(S.get('meta/compare')),
     safe(S.get('sup/' + d)), safe(S.get('days/' + d)),
@@ -110,8 +114,9 @@ async function load(force) {
     }
   }
   // 연차 신청서 승인 대기 수 (count — 문서를 받지 않음, 1천 건까지 읽기 1건)
-  const [hr, lvq] = await Promise.all([hrP, safe(S.count('leave_apps', [['status', '==', '대기'], ['deleted', '==', false]]))]);
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq };
+  const [hr, lvq, ng] = await Promise.all([hrP, isHk() ? null : safe(S.count('leave_apps', [['status', '==', '대기'], ['deleted', '==', false]])),
+    Promise.all([addDays(d, -1), d].map(x => safe(S.get('night/' + x))))]);
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -572,7 +577,7 @@ function hrHtml(v) {
 }
 function linksHtml() {
   return '<div class="card"><h2>현장 앱 <small>같은 로그인으로 열려요</small></h2><div class="go-grid">' +
-    LINKS.filter(l => FIELD.indexOf(l.href) >= 0).map(l => '<a class="go" href="' + l.href + '"' + (l.tab ? ' target="_blank" rel="noopener"' : '') + '><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
+    LINKS.filter(l => FIELD.indexOf(l.href) >= 0 && !(isHk() && l.href === '../unies-contract/')).map(l => '<a class="go" href="' + l.href + '"' + (l.tab ? ' target="_blank" rel="noopener"' : '') + '><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
 }
 function staffHtml() {
   return '<div class="card"><h2>👥 전 파트 직원 명단</h2><p class="note" style="margin:0 0 12px">룸메이드 · 정비보조 · 미화 · 사우나 · 하우스맨 · 오더테이커를 한곳에서 봐요. 입사일 · 근속 · 재직/퇴사.<br>파트별 관리는 각 앱에서 해도 되고, 여기서 고쳐도 같은 명단이에요.</p>' +
@@ -592,6 +597,7 @@ const TILES = [
   { go: 'quality', ic: '🔍', t: '품질 관리', s: '인스펙션 · 고객만족도 VOC' },
   { href: './leave/', ic: '📋', t: '연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
+  { href: './night/', ic: '🌙', t: '야간 보고서', s: '하우스키퍼 야간 업무 보고 · 확인 · 인쇄' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
   { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
   { go: 'apps', ic: '🔗', t: '현장 앱 열기', s: '정비 레포트 · 정비 지원 · 입퇴사 서류', wide: 1 }
@@ -601,7 +607,7 @@ let route = { sec: '', tab: '' }, fromHome = false;
 function parseRoute() {
   const m = location.hash.replace(/^#/, '').split('/');
   if (m[0] === 'assign') { m[0] = 'work'; m[1] = 'asg'; }   // 11/18-4 주소 (자동 배정 따로 쪽) 그대로 열리게
-  const sec = SECS[m[0]] ? m[0] : '';
+  const sec = SECS[m[0]] && !(m[0] === 'people' && isHk()) ? m[0] : '';
   const tabs = sec && SECS[sec].tabs;
   let tab = tabs && tabs.some(t => t[0] === m[1]) ? m[1] : '';
   if (tabs && !tab) tab = up ? 'up' : tabs[0][0];
@@ -623,9 +629,18 @@ function todoItems(v) {
   const p = progress(v);
   if (p.issue) L.push({ lv: 'wait', title: '이상 보고 ' + p.issue + '실', sub: '메이드가 이상으로 표시한 객실 · 정비 레포트에서 보기', go: 'work/now' });
   if (typeof v.lvq === 'number' && v.lvq) L.push({ lv: 'bad', title: '휴가신청서 승인 대기 ' + v.lvq + '건', sub: '연차 관리에서 승인 · 반려', href: './leave/' });
+  nightWait(v).forEach(n => L.push({ lv: 'wait', title: '야간 보고서 ' + md(n.date) + ' 밤 확인 대기', sub: n.need, href: './night/#' + n.date }));
   const r = v.hr;
   if (r && !r.__err && r.past.length) L.push({ lv: 'wait', title: '퇴사일 지난 분 ' + r.past.length + '명', sub: '아직 재직으로 남아 있어요 · 입퇴사 서류에서 퇴사 처리', go: 'people' });
   return L.sort((a, b) => (a.lv === 'bad' ? 0 : 1) - (b.lv === 'bad' ? 0 : 1));
+}
+// 🌙 야간 보고서: 제출됐고 내(소장 · 부소장) 확인이 아직인 것 — 어젯밤 · 오늘 밤 두 문서만 읽음
+function nightWait(v) {
+  if (isHk() || !Array.isArray(v.ng)) return [];
+  return v.ng.filter(n => n && !n.__err && n.state === '제출' && !(n.ok && n.ok[admin.label])).map(n => {
+    const need = (n.items || []).filter(it => { const q = n.stock && n.stock[it.name] && n.stock[it.name].qty; return typeof q === 'number' && q <= it.low; }).map(it => it.name);
+    return { date: n.date, need: (n.main ? n.main + ' 작성 · ' : '') + (need.length ? '발주 필요: ' + need.join(', ') : '발주 필요 없음') };
+  });
 }
 function badgeOf(t, v) {
   if (!v) return '';
@@ -636,6 +651,7 @@ function badgeOf(t, v) {
     return p.total ? B('ok', p.pct + '%') : '';
   }
   if (t.go === 'field') return Array.isArray(v.errs) && v.errs.length ? B('wait', '오류 ' + v.errs.length) : '';
+  if (t.href === './night/') { const n = nightWait(v).length; return n ? B('wait', '확인 ' + n) : ''; }
   if (t.href === './leave/') return typeof v.lvq === 'number' && v.lvq ? B('bad', '승인 ' + v.lvq) : '';
   if (t.go === 'people') {
     const r = v.hr; if (!r || r.__err) return '';
@@ -659,7 +675,7 @@ function homeHtml() {
         }).join('') + '</ul></div>';
     } else h += '<div class="card hm-ok"><b>✅ 모두 정상</b><span>' + hm(view.at) + ' 기준</span><button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></div>';
   }
-  h += '<div class="hm-grid">' + TILES.map(t => {
+  h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.href === './leave/'))).map(t => {
     const inner = badgeOf(t, v) + '<span class="hm-ic">' + t.ic + '</span><span class="hm-tx"><b>' + esc(t.t) + '</b><small>' + esc(t.s) + '</small></span>';
     return t.href ? '<a class="hm-tile' + (t.wide ? ' wide' : '') + '" href="' + t.href + '">' + inner + '</a>'
       : '<button class="hm-tile' + (t.wide ? ' wide' : '') + '" data-go="' + t.go + '">' + inner + '</button>';
@@ -768,7 +784,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 S.onUser(u => {
   if (vocOpen && !(u && !u.anon)) closeVoc();
   user = u || false;
-  admin = u && !u.anon ? ADMINS.filter(a => a.uid === u.uid)[0] || null : null;
+  admin = u && !u.anon ? ADMINS.filter(a => (a.uid && a.uid === u.uid) || (!a.uid && a.email === u.email))[0] || null : null;
   view = { st: null, busy: false, err: '', at: 0 };
   ex = { rows: null, acts: null, at: 0, busy: false, d: '' };
   if (NT) NT.reset();

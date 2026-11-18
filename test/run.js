@@ -38,7 +38,7 @@ function seed(kind) {
   }
   return s;
 }
-async function open(browser, vp, kind, hash) {
+async function open(browser, vp, kind, hash, who) {
   const ctx = await browser.newContext(Object.assign({ locale: 'ko-KR', timezoneId: 'Asia/Seoul', deviceScaleFactor: 2 }, vp));
   await ctx.addInitScript(s => { window.__seed = s; window.__hubFast = 1; }, seed(kind));
   await ctx.route('**/*', async route => {
@@ -56,7 +56,7 @@ async function open(browser, vp, kind, hash) {
   p.on('pageerror', e => p.errs.push(String(e))); p.on('console', m => { if (m.type() === 'error' && !/Failed to load|404/.test(m.text())) p.errs.push(m.text()); });
   p.on('dialog', d => d.accept());
   await p.goto(BASE + 'hub/' + (hash || ''));
-  await p.waitForSelector('#pw'); await p.fill('#pw', 'pw'); await p.click('[data-login]');
+  await p.waitForSelector('#pw'); if (who) await p.click('[data-who="' + who + '"]'); await p.fill('#pw', 'pw'); await p.click('[data-login]');
   await p.waitForFunction(() => document.querySelector('.hm-tile, .hm-sec'));
   await sleep(600);
   return p;
@@ -69,7 +69,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('① 휴대폰 첫 화면 (할 일 있음)');
   let p = await open(b, phone, 'busy');
   const tiles = await p.locator('.hm-tile').allInnerTexts();
-  ok(tiles.length === 7, '업무 버튼 7개: ' + tiles.map(t => t.split('\n').find(x => /[가-힣]/.test(x) && !/^(승인|입사|퇴사일|확인|\d)/.test(x))).join(', '));
+  ok(tiles.length === 8, '업무 버튼 8개: ' + tiles.map(t => t.split('\n').find(x => /[가-힣]/.test(x) && !/^(승인|입사|퇴사일|확인|\d)/.test(x))).join(', '));
   const todo = await p.locator('.hm-todo li').allInnerTexts();
   ok(todo.some(t => /승인 대기 2건/.test(t)), '할 일: 휴가신청서 승인 대기 2건 (지운 것·승인된 것 빼고)');
   ok(todo.some(t => /퇴사일 지난 분 1명/.test(t)), '할 일: 퇴사일 지난 분 1명');
@@ -95,7 +95,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await shot(p, '3_오늘정비_더티활동.png');
   console.log('③ 휴대폰 뒤로 → 첫 화면');
   await p.goBack(); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 7 && !/#/.test(p.url().replace(BASE + 'hub/', '')), '뒤로 한 번에 첫 화면 (탭 이동은 기록 안 쌓임)');
+  ok(await p.locator('.hm-tile').count() === 8 && !/#/.test(p.url().replace(BASE + 'hub/', '')), '뒤로 한 번에 첫 화면 (탭 이동은 기록 안 쌓임)');
   await p.click('[data-go="people"]'); await sleep(300);
   ok(await p.locator('.pn-bg').count() === 1 && /비밀번호 정하기/.test(await p.innerText('.pn-bg')), '🔒 처음: 화면 비밀번호 정하기');
   await pin(p, ['1234', '1235']); ok(/달라요/.test(await p.innerText('.pn-bg')), '두 번 다르면 다시');
@@ -105,7 +105,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(/입퇴사 진행/.test(await p.innerText('main')) && /직원 명단/.test(await p.innerText('main')), '인사: 입퇴사 진행 + 직원 명단');
   await shot(p, '4_인사.png');
   await p.click('[data-home]'); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 7, '‹ 버튼 → 첫 화면');
+  ok(await p.locator('.hm-tile').count() === 8, '‹ 버튼 → 첫 화면');
   for (const [g, re] of [['quality', /인스펙션[\s\S]*VOC/], ['field', /공지 확인[\s\S]*휴대폰 오류[\s\S]*오늘 1건/], ['apps', /정비 레포트[\s\S]*정비 지원[\s\S]*입퇴사 서류/]]) {
     await p.click('[data-go="' + g + '"]'); await sleep(250);
     ok(re.test(await p.innerText('main')), g + ' 안쪽 내용');
@@ -185,7 +185,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(/인사 화면 비밀번호/.test(await p.innerText('.pn-bg')), '30분 지나면 다시 물음');
   await pin(p, ['9999']); await p.waitForFunction(() => /맞지/.test(document.querySelector('.pn-err').innerText), null, { timeout: 3000 }).catch(() => {}); ok(/맞지 않아요\. \(1\/5\)/.test(await p.innerText('.pn-bg')), '틀리면 막음 (1/5)');
   await p.click('.pn-no'); await sleep(200);
-  ok(!/#people/.test(p.url()) && await p.locator('.hm-tile').count() === 7, '취소하면 첫 화면 그대로');
+  ok(!/#people/.test(p.url()) && await p.locator('.hm-tile').count() === 8, '취소하면 첫 화면 그대로');
   const [req] = await Promise.all([p.waitForSelector('.pn-bg'), p.click('.hm-tile[href="./leave/"]')]);
   ok(/연차 · 근무 화면 비밀번호/.test(await p.innerText('.pn-bg')) && /hub\/(#.*)?$/.test(p.url()), '연차·근무 버튼도 물음 (넘어가기 전)');
   await p.click('.pn-no'); await sleep(200);
@@ -210,7 +210,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   p = await open(b, phone, 'calm', '#work/dirty'); await sleep(500);
   ok(/출근 중/.test(await p.innerText('main')), '바로 열어도 더티 읽음');
   await p.click('[data-home]'); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 7, '첫 화면으로');
+  ok(await p.locator('.hm-tile').count() === 8, '첫 화면으로');
   ok(/모두 정상/.test(await p.innerText('main')), '할 일 없으면 "모두 정상" 한 줄');
   await shot(p, '6_첫화면_모두정상.png');
   ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
@@ -219,6 +219,83 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await shot(p, '7_PC_첫화면.png');
   const cols = await p.evaluate(() => getComputedStyle(document.querySelector('.hm-grid')).gridTemplateColumns.split(' ').length);
   ok(cols === 3, 'PC 는 한 줄에 3개');
+  ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
+  console.log('⑨ 하우스키퍼 공용 계정 (허브)');
+  p = await open(b, phone, 'busy', '', 2);
+  const ht = await p.locator('.hm-tile').allInnerTexts();
+  ok(ht.length === 6 && !ht.some(t => /인사|연차/.test(t)), '하우스키퍼: 인사 · 연차 버튼 없음 (' + ht.length + '개)');
+  ok(/하우스키퍼/.test(await p.innerText('#today')), '머리 줄에 하우스키퍼');
+  const htodo = await p.innerText('main');
+  ok(!/승인 대기|퇴사일/.test(htodo), '할 일에 연차 · 퇴사 줄 없음');
+  ok(await p.evaluate(() => window.__counts) === 0, '연차 신청서 개수도 안 읽음 (규칙상 못 읽음)');
+  await p.goto(BASE + 'hub/#people'); await sleep(900);
+  ok(await p.locator('.hm-tile').count() === 6 && !/입퇴사 진행|비밀번호가 필요/.test(await p.innerText('main')), '주소로 #people → 첫 화면');
+  await p.click('[data-go="apps"]'); await sleep(250);
+  ok(!/입퇴사 서류/.test(await p.innerText('main')) && /정비 레포트/.test(await p.innerText('main')), '현장 앱: 입퇴사 서류 없음');
+  await p.click('[data-home]'); await sleep(200);
+  await shot(p, '12_하우스키퍼_첫화면.png');
+  await p.click('[data-go="work"]'); await sleep(300); await p.click('[data-rm="today"]');
+  ok(await p.frameLocator('#rmf').locator('[data-view]').first().waitFor({ timeout: 8000 }).then(() => true, () => false), '하우스키퍼도 메이드별 현황 열림 (정비 레포트 관리자)');
+  await p.click('[data-rmclose]'); await sleep(200);
+  ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
+
+  console.log('⑩ 🌙 야간 보고서');
+  const ND = (() => { const t = new Date(Date.now() + 9 * 3600e3); return t.getUTCHours() < 15 ? fmt(Date.now() - 864e5) : DAY; })();
+  const NEXT = fmt(Date.parse(ND + 'T12:00:00+09:00') + 864e5), PREV = fmt(Date.parse(ND + 'T12:00:00+09:00') - 864e5);
+  const fx = o => p.evaluate(o => { const f = JSON.parse(sessionStorage.getItem('fx') || '{}'); Object.assign(f, o); sessionStorage.setItem('fx', JSON.stringify(f)); }, o);
+  const NS = {};
+  NS['days/' + NEXT] = { maids: Array.from({ length: 40 }, (_, i) => 'm' + i) };
+  NS['staff/hk1'] = { name: '하키A', job: '하우스키퍼', status: '재직' }; NS['staff/hk2'] = { name: '하키B', job: '오더테이커', status: '재직' };
+  NS['night/' + PREV] = { date: PREV, rdate: ND, main: '하키A', sub: '하키B', state: '제출', ok: { 소장: { at: 1, by: '소장' } }, items: [{ name: '비누', unit: 'BOX', low: 5, high: 15 }],
+    stock: { '생수': { qty: 5000, place: '9F 1,000 · B1 4,000' } }, clean: [{ kind: '창고 정리', where: '7층', who: '하키A', what: '렉 위 정리' }], sup: { names: '보조A, 보조B' }, notes: [] };
+  await fx(NS); await p.goto(BASE + 'hub/night/');
+  await p.waitForSelector('[data-f="main"]', { timeout: 6000 });
+  ok(await p.inputValue('[data-f="main"]') === '하키A' && await p.inputValue('[data-f="sub"]') === '하키B', '작성자: 전날 것 이어받음');
+  ok(await p.inputValue('[data-f="rm"]') === '40', 'R/M 출근: 다음 날 배정 40명 자동');
+  ok(await p.inputValue('[data-f="stock.생수.place"]') === '9F 1,000 · B1 4,000', '보관 위치: 전날 것 이어받음');
+  ok(await p.inputValue('[data-f="clean.0.what"]') === '렉 위 정리', '창고 정리: 전날 것 이어받음');
+  await p.click('[data-submit]'); await sleep(300);
+  ok(await p.evaluate(ND => !window.__seed['night/' + ND], ND), '수량 비면 제출 막음');
+  const Q = { '롤휴지': 60, '갑티슈': 17, '특화갑티슈': 47, '샴푸': 50, '바디워시': 34, '액상 커피': 18, '비누': 3.5, '생수': 5000 };
+  for (const k of Object.keys(Q)) { await p.fill('[data-f="stock.' + k + '.qty"]', String(Q[k])); }
+  await sleep(600);
+  ok(/발주 필요: 비누/.test(await p.innerText('main')), '비누 3.5 → 부족 → 발주 필요: 비누');
+  ok(/재고 부족/.test(await p.innerText('.sum')) && await p.innerText('.sum div:first-child b') === '1', '요약: 부족 1');
+  await p.click('[data-step="dirty:0"]'); await p.click('[data-step="dirty:1"]'); await p.click('[data-zone="dirty:고층"]');
+  ok(/2\/8/.test(await p.innerText('.sum')), '린넨 수거 2/8');
+  await p.fill('[data-f="sup.hk"]', '6'); await sleep(500);
+  await p.fill('[data-f="notes.0.t"]', '방향제 재고 없음'); await p.selectOption('[data-f="notes.0.st"]', '조치 필요');
+  await p.click('[data-add="notes"]'); await p.fill('[data-f="notes.1.t"]', '오더용 수건 적재');
+  await shot(p, '13_야간보고서_작성.png');
+  await p.click('[data-submit]'); await p.waitForFunction(ND => window.__seed['night/' + ND], ND, { timeout: 4000 }).catch(() => {});
+  const nd1 = await p.evaluate(ND => window.__seed['night/' + ND], ND);
+  ok(nd1 && nd1.state === '제출' && nd1.by === '하우스키퍼' && nd1.stock['비누'].qty === 3.5 && nd1.sup.hk === 6 && nd1.notes.length === 2 && nd1.rdate === NEXT && Object.keys(nd1.ok).length === 0, '제출 저장: 상태 · 수량 · 정비보조 · 특이사항 2줄 · 확인 없음');
+  ok(await p.locator('[data-ok]').count() === 0, '하우스키퍼는 확인 버튼 없음');
+  console.log('⑪ 소장 확인');
+  const ctxN = JSON.parse(await p.evaluate(() => sessionStorage.getItem('fx')));
+  p = await open(b, phone, 'calm');
+  await fx(ctxN); await p.reload(); await p.waitForSelector('.hm-tile'); await sleep(700);
+  const bt = await p.innerText('main');
+  ok(new RegExp('야간 보고서 .* 밤 확인 대기[\\s\\S]*발주 필요: 비누').test(bt), '허브 할 일: 야간 보고서 확인 대기 · 발주 필요: 비누');
+  ok(/확인 1/.test(await p.locator('.hm-tile[href="./night/"]').innerText()), '야간 보고서 버튼에 확인 1');
+  await p.goto(BASE + 'hub/night/#' + ND);
+  await p.waitForSelector('[data-ok="소장"]', { timeout: 6000 });
+  ok(await p.locator('[data-ok]').count() === 1, '소장은 소장 칸에만 확인 버튼');
+  await p.click('[data-ok="소장"]'); await sleep(500);
+  const nd2 = await p.evaluate(ND => window.__seed['night/' + ND], ND);
+  ok(nd2.ok['소장'] && nd2.ok['소장'].by === '소장' && nd2.stock['비누'].qty === 3.5, '확인 저장 (내용 그대로)');
+  ok(/확인 1\/3/.test(await p.innerText('.datebar')), '상태: 확인 1/3');
+  await p.emulateMedia({ media: 'print' });
+  await shot(p, '14_야간보고서_인쇄.png');
+  await p.pdf({ path: path.join(OUT, '야간보고서_인쇄_예시.pdf'), format: 'A4', printBackground: true }).catch(() => {});
+  ok(/야간 업무 보고서[\s\S]*발주 필요[\s\S]*비누/.test(await p.innerText('#print')), '인쇄 화면: 엑셀 양식 순서');
+  await p.emulateMedia({ media: 'screen' });
+  console.log('⑫ 확인 뒤 하우스키퍼');
+  await p.evaluate(() => sessionStorage.removeItem('fu'));
+  await p.reload(); await p.waitForSelector('[data-who]');
+  await p.click('[data-who="0"]'); await p.fill('#pw', 'pw'); await p.click('[data-login]');
+  await p.waitForSelector('.lock', { timeout: 6000 }).catch(() => {});
+  ok(/확인이 시작된 보고서라 고칠 수 없어요/.test(await p.innerText('main')) && await p.locator('[data-save]').count() === 0, '하우스키퍼: 잠김 · 저장 버튼 없음');
   ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
   console.log('\n통과 ' + pass + ' / 실패 ' + fail);
   await b.close(); process.exit(fail ? 1 : 0);

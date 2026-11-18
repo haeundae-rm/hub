@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>야간 업무 보고서</title>
+<meta name="theme-color" content="#10233F">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+:root{
+  --bg:#F4F6F9; --surface:#FFFFFF; --ink:#111827; --muted:#4B5563; --line:#E5E8EE; --tile:#F2F5FA;
+  --navy:#10233F; --brand:#1D3A6E; --gold:#C79A3B; --ok:#1E8E3E; --ok-soft:#E8F5EC; --warn:#B23A48; --warn-soft:#FDEDEF;
+  --wait:#8A5A00; --wait-soft:#FDF3DC; --yel:#FFF9DB;
+  --f-body:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+.top{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.top a.back{color:#fff;text-decoration:none;font-size:26px;line-height:1;padding:0 6px}
+.top h1{margin:0;font-size:17px;font-weight:900;flex:1}
+.top h1 small{display:block;font-size:12px;font-weight:500;opacity:.75}
+main{max-width:760px;margin:0 auto;padding:12px 12px 120px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
+.card h2{margin:0 0 10px;font-size:16px;font-weight:900;display:flex;align-items:center;gap:8px}
+.card h2 small{font-size:12px;font-weight:600;color:var(--muted);margin-left:auto}
+.note{color:var(--muted);font-size:13px;margin:6px 0 0}
+.err{color:var(--warn);font-weight:700;font-size:14px}
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.seg button{flex:1;min-width:80px;min-height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--tile);font-weight:800;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+.big{display:block;width:100%;min-height:52px;border-radius:14px;border:0;background:var(--brand);color:#fff;font-weight:900;font-size:16px;cursor:pointer}
+.big.sec{background:var(--tile);color:var(--ink);border:1.5px solid var(--line)}
+.big:disabled{opacity:.55}
+input.t,select.t,textarea.t{width:100%;min-height:44px;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--yel)}
+input.t:focus,select.t:focus,textarea.t:focus{outline:none;border-color:var(--brand);background:#fff}
+input.t[readonly],textarea.t[readonly]{background:#fff;border-color:transparent;padding-left:2px}
+input.n{text-align:right;font-weight:800}
+.datebar{display:flex;align-items:center;gap:8px}
+.datebar button{min-width:44px;min-height:44px;border-radius:12px;border:1.5px solid var(--line);background:#fff;font-size:18px;font-weight:900;cursor:pointer}
+.datebar .d{flex:1;text-align:center}
+.datebar .d b{display:block;font-size:17px}
+.datebar .d small{color:var(--muted)}
+.state{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:800;background:var(--tile);color:var(--muted)}
+.state.sub{background:var(--ok-soft);color:var(--ok)}
+.state.ok{background:var(--brand);color:#fff}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+label.f{display:block;font-size:12px;font-weight:700;color:var(--muted)}
+label.f>span{display:block;margin:0 0 3px}
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 8px}
+.sum div{background:var(--tile);border-radius:12px;padding:8px;text-align:center}
+.sum b{display:block;font-size:20px}
+.sum span{font-size:12px;color:var(--muted)}
+.sum .bad b{color:var(--warn)}
+.order{padding:10px 12px;border-radius:12px;background:var(--ok-soft);color:var(--ok);font-weight:800}
+.order.bad{background:var(--warn-soft);color:var(--warn)}
+.stk{display:grid;grid-template-columns:1fr 88px 58px;gap:6px 8px;align-items:center}
+.stk .nm b{display:block}
+.stk .nm small{color:var(--muted);font-size:12px}
+.stk .st{text-align:center;font-weight:900;font-size:13px;border-radius:99px;padding:3px 0}
+.st.부족{background:var(--warn-soft);color:var(--warn)}
+.st.보통{background:var(--wait-soft);color:var(--wait)}
+.st.여유{background:var(--ok-soft);color:var(--ok)}
+.stk .pl{grid-column:1/-1;margin-top:-2px}
+.stk .pl input{min-height:36px;font-size:13px}
+.stk hr{grid-column:1/-1;border:0;border-top:1px solid var(--line);margin:2px 0}
+.ln{border:1px solid var(--line);border-radius:12px;padding:10px;margin:0 0 8px}
+.ln b{display:block;margin:0 0 6px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0}
+.steps button,.chip{min-height:44px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;font-size:13px;cursor:pointer}
+.steps button[aria-pressed="true"],.chip[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.chips{display:flex;gap:6px}
+.chips .chip{flex:1}
+.rows .r{border:1px solid var(--line);border-radius:12px;padding:8px;margin:0 0 8px;position:relative}
+.rows .r .x{position:absolute;top:4px;right:4px;border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;min-width:36px;min-height:36px}
+.add{width:100%;min-height:44px;border-radius:12px;border:1.5px dashed var(--line);background:#fff;font-weight:800;color:var(--brand);cursor:pointer}
+.nt{display:grid;grid-template-columns:24px 1fr 104px;gap:6px;align-items:center;margin:0 0 6px}
+.nt>b{text-align:center;color:var(--muted)}
+.okbar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.okbar div{border:1.5px solid var(--line);border-radius:12px;padding:8px;text-align:center;min-height:78px}
+.okbar div b{display:block;font-size:13px;color:var(--muted)}
+.okbar div.on{border-color:var(--brand);background:#EEF3FB}
+.okbar div.on span{font-weight:900;color:var(--brand)}
+.okbar button{margin-top:4px;width:100%;min-height:40px;border-radius:10px;border:0;background:var(--brand);color:#fff;font-weight:800;cursor:pointer}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+.bar .in{max-width:760px;margin:0 auto;display:flex;gap:8px;align-items:center}
+.bar .in .msg{flex:1;font-size:13px;color:var(--muted)}
+.bar .in button{min-height:48px;padding:0 16px;border-radius:12px;border:0;font-weight:900;cursor:pointer}
+.bar .save{background:var(--tile);border:1.5px solid var(--line)!important}
+.bar .go{background:var(--brand);color:#fff}
+.list a{display:flex;justify-content:space-between;gap:8px;padding:10px 4px;border-bottom:1px solid var(--line);text-decoration:none;color:inherit}
+.list a:last-child{border-bottom:0}
+.lock{background:var(--wait-soft);color:var(--wait);font-weight:700;border-radius:12px;padding:10px 12px;font-size:14px}
+.cfg{display:grid;grid-template-columns:1fr 64px 64px 64px 36px;gap:6px;align-items:center;margin:0 0 6px}
+.cfg input{min-height:40px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;z-index:20;max-width:90%}
+#print{display:none}
+
+/* ---------- 인쇄 (A4 한 장, 엑셀 양식과 같은 순서) */
+@media print{
+  @page{size:A4 portrait;margin:10mm}
+  body{background:#fff;font-size:10.5px}
+  .top,main,.bar,.toast{display:none!important}
+  #print{display:block}
+  .pp h1{font-size:20px;text-align:center;margin:0 0 6px;letter-spacing:6px}
+  .pp table{width:100%;border-collapse:collapse;margin:0 0 6px}
+  .pp th,.pp td{border:1px solid #333;padding:3px 5px;vertical-align:middle}
+  .pp th{background:#E8ECF2;font-weight:700}
+  .pp .h{background:#10233F;color:#fff;text-align:left;font-weight:900}
+  .pp .c{text-align:center}
+  .pp .r{text-align:right}
+  .pp .sign td{height:44px;width:72px;text-align:center;font-size:9.5px}
+  .pp .foot{font-size:9.5px;color:#333;margin-top:4px}
+  .pp .bad{color:#B23A48;font-weight:900}
+}
+</style>
+</head>
+<body>
+<header class="top"><a class="back" href="../" aria-label="허브로">‹</a><h1>🌙 야간 업무 보고서<small id="who"></small></h1></header>
+<main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
+<div id="print"></div>
+<script type="module" src="./night.js?v=2026.11.18-1"></script>
+</body>
+</html>
