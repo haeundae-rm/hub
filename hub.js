@@ -20,10 +20,10 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import { setupNotice } from './notice.js?v=2026.11.18-8';
-import * as PIN from './pin.js?v=2026.11.18-8';
+import { setupNotice } from './notice.js?v=2026.11.19-1';
+import * as PIN from './pin.js?v=2026.11.19-1';
 
-const VER = '2026.11.18-8';
+const VER = '2026.11.19-1';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -716,12 +716,30 @@ window.addEventListener('hashchange', () => {
 route = parseRoute();
 
 // ---------- 직원 명단 (정비 레포트 · 정비 지원과 같은 화면 파일 — 여기선 전 파트)
+// 정비보조 이름 고르기 목록 맞추기 (2026-11-19): 정비 지원 앱 명단(dirty index.html '정비보조 명단' sync)과 같은 규칙
+//   직종 '정비보조' 재직·입사 진행 = sup_meta/roster.add 에 넣음, 퇴사 = hide 로 뺌, 이름 고침 = 예전 이름 뺌, 명단에서 지움 = add 에서 뺌
+//   예전엔 허브에서 정비보조를 넣어도 정비 지원 이름 고르기에 안 나왔음. 바뀐 게 있을 때만 한 번 씀
+async function supRosterSync(list, info) {
+  try {
+    info = info || {};
+    const nm = x => String(x || '').trim(), sup = list.filter(p => p.job === '정비보조');
+    const active = [], gone = [], rm = nm(info.removed);
+    sup.forEach(p => { const n = nm(p.name); if (!n) return; if ((p.status || '재직') === '퇴사') gone.push(n); else active.push(n); });
+    if (info.renamedFrom) gone.push(nm(info.renamedFrom));
+    const g0 = await S.get('sup_meta/roster') || {}, g = { add: (g0.add || []).slice(), hide: (g0.hide || []).slice() };
+    const goneF = gone.filter(n => active.indexOf(n) < 0), uniq = (n, i, a) => a.indexOf(n) === i;
+    const add = g.add.concat(active).filter((n, i, a) => uniq(n, i, a) && goneF.indexOf(n) < 0 && (n !== rm || active.indexOf(n) >= 0));
+    const hide = g.hide.filter(n => active.indexOf(n) < 0).concat(goneF).filter(uniq);
+    if (JSON.stringify(add) === JSON.stringify(g.add) && JSON.stringify(hide) === JSON.stringify(g.hide)) return;
+    await S.set('sup_meta/roster', { add, hide, at: S.SERVER_TIME, uid: user.uid });
+  } catch (e) { alert('정비 지원 이름 고르기 목록을 못 맞췄어요: ' + (e && (e.code || e.message) || e) + '\n정비 지원 앱 관리자 화면의 「👥 정비보조 명단」을 한 번 열면 다시 맞춰져요.'); }
+}
 function openStaff() {
   const go = () => window.StaffBook.open({ jobs: JOBS, title: '👥 전 파트 직원 명단',
     api: { list: () => S.getQuery('staff', []).then(xs => xs.map(x => Object.assign({}, x.data, { id: x.id }))),
       save: (id, d) => { const o = {}; Object.keys(d).forEach(k => { if (k !== 'id' && d[k] !== undefined) o[k] = d[k]; }); o.at = S.SERVER_TIME; o.uid = user.uid; return S.set('staff/' + id, o); },
       del: id => S.del('staff/' + id),
-      newId: () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) } });
+      newId: () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }, onChange: supRosterSync });
   if (window.StaffBook) { go(); return; }
   const sc = document.createElement('script');
   sc.src = new URL('../rm/app/staff.js?v=' + VER, import.meta.url).href;

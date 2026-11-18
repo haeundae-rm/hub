@@ -104,6 +104,15 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(pd && pd.h && pd.salt && !JSON.stringify(pd).includes('1234'), '저장: 해시만 (숫자 그대로 안 남음)');
   ok(/입퇴사 진행/.test(await p.innerText('main')) && /직원 명단/.test(await p.innerText('main')), '인사: 입퇴사 진행 + 직원 명단');
   await shot(p, '4_인사.png');
+  console.log('③-2 전 파트 명단에서 정비보조 고치면 정비 지원 이름 고르기 목록(sup_meta/roster)도 맞춤');
+  await p.evaluate(() => { window.__seed['sup_meta/roster'] = { add: ['기존보조'], hide: ['새보조'] }; });
+  await p.click('[data-staff]'); await p.waitForSelector('[data-sb="paste"]');
+  await p.click('[data-sb="paste"]'); await p.fill('[data-sb="ta"]', '이름\t직종\t상태\n새보조\t정비보조\t재직\n퇴보조\t정비보조\t퇴사\n룸예시\t룸메이드\t재직');
+  await p.click('[data-sb="pcheck"]'); await p.waitForSelector('[data-sb="psave"]'); await p.click('[data-sb="psave"]'); await sleep(1200);
+  const ro = await p.evaluate(() => window.__seed['sup_meta/roster']);
+  ok(ro && ro.add.includes('기존보조') && ro.add.includes('새보조') && !ro.add.includes('룸예시') && !ro.add.includes('퇴보조'), '정비보조 재직 → 이름 목록에 넣음 (다른 직종은 안 넣음) ' + JSON.stringify(ro && ro.add));
+  ok(ro && !ro.hide.includes('새보조') && ro.hide.includes('퇴보조'), '숨겨 있던 이름 다시 보이고, 퇴사는 뺌 ' + JSON.stringify(ro && ro.hide));
+  await p.click('[data-sb="close"]').catch(() => {}); await sleep(300);
   await p.click('[data-home]'); await sleep(300);
   ok(await p.locator('.hm-tile').count() === 8, '‹ 버튼 → 첫 화면');
   for (const [g, re] of [['quality', /인스펙션[\s\S]*VOC/], ['field', /공지 확인[\s\S]*휴대폰 오류[\s\S]*오늘 1건/], ['apps', /정비 레포트[\s\S]*정비 지원[\s\S]*입퇴사 서류/]]) {
