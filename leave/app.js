@@ -2,7 +2,7 @@
 // 나머지 화면(현황 · 신청서 · 월 사용 입력 · 명단 · 대장 출력)은 index.html 안 옛 LeavePage 코드 그대로
 import * as A from './api.js?v=2026.11.18-3';
 
-const VER = '2026.11.18-3';
+const VER = '2026.11.18-7';
 const EMAILS = ['unieshaeundae+admin@gmail.com', 'unieshaeundae+sub@gmail.com'];
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -128,7 +128,8 @@ window.LVX = { devHtml, impHtml };
 
 // ---------- 시작
 A.onUser(u => {
-  if (u && !u.anon && A.isAdmin()) P().load();
+  // 🔒 화면 비밀번호 (2026-11-18): 허브 주소로 바로 들어와도 4자리 → 틀리거나 취소하면 허브 첫 화면으로
+  if (u && !u.anon && A.isAdmin()) import('../pin.js?v=' + VER).then(m => m.gate('연차 · 근무')).then(ok => { if (ok) P().load(); else location.replace('../'); }, () => location.replace('../'));
   else if (u && !u.anon) P().gate('이 계정은 연차 관리 권한이 없어요.');
   else P().gate('');
 });

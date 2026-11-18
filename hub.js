@@ -16,12 +16,14 @@
 //   주소 끝 # 로 나눠서 휴대폰 '뒤로'로 첫 화면에 돌아옴. 더티·활동 자료는 그 탭을 열 때만 읽음 (읽기 아끼기). 안쪽 카드(자동 배정 · 인스펙션 · VOC …)는 그대로 옮기기만
 // 정비 레포트 관리자 기능 허브로 (2026-11-18-5): 오늘 정비 → '메이드별 현황' · '배정 변경 · 대조', 📱 현장 관리(공지 확인 · 2인 1조 · 휴대폰 등록 · 휴대폰 오류)
 //   = 정비 레포트 관리자 화면을 허브 안 전체 창(iframe ../rm/?hub=today|assign|set)으로 엶 (같은 화면 파일 · 같은 계산). 열려 있는 동안만 구독. 자동 배정은 오늘 정비 탭으로 옮김
+// 🔒 화면 비밀번호 (2026-11-18-7): 인사 · 연차·근무 들어갈 때 4자리 (pin.js) — 하우스키퍼도 허브를 보므로. 진짜 잠금은 전용 계정 + 규칙(다음 단계)
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import { setupNotice } from './notice.js?v=2026.11.18-6';
+import { setupNotice } from './notice.js?v=2026.11.18-7';
+import * as PIN from './pin.js?v=2026.11.18-7';
 
-const VER = '2026.11.18-6';
+const VER = '2026.11.18-7';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -675,7 +677,9 @@ function secHtml() {
     else if (route.tab === 'asg') h += assignCardHtml();
     else h += statusHtml() + progHtml() + rmCardHtml();
   } else if (sec === 'quality') h += inspCardHtml() + vocCardHtml();
-  else if (sec === 'people') h += (view.st ? hrHtml(view.st) : '<div class="card"><p class="note" style="margin:0">읽는 중…</p></div>') + staffHtml();
+  else if (sec === 'people' && !PIN.passed()) h += '<div class="card"><h2>🔒 비밀번호가 필요해요</h2><p class="note" style="margin:0 0 12px">직원 명단 · 입퇴사 정보가 있는 화면이에요.</p><button class="big-btn" data-unlock="people">비밀번호 넣고 보기</button></div>';
+  else if (sec === 'people') h += (view.st ? hrHtml(view.st) : '<div class="card"><p class="note" style="margin:0">읽는 중…</p></div>') + staffHtml() +
+    '<div class="card"><h2>🔒 화면 비밀번호</h2><p class="note" style="margin:0 0 12px">인사 · 연차·근무 화면에 들어갈 때 묻는 숫자 4자리예요. 한 번 넣으면 이 창에서 30분 동안 다시 안 물어요.</p><button class="big-btn sec" data-pinchg="1">비밀번호 바꾸기</button></div>';
   else if (sec === 'field') h += fieldHtml();
   else if (sec === 'apps') h += linksHtml();
   return h;
@@ -711,8 +715,13 @@ function openStaff() {
 
 // ---------- 누르기
 document.addEventListener('click', e => {
-  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose]');
+  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"]');
   if (!t || (t.closest && t.closest('#dz'))) return;
+  if (t.matches('a[href="./leave/"]') && !PIN.passed()) { e.preventDefault(); PIN.gate('연차 · 근무').then(ok => { if (ok) location.href = './leave/'; }); return; }
+  if (t.matches('a[href="./leave/"]')) return;
+  if (t.hasAttribute('data-unlock')) { PIN.gate('인사').then(ok => { if (ok) draw(); }); return; }
+  if (t.hasAttribute('data-pinchg')) { PIN.change(); return; }
+  if (t.hasAttribute('data-go') && t.getAttribute('data-go').split('/')[0] === 'people' && !PIN.passed()) { PIN.gate('인사').then(ok => { if (ok) goSec('people', ''); }); return; }
   if (t.hasAttribute('data-rm')) { openRm(t.getAttribute('data-rm')); return; }
   if (t.hasAttribute('data-rmclose')) { closeRm(); return; }
   if (t.hasAttribute('data-go')) { const g = t.getAttribute('data-go').split('/'); goSec(g[0], g[1] || ''); return; }
@@ -738,7 +747,7 @@ document.addEventListener('click', e => {
   if (t.hasAttribute('data-staff')) { openStaff(); return; }
   if (t.hasAttribute('data-logout')) {
     if (!confirm('로그아웃할까요?\n이 기기의 정비 레포트 · 정비 지원 관리자도 같이 로그아웃돼요.')) return;
-    S.signOut(); return;
+    PIN.forget(); S.signOut(); return;
   }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'pw') doLogin(); });

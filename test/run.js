@@ -61,6 +61,7 @@ async function open(browser, vp, kind, hash) {
   await sleep(600);
   return p;
 }
+async function pin(p, vals) { for (const v of vals) { await p.waitForSelector('.pn-in', { timeout: 4000 }); await p.fill('.pn-in', ''); await p.type('.pn-in', v); await sleep(250); } }
 const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true });
 (async () => {
   const b = await chromium.launch();
@@ -96,6 +97,11 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.goBack(); await sleep(300);
   ok(await p.locator('.hm-tile').count() === 7 && !/#/.test(p.url().replace(BASE + 'hub/', '')), '뒤로 한 번에 첫 화면 (탭 이동은 기록 안 쌓임)');
   await p.click('[data-go="people"]'); await sleep(300);
+  ok(await p.locator('.pn-bg').count() === 1 && /비밀번호 정하기/.test(await p.innerText('.pn-bg')), '🔒 처음: 화면 비밀번호 정하기');
+  await pin(p, ['1234', '1235']); ok(/달라요/.test(await p.innerText('.pn-bg')), '두 번 다르면 다시');
+  await pin(p, ['1234', '1234']); await sleep(400);
+  const pd = await p.evaluate(() => window.__seed['uploads/hubpin']);
+  ok(pd && pd.h && pd.salt && !JSON.stringify(pd).includes('1234'), '저장: 해시만 (숫자 그대로 안 남음)');
   ok(/입퇴사 진행/.test(await p.innerText('main')) && /직원 명단/.test(await p.innerText('main')), '인사: 입퇴사 진행 + 직원 명단');
   await shot(p, '4_인사.png');
   await p.click('[data-home]'); await sleep(300);
@@ -170,6 +176,32 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.click('[data-home]'); await sleep(200);
   await p.goto(BASE + 'hub/#assign'); await sleep(800);
   ok(/자동 배정 열기/.test(await p.innerText('main')), '예전 주소 #assign → 오늘 정비 · 자동 배정');
+  await p.goto(BASE + 'hub/'); await sleep(800);
+  console.log('⑧ 🔒 화면 비밀번호');
+  const keep = () => p.evaluate(d => { window.__seed['uploads/hubpin'] = d; }, pd);   // 가짜 store 는 새로 열 때마다 처음 자료로 돌아가서 다시 넣음
+  await keep();
+  await p.evaluate(() => sessionStorage.setItem('hub_pin_ok', '0'));
+  await p.click('[data-go="people"]'); await p.waitForSelector('.pn-bg');
+  ok(/인사 화면 비밀번호/.test(await p.innerText('.pn-bg')), '30분 지나면 다시 물음');
+  await pin(p, ['9999']); await p.waitForFunction(() => /맞지/.test(document.querySelector('.pn-err').innerText), null, { timeout: 3000 }).catch(() => {}); ok(/맞지 않아요\. \(1\/5\)/.test(await p.innerText('.pn-bg')), '틀리면 막음 (1/5)');
+  await p.click('.pn-no'); await sleep(200);
+  ok(!/#people/.test(p.url()) && await p.locator('.hm-tile').count() === 7, '취소하면 첫 화면 그대로');
+  const [req] = await Promise.all([p.waitForSelector('.pn-bg'), p.click('.hm-tile[href="./leave/"]')]);
+  ok(/연차 · 근무 화면 비밀번호/.test(await p.innerText('.pn-bg')) && /hub\/(#.*)?$/.test(p.url()), '연차·근무 버튼도 물음 (넘어가기 전)');
+  await p.click('.pn-no'); await sleep(200);
+  await p.goto(BASE + 'hub/#people'); await sleep(900); await keep();
+  ok(/비밀번호가 필요해요/.test(await p.innerText('main')) && !/입퇴사 진행/.test(await p.innerText('main')), '주소로 바로 #people → 잠금 카드');
+  await p.click('[data-unlock]'); await pin(p, ['1234']); await sleep(400);
+  ok(/입퇴사 진행/.test(await p.innerText('main')), '맞히면 보임');
+  await p.click('[data-pinchg]'); await pin(p, ['1234', '5678', '5678']); await sleep(400);
+  const pd2 = await p.evaluate(() => window.__seed['uploads/hubpin']);
+  ok(pd2 && pd2.h !== pd.h, '비밀번호 바꾸기');
+  await p.evaluate(() => sessionStorage.setItem('hub_pin_ok', '0'));
+  await p.goto(BASE + 'hub/leave/'); await keep();
+  ok(await p.waitForSelector('.pn-bg', { timeout: 6000 }).then(() => true, () => false), '연차 관리 주소로 바로 들어와도 물음');
+  await p.click('.pn-no'); await p.waitForURL(/hub\/$/, { timeout: 4000 }).catch(() => {});
+  ok(/hub\/$/.test(p.url()), '취소하면 허브 첫 화면으로');
+  await p.evaluate(() => sessionStorage.setItem('hub_pin_ok', String(Date.now() + 9e5)));
   await p.goto(BASE + 'hub/'); await sleep(800);
   await p.click('.hm-todo [data-go="people"]'); await sleep(250);
   ok(/#people/.test(p.url()), '할 일 줄 누르면 해당 화면');
