@@ -69,7 +69,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('① 휴대폰 첫 화면 (할 일 있음)');
   let p = await open(b, phone, 'busy');
   const tiles = await p.locator('.hm-tile').allInnerTexts();
-  ok(tiles.length === 8, '업무 버튼 8개: ' + tiles.map(t => t.split('\n').find(x => /[가-힣]/.test(x) && !/^(승인|입사|퇴사일|확인|\d)/.test(x))).join(', '));
+  ok(tiles.length === 9, '업무 버튼 9개: ' + tiles.map(t => t.split('\n').find(x => /[가-힣]/.test(x) && !/^(승인|입사|퇴사일|확인|\d)/.test(x))).join(', '));
   const todo = await p.locator('.hm-todo li').allInnerTexts();
   ok(todo.some(t => /승인 대기 2건/.test(t)), '할 일: 휴가신청서 승인 대기 2건 (지운 것·승인된 것 빼고)');
   ok(todo.some(t => /퇴사일 지난 분 1명/.test(t)), '할 일: 퇴사일 지난 분 1명');
@@ -95,7 +95,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await shot(p, '3_오늘정비_더티활동.png');
   console.log('③ 휴대폰 뒤로 → 첫 화면');
   await p.goBack(); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 8 && !/#/.test(p.url().replace(BASE + 'hub/', '')), '뒤로 한 번에 첫 화면 (탭 이동은 기록 안 쌓임)');
+  ok(await p.locator('.hm-tile').count() === 9 && !/#/.test(p.url().replace(BASE + 'hub/', '')), '뒤로 한 번에 첫 화면 (탭 이동은 기록 안 쌓임)');
   await p.click('[data-go="people"]'); await sleep(300);
   ok(await p.locator('.pn-bg').count() === 1 && /비밀번호 정하기/.test(await p.innerText('.pn-bg')), '🔒 처음: 화면 비밀번호 정하기');
   await pin(p, ['1234', '1235']); ok(/달라요/.test(await p.innerText('.pn-bg')), '두 번 다르면 다시');
@@ -114,7 +114,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(ro && !ro.hide.includes('새보조') && ro.hide.includes('퇴보조'), '숨겨 있던 이름 다시 보이고, 퇴사는 뺌 ' + JSON.stringify(ro && ro.hide));
   await p.click('[data-sb="close"]').catch(() => {}); await sleep(300);
   await p.click('[data-home]'); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 8, '‹ 버튼 → 첫 화면');
+  ok(await p.locator('.hm-tile').count() === 9, '‹ 버튼 → 첫 화면');
   for (const [g, re] of [['quality', /인스펙션[\s\S]*VOC/], ['field', /공지 확인[\s\S]*휴대폰 오류[\s\S]*오늘 1건/], ['apps', /정비 레포트[\s\S]*정비 지원[\s\S]*입퇴사 서류/]]) {
     await p.click('[data-go="' + g + '"]'); await sleep(250);
     ok(re.test(await p.innerText('main')), g + ' 안쪽 내용');
@@ -194,7 +194,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(/인사 화면 비밀번호/.test(await p.innerText('.pn-bg')), '30분 지나면 다시 물음');
   await pin(p, ['9999']); await p.waitForFunction(() => /맞지/.test(document.querySelector('.pn-err').innerText), null, { timeout: 3000 }).catch(() => {}); ok(/맞지 않아요\. \(1\/5\)/.test(await p.innerText('.pn-bg')), '틀리면 막음 (1/5)');
   await p.click('.pn-no'); await sleep(200);
-  ok(!/#people/.test(p.url()) && await p.locator('.hm-tile').count() === 8, '취소하면 첫 화면 그대로');
+  ok(!/#people/.test(p.url()) && await p.locator('.hm-tile').count() === 9, '취소하면 첫 화면 그대로');
   const [req] = await Promise.all([p.waitForSelector('.pn-bg'), p.click('.hm-tile[href="./leave/"]')]);
   ok(/연차 · 근무 화면 비밀번호/.test(await p.innerText('.pn-bg')) && /hub\/(#.*)?$/.test(p.url()), '연차·근무 버튼도 물음 (넘어가기 전)');
   await p.click('.pn-no'); await sleep(200);
@@ -219,7 +219,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   p = await open(b, phone, 'calm', '#work/dirty'); await sleep(500);
   ok(/출근 중/.test(await p.innerText('main')), '바로 열어도 더티 읽음');
   await p.click('[data-home]'); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 8, '첫 화면으로');
+  ok(await p.locator('.hm-tile').count() === 9, '첫 화면으로');
   ok(/모두 정상/.test(await p.innerText('main')), '할 일 없으면 "모두 정상" 한 줄');
   await shot(p, '6_첫화면_모두정상.png');
   ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
@@ -229,10 +229,43 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   const cols = await p.evaluate(() => getComputedStyle(document.querySelector('.hm-grid')).gridTemplateColumns.split(' ').length);
   ok(cols === 3, 'PC 는 한 줄에 3개');
   ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
+  console.log('⑤-2 📊 결산: 정비보조 월 출역표');
+  p = await open(b, phone, 'busy');
+  await p.evaluate(D1 => {
+    const S0 = window.__seed, t = (h, m) => Date.parse(D1 + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00+09:00');
+    S0['sup/' + D1 + '/rows/a1'] = { tab: '근태', row: [null, D1, '정비보조B', '출근', '더티', '', '본인', ''], at: t(8, 0) };
+    S0['sup/' + D1 + '/rows/a2'] = { tab: '근태', row: [null, D1, '정비보조B', '퇴근', '', '', '본인', ''], at: t(17, 0) };
+    S0['sup/' + D1 + '/rows/a3'] = { tab: '근태', row: [null, D1, '정비보조B', '퇴근취소', '', '', '관리자', ''], at: t(17, 5) };
+    S0['sup/' + D1 + '/rows/a4'] = { tab: '체크', row: [null, D1, '1001', '메이드1', '정비보조B', '완료'], at: t(9, 0) };
+    S0['sup/' + D1 + '/rows/a5'] = { tab: '근태', row: [null, D1, '정비보조C', '출근', '', '', '관리자', "'09:30"], at: t(10, 0) };
+    S0['sup/' + D1 + '/rows/a6'] = { tab: '근태', row: [null, D1, '정비보조C', '퇴근', '', '', '본인', ''], at: t(16, 45) };
+  }, DAY.slice(0, 8) + '01');
+  await p.click('[data-go="close"]'); await sleep(300);
+  ok(/#close/.test(p.url()) && /월 출역표/.test(await p.innerText('main')) && /연차 대장/.test(await p.innerText('main')), '결산 화면: 출역표 + 연차 대장');
+  const cr0 = await p.evaluate(() => window.__reads);
+  await p.click('[data-cl="make"]'); await p.waitForSelector('[data-cl="xlsx"]', { timeout: 6000 });
+  const cltxt = await p.innerText('main');
+  ok(/정비보조A/.test(cltxt) && /정비보조B/.test(cltxt) && /정비보조C/.test(cltxt) && !/메이드1/.test(cltxt), '출근한 정비보조만 (체크 줄은 안 셈)');
+  ok(await p.evaluate(() => window.__reads) - cr0 <= 31 + 8, '읽기: 그 달 날짜 수 + 근태 줄 정도 (' + (await p.evaluate(() => window.__reads) - cr0) + ')');
+  await shot(p, '14_결산_출역표.png');
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-cl="xlsx"]')]);
+  const xf = path.join(OUT, 'test_출역.xlsx'); await dl.saveAs(xf);
+  const cp = require('child_process');
+  let cells = '';
+  try { cells = cp.execFileSync('python3', ['-c', 'import openpyxl,sys,json;ws=openpyxl.load_workbook(sys.argv[1]).active;print(json.dumps([[c for c in r] for r in ws.iter_rows(values_only=True)],ensure_ascii=False))', xf]).toString(); } catch (e) { cells = 'ERR ' + e.message; }
+  const G = /^\[/.test(cells) ? JSON.parse(cells) : [];
+  const rowOf = n => G.find(r => r[0] === n) || [];
+  ok(G.length && /출역표/.test(G[0][0]) && G[2][0] === '이름' && G[2][G[2].length - 1] === '출근일수', '엑셀: 제목 · 머리줄 (openpyxl 로 열림) ' + (G.length ? '' : cells.slice(0, 200)));
+  ok(rowOf('정비보조B')[1] === '08:00~*', '퇴근취소 → 퇴근 비움 + 관리자 표시 * (' + rowOf('정비보조B')[1] + ')');
+  ok(rowOf('정비보조C')[1] === '09:30~16:45*', '관리자가 정한 출근 시각 · 퇴근 (' + rowOf('정비보조C')[1] + ')');
+  ok(Number(rowOf('정비보조A')[rowOf('정비보조A').length - 1]) >= 1, '출근일수 칸');
+  await p.click('[data-cl="prev"]'); await sleep(200);
+  ok(!/\[data-cl="xlsx"\]/.test(await p.innerHTML('main')) && /출역표 만들기/.test(await p.innerText('main')), '이전 달로 가면 새로 만들기');
+  ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
   console.log('⑨ 하우스키퍼 공용 계정 (허브)');
   p = await open(b, phone, 'busy', '', 2);
   const ht = await p.locator('.hm-tile').allInnerTexts();
-  ok(ht.length === 6 && !ht.some(t => /인사|연차/.test(t)), '하우스키퍼: 인사 · 연차 버튼 없음 (' + ht.length + '개)');
+  ok(ht.length === 6 && !ht.some(t => /인사|연차|결산/.test(t)), '하우스키퍼: 인사 · 연차 · 결산 버튼 없음 (' + ht.length + '개)');
   ok(/하우스키퍼/.test(await p.innerText('#today')), '머리 줄에 하우스키퍼');
   const htodo = await p.innerText('main');
   ok(!/승인 대기|퇴사일/.test(htodo), '할 일에 연차 · 퇴사 줄 없음');

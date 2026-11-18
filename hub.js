@@ -22,6 +22,7 @@
 import * as S from '../rm/app/store.js';
 import { setupNotice } from './notice.js?v=2026.11.19-1';
 import * as PIN from './pin.js?v=2026.11.19-1';
+import { setupClose } from './close.js?v=2026.11.19-1';
 
 const VER = '2026.11.19-1';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
@@ -583,6 +584,8 @@ function staffHtml() {
   return '<div class="card"><h2>👥 전 파트 직원 명단</h2><p class="note" style="margin:0 0 12px">룸메이드 · 정비보조 · 미화 · 사우나 · 하우스맨 · 오더테이커를 한곳에서 봐요. 입사일 · 근속 · 재직/퇴사.<br>파트별 관리는 각 앱에서 해도 되고, 여기서 고쳐도 같은 명단이에요.</p>' +
     '<button class="big-btn" data-staff="1">명단 열기</button></div>';
 }
+// ---------- 📊 결산 (2026-11-19): close.js — 정비보조 월 출역표(엑셀·인쇄) · 연차 대장 길. 하우스키퍼에겐 안 보임 (출퇴근 기록)
+let CL = null;
 // ---------- 첫 화면 · 안쪽 화면 (2026-11-18-4)
 // 주소 끝 # 로 어느 화면인지 나눔: '' 첫 화면 · #work(/now|up|dirty) · #quality · #people · #assign · #apps
 const SECS = {
@@ -590,6 +593,7 @@ const SECS = {
   quality: { ic: '🔍', t: '품질 관리' },
   people: { ic: '👥', t: '인사' },
   field: { ic: '📱', t: '현장 관리' },
+  close: { ic: '📊', t: '결산' },
   apps: { ic: '🔗', t: '현장 앱 열기' }
 };
 const TILES = [
@@ -600,6 +604,7 @@ const TILES = [
   { href: './night/', ic: '🌙', t: '야간 보고서', s: '하우스키퍼 야간 업무 보고 · 확인 · 인쇄' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
   { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
+  { go: 'close', ic: '📊', t: '결산', s: '정비보조 월 출역표 · 연차 대장' },
   { go: 'apps', ic: '🔗', t: '현장 앱 열기', s: '정비 레포트 · 정비 지원 · 입퇴사 서류', wide: 1 }
 ];
 const FIELD = ['../rm/', '../dirty/', '../unies-contract/'];
@@ -607,7 +612,7 @@ let route = { sec: '', tab: '' }, fromHome = false;
 function parseRoute() {
   const m = location.hash.replace(/^#/, '').split('/');
   if (m[0] === 'assign') { m[0] = 'work'; m[1] = 'asg'; }   // 11/18-4 주소 (자동 배정 따로 쪽) 그대로 열리게
-  const sec = SECS[m[0]] && !(m[0] === 'people' && isHk()) ? m[0] : '';
+  const sec = SECS[m[0]] && !((m[0] === 'people' || m[0] === 'close') && isHk()) ? m[0] : '';
   const tabs = sec && SECS[sec].tabs;
   let tab = tabs && tabs.some(t => t[0] === m[1]) ? m[1] : '';
   if (tabs && !tab) tab = up ? 'up' : tabs[0][0];
@@ -675,7 +680,7 @@ function homeHtml() {
         }).join('') + '</ul></div>';
     } else h += '<div class="card hm-ok"><b>✅ 모두 정상</b><span>' + hm(view.at) + ' 기준</span><button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></div>';
   }
-  h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.href === './leave/'))).map(t => {
+  h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.go === 'close' || t.href === './leave/'))).map(t => {
     const inner = badgeOf(t, v) + '<span class="hm-ic">' + t.ic + '</span><span class="hm-tx"><b>' + esc(t.t) + '</b><small>' + esc(t.s) + '</small></span>';
     return t.href ? '<a class="hm-tile' + (t.wide ? ' wide' : '') + '" href="' + t.href + '">' + inner + '</a>'
       : '<button class="hm-tile' + (t.wide ? ' wide' : '') + '" data-go="' + t.go + '">' + inner + '</button>';
@@ -697,6 +702,7 @@ function secHtml() {
   else if (sec === 'people') h += (view.st ? hrHtml(view.st) : '<div class="card"><p class="note" style="margin:0">읽는 중…</p></div>') + staffHtml() +
     '<div class="card"><h2>🔒 화면 비밀번호</h2><p class="note" style="margin:0 0 12px">인사 · 연차·근무 화면에 들어갈 때 묻는 숫자 4자리예요. 한 번 넣으면 이 창에서 30분 동안 다시 안 물어요.</p><button class="big-btn sec" data-pinchg="1">비밀번호 바꾸기</button></div>';
   else if (sec === 'field') h += fieldHtml();
+  else if (sec === 'close') { if (!CL) CL = setupClose({ S, esc, ymd, draw: () => draw() }); h += CL.html(); }
   else if (sec === 'apps') h += linksHtml();
   return h;
 }
