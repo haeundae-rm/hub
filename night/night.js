@@ -8,7 +8,7 @@ import * as S from '../../rm/app/store.js';
 
 const VER = '2026.11.18-1';
 // 하우스키퍼 공용 계정 UID — 계정을 만든 뒤 채움 (비어 있으면 이메일로 알아봄)
-const HK_UID = '';
+const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: HK_UID },
   { k: 'boss', label: '소장', email: 'unieshaeundae+admin@gmail.com', uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2' },

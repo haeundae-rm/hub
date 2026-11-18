@@ -12,7 +12,7 @@ const val = v => (v === SERVER_TIME ? Date.now() : Array.isArray(v) ? v.map(val)
 // Firestore merge 처럼 안쪽 칸(map)까지 합침 (배열은 통째로 바꿈)
 const deep = (a, b) => { const o = isObj(a) ? Object.assign({}, a) : {}; Object.keys(b).forEach(k => { o[k] = isObj(b[k]) && isObj(o[k]) ? deep(o[k], b[k]) : b[k]; }); return o; };
 export function onUser(cb) { cbs.push(cb); setTimeout(() => cb(user), 0); return () => {}; }
-export async function signInEmail(e, pw) { if (pw !== 'pw') throw Object.assign(new Error('x'), { code: 'auth/wrong-password' }); user = { uid: e.includes('+hk') ? 'HKUIDfake' : e.includes('+insp') ? '4sVIUKcXtYg28Lm7Qw41UqI6hRX2' : e.includes('sub') ? 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2' : 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', anon: false, email: e }; sessionStorage.setItem('fu', JSON.stringify(user)); cbs.forEach(c => c(user)); }
+export async function signInEmail(e, pw) { if (pw !== 'pw') throw Object.assign(new Error('x'), { code: 'auth/wrong-password' }); user = { uid: e.includes('+hk') ? 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' : e.includes('+insp') ? '4sVIUKcXtYg28Lm7Qw41UqI6hRX2' : e.includes('sub') ? 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2' : 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', anon: false, email: e }; sessionStorage.setItem('fu', JSON.stringify(user)); cbs.forEach(c => c(user)); }
 export async function signOut() { user = null; sessionStorage.removeItem('fu'); cbs.forEach(c => c(null)); }
 export async function signInAnon() {}
 export async function idToken() { return 't'; }

@@ -24,12 +24,12 @@ import { setupNotice } from './notice.js?v=2026.11.18-8';
 import * as PIN from './pin.js?v=2026.11.18-8';
 
 const VER = '2026.11.18-8';
-const HK_UID = '';
+const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' },
-  // 하우스키퍼 공용 계정 (2026-11-18): 야간 방배정 · 오더테이커. 인사 · 연차는 안 보임 (규칙 v15 로도 막힘). uid 는 계정 만든 뒤 채움
+  // 하우스키퍼 공용 계정 (2026-11-18): 야간 방배정 · 오더테이커. 인사 · 연차는 안 보임 (규칙 v15 로도 막힘). uid = 11/18 만든 공용 계정
   { uid: HK_UID, label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', hk: true }
 ];
 const ROYAL = { '3001': 1, '3002': 1, '3101': 1, '3102': 1 };   // 로얄 = 2실 (레포트 앱과 같음)
