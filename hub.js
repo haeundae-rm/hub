@@ -10,10 +10,11 @@
 //   같은 주소라 로그인 공유, 활동판을 닫으면 정비 지원이 알려 와서(postMessage) 창을 닫고 오늘 한눈에 다시 읽음. 열려 있는 동안만 정비 지원 구독
 // 배정 자동화 1단계 (2026-11-13): 🧩 자동 배정 (시험·대조) — assignui.js · assign.js(엔진) · assign_worker.js. 보기·대조만, 앱에 안 올림
 // 인스펙션 (2026-11-15 ① 새 구조): 🔍 hub/insp/ 따로 쪽 — 사진·사진별 지적·카톡 이미지 (insp · Storage insp/). 처음 만든 체크 버튼 방식(inspui.js)은 사용자 요청으로 중단·삭제
+// 입퇴사 부분 연결 (2026-11-18): 🧾 바로가기는 새 창 + '오늘 한눈에' 입퇴사 진행 카드 — staff 에서 '입사 진행'·퇴사일 있는 분만 골라 읽음 (서류·개인정보는 입퇴사 앱에 그대로)
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 
-const VER = '2026.11.18-1';
+const VER = '2026.11.18-2';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -23,7 +24,7 @@ const JOBS = ['관리', '룸메이드', '정비보조', '하우스키퍼', '하�
 const LINKS = [
   { ic: '🧹', t: '정비 레포트', s: '메이드별 현황 · 룸메이드 명단 · 메이드 화면', href: '../rm/' },
   { ic: '🛏', t: '정비 지원', s: '정비보조 명단 · 정비보조 화면', href: '../dirty/' },
-  { ic: '📝', t: '입퇴사 서류', s: '근로계약서 · 입사서류 · 사직서 (별도 비밀번호)', href: '../unies-contract/' },
+  { ic: '🧾', t: '입퇴사 서류', s: '근로계약서 · 입사서류 · 사직서 (별도 비밀번호 · 새 창)', href: '../unies-contract/', tab: 1 },
   { ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)', href: '../inventory/' }
 ];
 
@@ -83,6 +84,7 @@ async function load(force) {
   if (!force && view.at && Date.now() - view.at < 120000) return;
   view.busy = true; draw();
   const d = ymd(), tm = ymd(Date.now() + 864e5);
+  const hrP = hrLoad(d);
   const [up, rl, srl, cmp, sup, day, recs, errs] = await Promise.all([
     safe(S.get('uploads/latest')), safe(S.get('meta/relay')), safe(S.get('sup_meta/relay')), safe(S.get('meta/compare')),
     safe(S.get('sup/' + d)), safe(S.get('days/' + d)),
@@ -110,7 +112,8 @@ async function load(force) {
       return { id: a.id, name: x.name || a.id, color: x.color || '', due: x.due || '', doneName: x.doneName || '', proc: typeof proc === 'number' ? proc : null, today: typeof td === 'number' ? td : null, target };
     }));
   }
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, rows, acts: actList };
+  const hr = await hrP;
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, rows, acts: actList, hr };
   view.busy = false; view.at = Date.now(); draw();
 }
 function bad(x) { return !x || x.__err; }
@@ -463,7 +466,45 @@ function todayHtml() {
   else h += '<div class="prog"><div class="big">' + p.pct + '%<small>' + p.doneU + ' / ' + p.total + '실</small></div><div class="bar"><i style="width:' + p.pct + '%"></i></div></div>' +
     '<div class="kv"><div><b>' + (p.total - p.doneU > 0 ? p.total - p.doneU : 0) + '</b><span>남은 실</span></div><div><b>' + (p.maids || '-') + '</b><span>근무 메이드</span></div><div><b>' + p.issue + '</b><span>이상 보고</span></div></div>' +
     '<p class="note">정비보고서 올린 배정 기준이에요 (근무 중 추가·제외는 빠짐). 메이드별로는 정비 레포트 → 오늘 현황에서 봐요.</p></div>';
-  return h + dirtyHtml(v) + actsHtml(v);
+  return h + dirtyHtml(v) + actsHtml(v) + hrHtml(v);
+}
+// ---------- 🧾 입퇴사 진행 (2026-11-18, 입퇴사 서류 부분 연결)
+// 입퇴사 앱(HrStaff.gs)이 1시간마다 staff/{id} 로 보내는 기본 정보만 씀. 서류·주민번호·사진은 입퇴사 앱에만 있음
+// 읽기 아끼기: 명단 전체를 받지 않고 '입사 진행'인 분 + 퇴사일이 최근 30일 이후인 분만 골라 읽음
+const HR_URL = '../unies-contract/';
+function hrLoad(d) {
+  return Promise.all([
+    safe(S.getQuery('staff', [['status', '==', '입사 진행']])),
+    safe(S.getQuery('staff', [['left', '>=', addDays(d, -30)]]))
+  ]).then(([a, b]) => {
+    if (a && a.__err) return a;
+    if (b && b.__err) return b;
+    const one = x => Object.assign({ id: x.id }, x.data || {});
+    const join = a.map(one).sort((x, y) => String(x.hired || '9').localeCompare(String(y.hired || '9')));
+    const lv = b.map(one).filter(p => p.status !== '퇴사' && p.left);
+    return {
+      join,
+      soon: lv.filter(p => p.left >= d).sort((x, y) => x.left.localeCompare(y.left)),
+      past: lv.filter(p => p.left < d).sort((x, y) => x.left.localeCompare(y.left))
+    };
+  });
+}
+function hrHtml(v) {
+  const open = '<a class="big-btn sec linkbtn" style="margin-top:12px" href="' + HR_URL + '" target="_blank" rel="noopener">🧾 입퇴사 서류 열기 <small style="font-weight:600;color:var(--muted);margin-left:6px">새 창</small></a>' +
+    '<p class="note">안 열리고 「현재 파일을 열 수 없습니다」가 나오면, 크롬 <b>시크릿 창</b>이나 <b>「해운대객실」 프로필</b>에서 열어 주세요. (크롬에 구글 계정이 여러 개 로그인돼 있으면 생기는 문제예요)</p>';
+  let h = '<div class="card"><h2>🧾 입퇴사 진행 <small>1시간마다 갱신</small></h2>';
+  const r = v.hr;
+  if (!r) return h + '<p class="note" style="margin:0">읽는 중…</p>' + open + '</div>';
+  if (r.__err) return h + '<p class="err">직원 명단을 못 읽었어요: ' + esc(r.__err) + '</p>' + open + '</div>';
+  const d = v.d, dd = x => { const n = Math.round((Date.parse(x + 'T00:00:00Z') - Date.parse(d + 'T00:00:00Z')) / 864e5); return n === 0 ? '오늘' : n > 0 ? n + '일 남음' : -n + '일 지남'; };
+  const row = (p, sub) => '<li><b>' + esc(p.name || '(이름 없음)') + '</b><span>' + esc([p.job, sub].filter(Boolean).join(' · ')) + '</span></li>';
+  h += '<div class="kv"><div><b>' + r.join.length + '</b><span>입사 진행</span></div><div><b>' + r.soon.length + '</b><span>퇴사 예정</span></div>' +
+    '<div' + (r.past.length ? ' style="background:var(--wait-soft)"' : '') + '><b' + (r.past.length ? ' style="color:var(--wait)"' : '') + '>' + r.past.length + '</b><span>퇴사일 지남</span></div></div>';
+  if (!r.join.length && !r.soon.length && !r.past.length) h += '<p class="note">입사 진행 중이거나 퇴사 예정인 분이 없어요. 입퇴사 서류 앱의 바뀐 내용은 1시간 안에 여기 나와요.</p>';
+  if (r.join.length) h += '<h3 class="hrh">입사 진행 <small>서류 링크를 보냈고 아직 제출 전</small></h3><ul class="hrl">' + r.join.map(p => row(p, p.hired ? '입사 ' + md(p.hired) : '')).join('') + '</ul>';
+  if (r.soon.length) h += '<h3 class="hrh">퇴사 예정</h3><ul class="hrl">' + r.soon.map(p => row(p, '퇴사 ' + md(p.left) + ' (' + dd(p.left) + ')')).join('') + '</ul>';
+  if (r.past.length) h += '<h3 class="hrh" style="color:var(--wait)">퇴사일 지남 <small>아직 재직으로 남아 있어요</small></h3><ul class="hrl">' + r.past.map(p => row(p, '퇴사 ' + md(p.left) + ' (' + dd(p.left) + ')')).join('') + '</ul><p class="note" style="margin-top:6px">입퇴사 서류 앱에서 퇴사 처리를 마치면 다음 갱신 때 빠져요.</p>';
+  return h + open + '</div>';
 }
 function linksHtml() {
   return '<div class="card"><h2>바로가기 <small>같은 로그인으로 열려요</small></h2><div class="go-grid">' +
