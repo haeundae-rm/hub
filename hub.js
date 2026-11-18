@@ -12,10 +12,12 @@
 // 인스펙션 (2026-11-15 ① 새 구조): 🔍 hub/insp/ 따로 쪽 — 사진·사진별 지적·카톡 이미지 (insp · Storage insp/). 처음 만든 체크 버튼 방식(inspui.js)은 사용자 요청으로 중단·삭제
 // 입퇴사 부분 연결 (2026-11-18): 🧾 바로가기는 새 창 + '오늘 한눈에' 입퇴사 진행 카드 — staff 에서 '입사 진행'·퇴사일 있는 분만 골라 읽음 (서류·개인정보는 입퇴사 앱에 그대로)
 // 룸메이드 연차 Firebase 전환 (2026-11-18): 📋 바로가기 → hub/leave/ 따로 쪽 (옛 Apps Script 연차 관리 페이지를 옮김, leave_* 컬렉션)
+// 첫 화면 개편 (2026-11-18-4): 칸 11개를 위아래로 늘어놓던 것을 '지금 확인할 것' + 업무 버튼 7개로. 버튼을 누르면 안쪽 화면(#work · #quality · #people · #assign · #apps)
+//   주소 끝 # 로 나눠서 휴대폰 '뒤로'로 첫 화면에 돌아옴. 더티·활동 자료는 그 탭을 열 때만 읽음 (읽기 아끼기). 안쪽 카드(자동 배정 · 인스펙션 · VOC …)는 그대로 옮기기만
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 
-const VER = '2026.11.18-3';
+const VER = '2026.11.18-4';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -101,6 +103,18 @@ async function load(force) {
       if (Array.isArray(pl) && pl.length) base = { rooms: [].concat(...pl.map(x => (x.data && x.data.rooms) || []).map(rs => rs.map(r => ({ room: r.room, name: 'x' })))) };
     }
   }
+  // 연차 신청서 승인 대기 수 (count — 문서를 받지 않음, 1천 건까지 읽기 1건)
+  const [hr, lvq] = await Promise.all([hrP, safe(S.count('leave_apps', [['status', '==', '대기'], ['deleted', '==', false]]))]);
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq };
+  view.busy = false; view.at = Date.now(); draw();
+}
+// 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
+let ex = { rows: null, acts: null, at: 0, busy: false, d: '' };
+async function loadEx(force) {
+  if (!admin || ex.busy) return;
+  const d = ymd();
+  if (!force && ex.d === d && ex.at && Date.now() - ex.at < 120000) return;
+  ex.busy = true; draw();
   // 더티·정비보조: 오늘 기록 줄(체크·근태) / 진행 중 활동: 개수만 세기(count — 체크 문서를 받지 않음)
   const [rows, acts] = await Promise.all([safe(S.getQuery('sup/' + d + '/rows', [])), safe(S.getQuery('acts', [['status', '==', '진행']]))]);
   let actList = acts;
@@ -114,10 +128,9 @@ async function load(force) {
       return { id: a.id, name: x.name || a.id, color: x.color || '', due: x.due || '', doneName: x.doneName || '', proc: typeof proc === 'number' ? proc : null, today: typeof td === 'number' ? td : null, target };
     }));
   }
-  const hr = await hrP;
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, rows, acts: actList, hr };
-  view.busy = false; view.at = Date.now(); draw();
+  ex = { rows, acts: actList, at: Date.now(), busy: false, d }; draw();
 }
+function reload(force) { load(force); if (route.sec === 'work' && route.tab === 'dirty') loadEx(force); }
 function bad(x) { return !x || x.__err; }
 function statusItems(v) {
   const L = [], now = Date.now(), H = Number(seoul().toISOString().slice(11, 13));
@@ -344,7 +357,7 @@ async function openDist() {
   try {
     const d = ymd();
     const [names, roster, sup, rows] = await Promise.all([safe(S.get('sup_meta/names')), safe(S.get('sup_meta/roster')), safe(S.get('sup/' + d)),
-      view.st && Array.isArray(view.st.rows) ? Promise.resolve(view.st.rows) : safe(S.getQuery('sup/' + d + '/rows', []))]);
+      ex.d === d && Array.isArray(ex.rows) ? Promise.resolve(ex.rows) : safe(S.getQuery('sup/' + d + '/rows', []))]);
     if (sup && !sup.__err) distOther[d] = sup;
     const known = () => {
       const r = roster && !roster.__err ? roster : {}, hide = {}, out = {};
@@ -378,7 +391,7 @@ async function openDist() {
     await distP;
     window.SupDist.open();
     clearInterval(distWatch);
-    distWatch = setInterval(() => { if (!document.getElementById('dz')) { clearInterval(distWatch); load(true); } }, 700);   // 닫으면 오늘 한눈에 다시 읽기
+    distWatch = setInterval(() => { if (!document.getElementById('dz')) { clearInterval(distWatch); reload(true); } }, 700);   // 닫으면 오늘 한눈에 다시 읽기
   } catch (e) {
     distP = null;
     alert('더티 배분 화면을 못 열었어요: ' + (e && e.message || e) + '\n인터넷을 확인하고 다시 눌러 주세요.');
@@ -394,7 +407,7 @@ function openAct() {
   document.body.appendChild(p); document.body.classList.add('sb-lock');
   const f = p.querySelector('iframe'); f.addEventListener('load', () => { const m = document.getElementById('actmsg'); if (m) m.textContent = ''; });
 }
-function closeAct() { const p = document.getElementById('actp'); if (!p) return; p.remove(); document.body.classList.remove('sb-lock'); load(true); }
+function closeAct() { const p = document.getElementById('actp'); if (!p) return; p.remove(); document.body.classList.remove('sb-lock'); reload(true); }
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || !e.data || !e.data.hub) return;
   if (e.data.hub === 'close') closeAct();
@@ -435,7 +448,7 @@ function closeVoc() {
   const p = document.getElementById('vp'); if (p) p.remove(); document.body.classList.remove('sb-lock');
 }
 async function openAssignUI(view) {
-  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, admin: () => admin, user: () => user, upload: o => { up = { file: o.file, date: o.date, res: o.res, buf: null }; draw(); upSend(true); scrollUp(); } }, { view }); }
+  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, admin: () => admin, user: () => user, upload: o => { up = { file: o.file, date: o.date, res: o.res, buf: null }; goSec('work', 'up'); draw(); upSend(true); scrollUp(); } }, { view }); }
   catch (e) { alert('자동 배정 화면을 못 불러왔어요: ' + (e && e.message || e)); }
 }
 function assignCardHtml() {
@@ -451,7 +464,7 @@ function vocCardHtml() {
   return '<div class="card"><h2>📣 고객만족도 VOC</h2><p class="note" style="margin:0 0 12px">카톡으로 받은 고객만족도 공유 글을 붙여넣으면 건별로 나누고 마지막 정비자를 찾아 메이드별 칭찬·불만 누계를 내요. 정비 레포트 VOC 메뉴와 같은 자료예요.</p>' +
     '<button class="big-btn" data-voc="1">VOC 열기</button></div>';
 }
-function todayHtml() {
+function statusHtml() {
   const v = view.st;
   let h = '<div class="card"><h2>오늘 한눈에 <button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></h2>';
   if (!v) return h + '<p class="note" style="margin:0">읽는 중…</p></div>';
@@ -460,15 +473,23 @@ function todayHtml() {
     (!nb && !nw ? '<span class="pill ok">모두 정상</span>' : '') + '<span class="pill" style="background:var(--tile);color:var(--muted)">' + hm(view.at) + ' 기준</span></div>';
   h += '<ul class="st">' + L.sort((a, b) => ({ bad: 0, wait: 1, ok: 2 }[a.lv] - { bad: 0, wait: 1, ok: 2 }[b.lv])).map(x =>
     '<li class="' + x.lv + '"><span style="font-size:17px;color:inherit">' + (x.lv === 'bad' ? '❗' : x.lv === 'wait' ? '⏳' : '✅') + '</span><div><b>' + esc(x.title) + '</b>' + (x.sub ? '<span>' + esc(x.sub) + '</span>' : '') + '</div></li>').join('') + '</ul></div>';
-  h += upHtml();
+  return h;
+}
+function progHtml() {
+  const v = view.st;
+  if (!v) return '';
   const p = progress(v);
-  h += '<div class="card"><h2>오늘 정비 진행 <small>' + (p.last ? '마지막 완료 ' + hm(p.last) : '') + '</small></h2>';
+  let h = '<div class="card"><h2>오늘 정비 진행 <small>' + (p.last ? '마지막 완료 ' + hm(p.last) : '') + '</small></h2>';
   if (p.err) h += '<p class="err">완료 기록을 못 읽었어요: ' + esc(p.err) + '</p>';
-  if (!p.total) h += '<p class="note" style="margin:0">오늘 정비보고서가 올라오면 진행률이 나와요. 지금까지 완료 ' + p.doneU + '실.</p></div>';
-  else h += '<div class="prog"><div class="big">' + p.pct + '%<small>' + p.doneU + ' / ' + p.total + '실</small></div><div class="bar"><i style="width:' + p.pct + '%"></i></div></div>' +
+  if (!p.total) return h + '<p class="note" style="margin:0">오늘 정비보고서가 올라오면 진행률이 나와요. 지금까지 완료 ' + p.doneU + '실.</p></div>';
+  return h + '<div class="prog"><div class="big">' + p.pct + '%<small>' + p.doneU + ' / ' + p.total + '실</small></div><div class="bar"><i style="width:' + p.pct + '%"></i></div></div>' +
     '<div class="kv"><div><b>' + (p.total - p.doneU > 0 ? p.total - p.doneU : 0) + '</b><span>남은 실</span></div><div><b>' + (p.maids || '-') + '</b><span>근무 메이드</span></div><div><b>' + p.issue + '</b><span>이상 보고</span></div></div>' +
     '<p class="note">정비보고서 올린 배정 기준이에요 (근무 중 추가·제외는 빠짐). 메이드별로는 정비 레포트 → 오늘 현황에서 봐요.</p></div>';
-  return h + dirtyHtml(v) + actsHtml(v) + hrHtml(v);
+}
+function exHtml() {
+  const v = view.st;
+  if (!ex.at || ex.d !== ymd()) return '<div class="card"><h2>더티 · 정비보조</h2><p class="note" style="margin:0">읽는 중…</p></div>';
+  return dirtyHtml(Object.assign({}, v || {}, { rows: ex.rows })) + actsHtml({ acts: ex.acts });
 }
 // ---------- 🧾 입퇴사 진행 (2026-11-18, 입퇴사 서류 부분 연결)
 // 입퇴사 앱(HrStaff.gs)이 1시간마다 staff/{id} 로 보내는 기본 정보만 씀. 서류·주민번호·사진은 입퇴사 앱에만 있음
@@ -509,20 +530,127 @@ function hrHtml(v) {
   return h + open + '</div>';
 }
 function linksHtml() {
-  return '<div class="card"><h2>바로가기 <small>같은 로그인으로 열려요</small></h2><div class="go-grid">' +
-    LINKS.map(l => '<a class="go" href="' + l.href + '"' + (l.tab ? ' target="_blank" rel="noopener"' : '') + '><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
+  return '<div class="card"><h2>현장 앱 <small>같은 로그인으로 열려요</small></h2><div class="go-grid">' +
+    LINKS.filter(l => FIELD.indexOf(l.href) >= 0).map(l => '<a class="go" href="' + l.href + '"' + (l.tab ? ' target="_blank" rel="noopener"' : '') + '><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
 }
 function staffHtml() {
   return '<div class="card"><h2>👥 전 파트 직원 명단</h2><p class="note" style="margin:0 0 12px">룸메이드 · 정비보조 · 미화 · 사우나 · 하우스맨 · 오더테이커를 한곳에서 봐요. 입사일 · 근속 · 재직/퇴사.<br>파트별 관리는 각 앱에서 해도 되고, 여기서 고쳐도 같은 명단이에요.</p>' +
     '<button class="big-btn" data-staff="1">명단 열기</button></div>';
 }
+// ---------- 첫 화면 · 안쪽 화면 (2026-11-18-4)
+// 주소 끝 # 로 어느 화면인지 나눔: '' 첫 화면 · #work(/now|up|dirty) · #quality · #people · #assign · #apps
+const SECS = {
+  work: { ic: '🧹', t: '오늘 정비', tabs: [['now', '상황'], ['up', '보고서 올리기'], ['dirty', '더티 · 활동']] },
+  quality: { ic: '🔍', t: '품질 관리' },
+  people: { ic: '👥', t: '인사' },
+  assign: { ic: '🧩', t: '자동 배정' },
+  apps: { ic: '🔗', t: '현장 앱 열기' }
+};
+const TILES = [
+  { go: 'work', ic: '🧹', t: '오늘 정비', s: '상황 · 보고서 올리기 · 더티 배분 · 활동판' },
+  { go: 'quality', ic: '🔍', t: '품질 관리', s: '인스펙션 · 고객만족도 VOC' },
+  { href: './leave/', ic: '📋', t: '연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
+  { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
+  { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
+  { go: 'assign', ic: '🧩', t: '자동 배정', s: '시험 · 하우스키퍼와 대조 · 장기 미정비' },
+  { go: 'apps', ic: '🔗', t: '현장 앱 열기', s: '정비 레포트 · 정비 지원 · 입퇴사 서류', wide: 1 }
+];
+const FIELD = ['../rm/', '../dirty/', '../unies-contract/'];
+let route = { sec: '', tab: '' }, fromHome = false;
+function parseRoute() {
+  const m = location.hash.replace(/^#/, '').split('/'), sec = SECS[m[0]] ? m[0] : '';
+  const tabs = sec && SECS[sec].tabs;
+  let tab = tabs && tabs.some(t => t[0] === m[1]) ? m[1] : '';
+  if (tabs && !tab) tab = up ? 'up' : tabs[0][0];
+  return { sec, tab };
+}
+function goSec(sec, tab) {
+  const h = '#' + sec + (tab ? '/' + tab : '');
+  if (location.hash === h) return;
+  if (!route.sec) { fromHome = true; location.hash = h; } else location.replace(h);
+}
+function goHome() {
+  if (fromHome) { history.back(); return; }
+  history.replaceState(null, '', location.pathname + location.search);
+  route = parseRoute(); draw(); window.scrollTo(0, 0);
+}
+// 첫 화면 '지금 확인할 것': 오늘 한눈에에서 문제·주의만 + 이상 보고 · 연차 승인 대기 · 퇴사일 지남
+function todoItems(v) {
+  const L = statusItems(v).filter(x => x.lv !== 'ok').map(x => Object.assign({ go: 'work/now' }, x));
+  const p = progress(v);
+  if (p.issue) L.push({ lv: 'wait', title: '이상 보고 ' + p.issue + '실', sub: '메이드가 이상으로 표시한 객실 · 정비 레포트에서 보기', go: 'work/now' });
+  if (typeof v.lvq === 'number' && v.lvq) L.push({ lv: 'bad', title: '휴가신청서 승인 대기 ' + v.lvq + '건', sub: '연차 관리에서 승인 · 반려', href: './leave/' });
+  const r = v.hr;
+  if (r && !r.__err && r.past.length) L.push({ lv: 'wait', title: '퇴사일 지난 분 ' + r.past.length + '명', sub: '아직 재직으로 남아 있어요 · 입퇴사 서류에서 퇴사 처리', go: 'people' });
+  return L.sort((a, b) => (a.lv === 'bad' ? 0 : 1) - (b.lv === 'bad' ? 0 : 1));
+}
+function badgeOf(t, v) {
+  if (!v) return '';
+  const B = (lv, x) => '<i class="hm-bd ' + lv + '">' + esc(x) + '</i>';
+  if (t.go === 'work') {
+    const p = progress(v), nb = statusItems(v).filter(x => x.lv === 'bad').length;
+    if (nb) return B('bad', '확인 ' + nb);
+    return p.total ? B('ok', p.pct + '%') : '';
+  }
+  if (t.href === './leave/') return typeof v.lvq === 'number' && v.lvq ? B('bad', '승인 ' + v.lvq) : '';
+  if (t.go === 'people') {
+    const r = v.hr; if (!r || r.__err) return '';
+    if (r.past.length) return B('wait', '퇴사일 ' + r.past.length);
+    if (r.join.length) return B('wait', '입사 ' + r.join.length);
+    if (r.soon.length) return B('wait', '퇴사 ' + r.soon.length);
+  }
+  return '';
+}
+function homeHtml() {
+  const v = view.st;
+  let h = '';
+  if (!v) h += '<div class="card hm-ok"><span>오늘 상황을 읽는 중…</span></div>';
+  else {
+    const T = todoItems(v), nb = T.filter(x => x.lv === 'bad').length;
+    if (T.length) {
+      h += '<div class="card hm-todo' + (nb ? '' : ' w') + '"><h2>' + (nb ? '❗' : '⏳') + ' 지금 확인할 것 ' + T.length + ' <button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ ' + hm(view.at)) + '</button></h2><ul>' +
+        T.map(x => {
+          const inner = '<span class="hm-i">' + (x.lv === 'bad' ? '❗' : '⏳') + '</span><span class="hm-t"><b>' + esc(x.title) + '</b>' + (x.sub ? '<small>' + esc(x.sub) + '</small>' : '') + '</span><span class="hm-c">›</span>';
+          return '<li class="' + x.lv + '">' + (x.href ? '<a href="' + x.href + '">' + inner + '</a>' : '<button data-go="' + x.go + '">' + inner + '</button>') + '</li>';
+        }).join('') + '</ul></div>';
+    } else h += '<div class="card hm-ok"><b>✅ 모두 정상</b><span>' + hm(view.at) + ' 기준</span><button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></div>';
+  }
+  h += '<div class="hm-grid">' + TILES.map(t => {
+    const inner = badgeOf(t, v) + '<span class="hm-ic">' + t.ic + '</span><span class="hm-tx"><b>' + esc(t.t) + '</b><small>' + esc(t.s) + '</small></span>';
+    return t.href ? '<a class="hm-tile' + (t.wide ? ' wide' : '') + '" href="' + t.href + '">' + inner + '</a>'
+      : '<button class="hm-tile' + (t.wide ? ' wide' : '') + '" data-go="' + t.go + '">' + inner + '</button>';
+  }).join('') + '</div>';
+  return h;
+}
+function secHtml() {
+  const S0 = SECS[route.sec], sec = route.sec;
+  let h = '<div class="hm-sec"><button class="hm-back" data-home="1" aria-label="첫 화면으로">‹</button><b>' + S0.ic + ' ' + esc(S0.t) + '</b>' +
+    (sec === 'work' || sec === 'people' ? '<button class="ref" data-ref="1">' + (view.busy || ex.busy ? '읽는 중…' : '↻ 새로 고침') + '</button>' : '') + '</div>';
+  if (S0.tabs) h += '<div class="hm-tabs" role="tablist">' + S0.tabs.map(t => '<button role="tab" data-tab="' + t[0] + '" aria-pressed="' + (route.tab === t[0]) + '">' + esc(t[1]) + (t[0] === 'up' && up && !up.sent ? ' •' : '') + '</button>').join('') + '</div>';
+  if (sec === 'work') {
+    if (route.tab === 'up') h += upHtml();
+    else if (route.tab === 'dirty') h += exHtml();
+    else h += statusHtml() + progHtml();
+  } else if (sec === 'quality') h += inspCardHtml() + vocCardHtml();
+  else if (sec === 'people') h += (view.st ? hrHtml(view.st) : '<div class="card"><p class="note" style="margin:0">읽는 중…</p></div>') + staffHtml();
+  else if (sec === 'assign') h += assignCardHtml();
+  else if (sec === 'apps') h += linksHtml();
+  return h;
+}
 function draw() {
   head();
   if (user === null) { $('#main').innerHTML = '<div class="card"><p class="note" style="margin:0">여는 중…</p></div>'; return; }
   if (!admin) { $('#main').innerHTML = loginHtml(); return; }
-  $('#main').innerHTML = todayHtml() + inspCardHtml() + assignCardHtml() + vocCardHtml() + linksHtml() + staffHtml() +
+  $('#main').innerHTML = (route.sec ? secHtml() : homeHtml()) +
     '<div class="foot">객실 통합 관리 시스템 ' + VER + ' · <button data-logout="1">로그아웃</button></div>';
 }
+window.addEventListener('hashchange', () => {
+  route = parseRoute();
+  if (!route.sec) fromHome = false;
+  draw(); window.scrollTo(0, 0);
+  if (route.sec === 'work' && route.tab === 'dirty') loadEx(false);
+});
+route = parseRoute();
 
 // ---------- 직원 명단 (정비 레포트 · 정비 지원과 같은 화면 파일 — 여기선 전 파트)
 function openStaff() {
@@ -540,8 +668,11 @@ function openStaff() {
 
 // ---------- 누르기
 document.addEventListener('click', e => {
-  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg]');
+  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg],[data-go],[data-tab],[data-home]');
   if (!t || (t.closest && t.closest('#dz'))) return;
+  if (t.hasAttribute('data-go')) { const g = t.getAttribute('data-go').split('/'); goSec(g[0], g[1] || ''); return; }
+  if (t.hasAttribute('data-tab')) { goSec(route.sec, t.getAttribute('data-tab')); return; }
+  if (t.hasAttribute('data-home')) { goHome(); return; }
   if (t.hasAttribute('data-voc')) { openVoc(); return; }
   if (t.hasAttribute('data-act')) { openAct(); return; }
   if (t.hasAttribute('data-asg')) { openAssignUI(t.getAttribute('data-asg') === 'blocks' ? 'blocks' : ''); return; }
@@ -558,7 +689,7 @@ document.addEventListener('click', e => {
   if (t.hasAttribute('data-upd')) { if (up && !up.sent && !up.sending) { up.date = t.getAttribute('data-upd'); if (up.buf) upBuild(); else draw(); } return; }
   if (t.hasAttribute('data-who')) { const pw = ($('#pw') || {}).value || ''; login.who = Number(t.getAttribute('data-who')); draw(); const el = $('#pw'); if (el) { el.value = pw; el.focus(); } return; }
   if (t.hasAttribute('data-login')) { doLogin(); return; }
-  if (t.hasAttribute('data-ref')) { load(true); return; }
+  if (t.hasAttribute('data-ref')) { reload(true); return; }
   if (t.hasAttribute('data-staff')) { openStaff(); return; }
   if (t.hasAttribute('data-logout')) {
     if (!confirm('로그아웃할까요?\n이 기기의 정비 레포트 · 정비 지원 관리자도 같이 로그아웃돼요.')) return;
@@ -578,15 +709,16 @@ function checkVer() {
   }).catch(() => {});
 }
 checkVer();
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { load(false); checkVer(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { reload(false); checkVer(); } });
 
 S.onUser(u => {
   if (vocOpen && !(u && !u.anon)) closeVoc();
   user = u || false;
   admin = u && !u.anon ? ADMINS.filter(a => a.uid === u.uid)[0] || null : null;
   view = { st: null, busy: false, err: '', at: 0 };
+  ex = { rows: null, acts: null, at: 0, busy: false, d: '' };
   draw();
-  if (admin) load(true);
+  if (admin) reload(true);
 });
 setInterval(() => { if (admin && document.visibilityState === 'visible') { head(); } }, 60000);
 draw();
