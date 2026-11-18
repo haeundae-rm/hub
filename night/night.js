@@ -6,7 +6,7 @@
 // 규칙(v15): 하우스키퍼는 확인이 하나라도 붙기 전까지만 고침. 확인은 자기 이름 칸만. 파트장 계정은 읽기 + 파트장 확인만
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.18-1';
+const VER = '2026.11.18-2';
 // 하우스키퍼 공용 계정 UID — 계정을 만든 뒤 채움 (비어 있으면 이메일로 알아봄)
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const ROLES = [
@@ -25,7 +25,8 @@ const DEF_ITEMS = [
 const LINEN = [['dirty', '오염 린넨 회수 → 1F'], ['waste', '폐기 린넨 회수 → B4']];
 const STEPS = ['수량 체크', '사진 촬영', '임시 적재', '이동 완료'];
 const ZONES = ['고층', '저층'];
-const NOTE_ST = ['', '조치 필요', '완료'];
+const NOTE_ST = ['', '확인요망', '인계', '조치완료'];   // 엑셀 양식과 같은 상태
+const noteSt = v => ({ '조치 필요': '확인요망', '완료': '조치완료' }[v] || v || '');
 
 const $ = s => document.querySelector(s);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -42,7 +43,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const defDate = () => (seoul().getUTCHours() < 15 ? addDays(ymd(), -1) : ymd());
 
 let user = null, role = null, login = { who: 0, err: '', busy: false };
-let date = '', doc = null, form = null, cfg = null, recent = [], names = [], rmAuto = null;
+let date = '', doc = null, form = null, cfg = null, recent = [], names = [], rmAuto = null, prevDoc = null;
 let busy = false, dirty = false, msg = '', editCfg = null;
 
 function roleOf(u) {
@@ -104,6 +105,7 @@ async function load(d) {
       S.get('days/' + addDays(d, 1)).catch(() => null)
     ]);
     recent = rec.map(x => x.data).filter(x => x && x.date).sort((a, b) => b.date.localeCompare(a.date));
+    prevDoc = recent.filter(x => x.date < d)[0] || null;   // 지난 보고서 — 수량 칸에 흐리게 보여 줌
     rmAuto = day && Array.isArray(day.maids) ? day.maids.length : null;
     doc = dd;
     if (doc) form = fromDoc(doc);
@@ -206,9 +208,11 @@ function formHtml() {
   // ② 재고
   h += '<div class="card"><h2>② 소모품 재고 <small>수량만 넣으면 상태 자동</small></h2><div class="stk">' + f.items.map((it, i) => {
     const o = f.stock[it.name] || {}, st = status(it, num(o.qty));
+    const pq = prevDoc && prevDoc.stock && prevDoc.stock[it.name] ? num(prevDoc.stock[it.name].qty) : null, pl = prevDoc ? (prevDoc.date === addDays(date, -1) ? '어제' : md(prevDoc.date)) : '';
     return (i ? '<hr>' : '') + '<div class="nm"><b>' + esc(it.name) + '</b><small>' + esc(it.unit) + ' · 부족 ≤' + it.low + ' · 여유 ≥' + it.high + '</small></div>' +
-      inp('stock.' + it.name + '.qty', o.qty, { n: 1, ph: '수량' }) + '<span class="st ' + st + '">' + (st || '-') + '</span>' +
-      '<div class="pl">' + inp('stock.' + it.name + '.place', o.place, { ph: '보관 위치 / 비고' }) + '</div>';
+      inp('stock.' + it.name + '.qty', o.qty, { n: 1, ph: pq != null ? pl + ' ' + pq : '수량' }) + '<span class="st ' + st + '">' + (st || '-') + '</span>' +
+      (pq != null && num(o.qty) != null ? '<div class="pv">' + pl + ' ' + pq + ' → ' + (num(o.qty) - pq === 0 ? '변동 없음' : (num(o.qty) > pq ? '+' : '−') + Math.abs(Math.round((num(o.qty) - pq) * 10) / 10)) + '</div>' : '') +
+      '<div class="pl">' + inp('stock.' + it.name + '.place', o.place, { ph: '보관 위치 / 비고' }) + inp('stock.' + it.name + '.memo', o.memo, { ph: '발주 메모' }) + '</div>';
   }).join('') + '</div>' + (role.k === 'boss' ? '<button class="big sec" data-cfg="1" style="margin-top:10px">품목 · 기준 고치기</button>' : '') + '</div>';
   // ③ 린넨 수거
   h += '<div class="card"><h2>③ 린넨 수거 <small>단계마다 누르기</small></h2>' + LINEN.map(([k, t]) => {
@@ -233,8 +237,10 @@ function formHtml() {
     '<label class="f" style="margin-top:6px"><span>출근자 명단 (계 ' + s.supT + '명)</span>' + inp('sup.names', f.sup.names, { ph: '이름, 이름, …' }) + '</label></div>';
   // ⑦ 기타
   h += '<div class="card"><h2>⑦ 기타 업무 및 특이사항 <small>조치 필요 건은 상태 표기</small></h2>' + f.notes.map((n, i) =>
-    '<div class="nt"><b>' + (i + 1) + '</b>' + inp('notes.' + i + '.t', n.t) + '<select class="t" data-f="notes.' + i + '.st"' + (ro ? ' disabled' : '') + '>' + NOTE_ST.map(x => '<option' + (n.st === x ? ' selected' : '') + ' value="' + x + '">' + (x || '상태') + '</option>').join('') + '</select></div>').join('') +
+    '<div class="nt"><b>' + (i + 1) + '</b>' + inp('notes.' + i + '.t', n.t) + '<select class="t" data-f="notes.' + i + '.st"' + (ro ? ' disabled' : '') + '>' + NOTE_ST.map(x => '<option' + (noteSt(n.st) === x ? ' selected' : '') + ' value="' + x + '">' + (x || '상태') + '</option>').join('') + '</select></div>').join('') +
     (ro ? '' : '<button class="add" data-add="notes">＋ 한 줄 추가</button>') + '<p class="note">※ 관리자분들께 상세 보고 후 퇴근 바랍니다.</p></div>';
+  // 소장 · 부소장: 시험으로 쓴 보고서 등 지우기
+  if (doc && role.k === 'boss') h += '<div class="card"><button class="big sec" data-delrep="1" style="color:var(--warn)">이 날 보고서 지우기</button><p class="note">시험으로 쓴 것처럼 필요 없는 보고서를 지워요. 지우면 되돌릴 수 없어요.</p></div>';
   // 지난 보고서
   h += '<div class="card"><h2>지난 보고서</h2><div class="list">' + (recent.length ? recent.slice(0, 14).map(r =>
     '<a href="#' + r.date + '"><span>' + md(r.date) + ' 밤 · ' + esc(r.main || '') + '</span><span class="state' + (okCount(r) === 3 ? ' ok' : r.state === '제출' ? ' sub' : '') + '">' + (okCount(r) === 3 ? '결재 끝' : okCount(r) ? '확인 ' + okCount(r) + '/3' : r.state === '제출' ? '제출됨' : '작성 중') + '</span></a>').join('') : '<p class="note" style="margin:0">아직 없어요.</p>') + '</div></div>';
@@ -254,30 +260,90 @@ function barHtml() {
     (ed ? '<button class="save" data-save="1"' + (busy ? ' disabled' : '') + '>저장</button>' : '') +
     (ed && (!doc || doc.state !== '제출') ? '<button class="go" data-submit="1"' + (busy ? ' disabled' : '') + '>제출</button>' : '') + '</div></div>';
 }
+// ---------- 인쇄: 옛 엑셀 양식(B~N 13칸, 같은 색 · 글꼴 크기 · 줄 높이)을 그대로 따라 그림
+const XC = { navy: '#1F3864', gold: '#C8A96A', head: '#2E5C8A', lab: '#FAF6EE', labT: '#1F3864', yel: '#FFF9DB', item: '#EEF2F7', ink: '#1A1A1A', unit: '#5A6472',
+  bad: ['#F8D3D8', '#9C1F2E'], mid: ['#FFF2CC', '#7F6000'], good: ['#DFF0E4', '#1F6F43'], prog: ['#FFDB70', '#8A5A00'], order: '#FDECEE' };
+const ST_COL = { 부족: XC.bad, 보통: XC.mid, 여유: XC.good };
+const NOTE_COL = { 확인요망: XC.bad, 인계: XC.mid, 조치완료: XC.good };
+const K = 0.86;   // 엑셀 '한 페이지에 맞춤'과 같이 줄 높이 · 글자를 줄여 A4 한 장에
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const longDate = d => d.slice(0, 4) + '년 ' + Number(d.slice(5, 7)) + '월 ' + Number(d.slice(8)) + '일 (' + WD[new Date(d + 'T00:00:00Z').getUTCDay()] + ')';
+const qtyFmt = v => { const n = num(v); return n == null ? '' : n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
 function printHtml() {
   if (!form) return '';
   const f = form, s = summary(f), o = (doc && doc.ok) || {};
-  const td = (v, c) => '<td' + (c ? ' class="' + c + '"' : '') + '>' + esc(v == null ? '' : v) + '</td>';
-  let h = '<div class="pp"><table><tr><td rowspan="2" style="border:0"><h1>야간 업무 보고서</h1></td>' + OKS.map(k => '<th style="width:72px">' + k + '</th>').join('') + '</tr><tr class="sign">' +
-    OKS.map(k => '<td>' + (o[k] ? '확인<br>' + esc(hmOf(o[k].at)) : '') + '</td>').join('') + '</tr></table>';
-  h += '<table><tr><th>보고일자</th>' + td(addDays(date, 1)) + '<th>근무일자(야간)</th>' + td(date) + '<th>R/M 출근</th>' + td(f.rm, 'r') + '</tr>' +
-    '<tr><th>작성자(메인)</th>' + td(f.main) + '<th>작성자(서브)</th>' + td(f.sub) + '<th>정비보조</th>' + td(s.supT, 'r') + '</tr></table>';
-  h += '<table><tr><td class="h" colspan="8">① 야간 현황 요약</td></tr><tr><th>재고 부족</th>' + td(s.c.부족, 'c') + '<th>보통</th>' + td(s.c.보통, 'c') + '<th>여유</th>' + td(s.c.여유, 'c') + '<th>린넨 수거</th>' + td(s.ln + ' / 8 단계', 'c') + '</tr>' +
-    '<tr><th>발주 필요</th><td colspan="7"' + (s.need.length ? ' class="bad"' : '') + '>' + esc(s.need.length ? s.need.join('   ') : '이상 없음 — 발주 필요 품목 없습니다.') + '</td></tr></table>';
-  h += '<table><tr><td class="h" colspan="5">② 소모품 재고</td></tr><tr><th>품목</th><th>보유 수량</th><th>단위</th><th>보관 위치 / 비고</th><th>상태</th></tr>' +
-    f.items.map(it => { const x = f.stock[it.name] || {}, st = status(it, num(x.qty)); return '<tr>' + td(it.name) + td(x.qty, 'r') + td(it.unit, 'c') + td(x.place) + td(st, 'c' + (st === '부족' ? ' bad' : '')) + '</tr>'; }).join('') + '</table>';
-  h += '<table><tr><td class="h" colspan="8">③ 린넨 수거</td></tr><tr><th>구분</th><th>구역</th>' + STEPS.map(x => '<th>' + x + '</th>').join('') + '<th>비고</th><th>진행</th></tr>' +
-    LINEN.map(([k, t]) => { const L = f.linen[k]; return '<tr>' + td(t) + td(L.zone.join(' / '), 'c') + L.s.map(b => td(b ? '완료' : '', 'c')).join('') + td(L.memo) + td(L.s.filter(Boolean).length + '/4', 'c') + '</tr>'; }).join('') + '</table>';
-  h += '<table><tr><td class="h" colspan="4">④ 린넨 부족 · 캐처스 입고</td></tr><tr><th>부족 품목</th><th>수량</th><th>캐처스 추가 입고</th><th>특이사항</th></tr>' +
-    (f.short.length ? f.short.map(r => '<tr>' + td(r.item) + td(r.qty, 'c') + td(r.catchers) + td(r.memo) + '</tr>').join('') : '<tr><td></td><td></td><td>없음</td><td></td></tr>') + '</table>';
-  h += '<table><tr><td class="h" colspan="4">⑤ 창고 정리 · 사무실 청소</td></tr><tr><th>구분</th><th>구역 · 위치</th><th>작업자</th><th>작업 내용</th></tr>' +
-    f.clean.map(r => '<tr>' + td(r.kind) + td(r.where) + td(r.who) + td(r.what) + '</tr>').join('') + '</table>';
-  h += '<table><tr><td class="h" colspan="5">⑥ 정비보조 출근</td></tr><tr><th>H/K 지원</th><th>더티</th><th>기타</th><th>계</th><th>출근자 명단</th></tr><tr>' +
-    td(f.sup.hk, 'c') + td(f.sup.dirty, 'c') + td(f.sup.etc, 'c') + td(s.supT, 'c') + td(f.sup.names) + '</tr></table>';
+  // c(값, 칸 수, { bg, co, b(굵게), sz(pt), al, cls })
+  const c = (v, n, x = {}) => '<td' + (n > 1 ? ' colspan="' + n + '"' : '') + ' style="' + (x.bg ? 'background:' + x.bg + ';' : '') + (x.co ? 'color:' + x.co + ';' : '') +
+    'font-weight:' + (x.b === false ? 400 : 700) + ';font-size:' + (x.sz || 9.5) + 'pt;text-align:' + (x.al || 'center') + ';' + (x.st || '') + '">' + esc(v == null ? '' : v).replace(/\n/g, '<br>') + '</td>';
+  const lab = (v, n) => c(v, n, { bg: XC.lab, co: XC.labT, sz: 9 });
+  const hd = (v, n) => c(v, n, { bg: XC.head, co: '#fff', sz: 9 });
+  const inp = (v, n, x = {}) => c(v, n, Object.assign({ bg: XC.yel, co: XC.ink, b: false }, x));
+  const row = (h, cells) => '<tr style="height:' + (h * K).toFixed(2) + 'pt">' + cells + '</tr>';
+  const gap = h => '<tr class="gap" style="height:' + (h * K).toFixed(2) + 'pt"><td colspan="13"></td></tr>';
+  const sec = (t, sub) => '<tr class="sec" style="height:' + (18.75 * K).toFixed(2) + 'pt"><td colspan="13"><span style="font-size:' + (10.5 * K).toFixed(2) + 'pt">  ' + esc(t) + '</span><span class="sub" style="font-size:' + (8 * K).toFixed(2) + 'pt">' + esc(sub || '') + '</span></td></tr>';
+  let h = '<div class="xl"><table><colgroup>' + Array.from({ length: 13 }, (_, i) => '<col style="width:' + (i === 12 ? 8.5 : 7.625) + '%">').join('') + '</colgroup>';
+  // 머리: 로고 · 제목 · 결재
+  h += '<tr class="gap" style="height:' + (31.5 * K).toFixed(2) + 'pt"><td colspan="13" style="text-align:left;vertical-align:bottom"><img src="./unies.png" alt="unies" style="height:' + (20 * K).toFixed(2) + 'pt"></td></tr>';
+  const sign = k => { const x = o[k]; return x ? '확인<br><small>' + esc(hmOf(x.at)) + '</small>' : ''; };
+  h += '<tr style="height:' + (16.5 * K).toFixed(2) + 'pt"><td colspan="7" rowspan="3" class="title">야간 업무 보고서</td>' + lab('파트장', 2) + lab('부소장', 2) + lab('현장소장', 2) + '</tr>';
+  h += '<tr style="height:' + (16.5 * K).toFixed(2) + 'pt">' + ['파트장', '부소장', '소장'].map(k => '<td colspan="2" rowspan="2" class="sign">' + sign(k) + '</td>').join('') + '</tr><tr style="height:' + (16.5 * K).toFixed(2) + 'pt"></tr>';
+  h += gap(4.5);
+  h += row(19.5, lab('보고일자', 2) + c(longDate(addDays(date, 1)), 3, { co: XC.ink, sz: 10 }) + lab('근무일자(야간)', 2) + c(longDate(date), 3, { co: XC.ink, sz: 10 }) + lab('R/M 출근', 2) + inp(f.rm, 1, { b: true, sz: 10 }));
+  h += row(19.5, lab('작성자(메인)', 2) + inp(f.main, 3, { b: true, sz: 10 }) + lab('작성자(서브)', 2) + inp(f.sub, 3, { b: true, sz: 10 }) + lab('정비보조', 2) + c(s.supT, 1, { co: XC.ink, sz: 10 }));
+  h += gap(6.75);
+  // ① 요약
+  h += sec('① 야간 현황 요약', '자동 집계');
+  h += row(21, c('재고 부족', 2, { bg: XC.bad[0], co: XC.bad[1], sz: 9 }) + c(s.c.부족, 1, { co: XC.bad[1], sz: 11 }) + c('보통', 2, { bg: XC.mid[0], co: XC.mid[1], sz: 9 }) + c(s.c.보통, 1, { co: XC.mid[1], sz: 11 }) +
+    c('여유', 2, { bg: XC.good[0], co: XC.good[1], sz: 9 }) + c(s.c.여유, 1, { co: XC.good[1], sz: 11 }) + lab('린넨 수거', 2) + c(s.ln + ' / 8 단계', 2, { co: XC.labT, sz: 10 }));
+  const ob = s.need.length ? XC.order : '';
+  h += row(21, c('발주 필요', 2, ob ? { bg: XC.order, co: XC.bad[1], sz: 9 } : { bg: XC.lab, co: XC.labT, sz: 9 }) + c(s.need.length ? s.need.join('   ') : '이상 없음 — 발주 필요 품목 없습니다.', 11, { bg: ob, co: XC.bad[1], sz: 10, al: 'left' }));
+  h += gap(6.75);
+  // ② 재고
+  h += sec('② 소모품 재고', '수량만 입력 → 상태 자동');
+  h += row(19.5, hd('품목', 3) + hd('보유 수량', 2) + hd('단위', 1) + hd('보관 위치 / 비고', 4) + hd('상태', 1) + hd('발주 메모', 2));
+  f.items.forEach(it => {
+    const x = f.stock[it.name] || {}, st = status(it, num(x.qty)), low = st === '부족', sc = ST_COL[st];
+    h += row(18.75, c(it.name, 3, low ? { bg: XC.bad[0], co: XC.bad[1] } : { bg: XC.item, co: XC.ink }) + inp(qtyFmt(x.qty), 2, low ? { bg: XC.bad[0], co: XC.bad[1], b: true, sz: 10 } : { b: true, sz: 10 }) +
+      c(it.unit, 1, { co: XC.unit, b: false, sz: 8.5 }) + inp(x.place, 4, { al: 'left' }) + c(st, 1, sc ? { bg: sc[0], co: sc[1] } : {}) + inp(x.memo, 2, { al: 'left' }));
+  });
+  h += gap(6.75);
+  // ③ 린넨
+  h += sec('③ 린넨 수거', '각 단계 완료 시 선택');
+  h += row(25.5, hd('구분', 3) + hd('구역', 2) + hd('수량\n체크', 1) + hd('사진\n촬영', 1) + hd('임시\n적재', 1) + hd('이동\n완료', 1) + hd('비고', 3) + hd('진행', 1));
+  LINEN.map(([k, t]) => {
+    const L = f.linen[k], n = L.s.filter(Boolean).length;
+    h += row(19.5, c(t.replace('→', ' →  '), 3, { bg: XC.item, co: XC.ink, al: 'left' }) + inp(L.zone.length ? L.zone.join(' / ') : '고층 / 저층', 2) +
+      L.s.map(b => (b ? c('완료', 1, { bg: XC.good[0], co: XC.good[1], sz: 9 }) : inp('', 1))).join('') + inp(L.memo, 3, { al: 'left' }) +
+      c(n + '/4', 1, n < 4 ? { bg: XC.prog[0], co: XC.prog[1], sz: 9 } : { co: XC.labT, sz: 9 }));
+  });
+  h += gap(6.75);
+  // ④ 린넨 부족 · 캐처스
+  h += sec('④ 린넨 부족 · 캐처스 입고', '');
+  h += row(19.5, hd('부족 품목', 4) + hd('수량', 2) + hd('캐처스 추가 입고', 3) + hd('특이사항', 4));
+  (f.short.length ? f.short : [{ item: '', qty: '', catchers: '없음', memo: '' }]).forEach(r => {
+    h += row(21.75, inp(r.item, 4, { al: 'left' }) + inp(r.qty, 2) + inp(r.catchers, 3, { b: true }) + inp(r.memo, 4, { al: 'left' }));
+  });
+  h += gap(6.75);
+  // ⑤ 창고 · 사무실
+  h += sec('⑤ 창고 정리 · 사무실 청소', '창고정리 일정표 참고');
+  h += row(19.5, hd('구분', 2) + hd('구역 · 위치', 2) + hd('작업자', 2) + hd('작업 내용', 7));
+  f.clean.forEach(r => { h += row(27, c(r.kind, 2, { bg: XC.item, co: XC.ink }) + inp(r.where, 2) + inp(r.who, 2) + inp(r.what, 7, { al: 'left' })); });
+  h += gap(6.75);
+  // ⑥ 정비보조
+  h += sec('⑥ 정비보조 출근', '');
+  h += row(19.5, hd('H/K 지원', 2) + hd('더티', 2) + hd('기타', 2) + hd('계', 2) + hd('출근자 명단', 5));
+  h += row(24, inp(f.sup.hk, 2, { b: true, sz: 10 }) + inp(f.sup.dirty, 2, { b: true, sz: 10 }) + inp(f.sup.etc, 2, { b: true, sz: 10 }) + c(s.supT, 2, { bg: XC.item, co: XC.labT, sz: 11 }) + inp(f.sup.names, 5, { al: 'left' }));
+  h += gap(6.75);
+  // ⑦ 기타
+  h += sec('⑦ 기타 업무 및 특이사항', '조치 필요 건은 상태 표기');
+  h += row(19.5, hd('No', 1) + hd('내용', 10) + hd('상태', 1) + hd('확인', 1));
   const ns = f.notes.filter(n => String(n.t).trim());
-  h += '<table><tr><td class="h" colspan="3">⑦ 기타 업무 및 특이사항</td></tr><tr><th style="width:28px">No</th><th>내용</th><th style="width:70px">상태</th></tr>' +
-    (ns.length ? ns.map((n, i) => '<tr>' + td(i + 1, 'c') + td(n.t) + td(n.st, 'c') + '</tr>').join('') : '<tr><td></td><td>없음</td><td></td></tr>') + '</table>';
-  return h + '<p class="foot">※ 관리자분들께 상세 보고 후 퇴근 바랍니다. · 객실 통합 관리 시스템 야간 보고서 ' + VER + '</p></div>';
+  for (let i = 0; i < Math.max(8, ns.length); i++) {
+    const n = ns[i] || { t: '', st: '' }, st = noteSt(n.st), nc = NOTE_COL[st];
+    h += row(18.75, c(i + 1, 1, { bg: XC.item, co: XC.labT, sz: 9 }) + inp(n.t, 10, { al: 'left' }) + (nc ? c(st, 1, { bg: nc[0], co: nc[1], sz: 9 }) : inp(st, 1, { sz: 9 })) + inp('', 1));
+  }
+  h += '<tr style="height:' + (18 * K).toFixed(2) + 'pt"><td colspan="13" class="foot">※ 관리자분들께 상세 보고 후 퇴근 바랍니다.</td></tr>';
+  return h + '</table></div>';
 }
 function draw() {
   $('#who').textContent = role ? role.label + ' · ' + VER : VER;
@@ -322,6 +388,12 @@ document.addEventListener('click', e => {
   if (t.hasAttribute('data-submit')) { save(true); return; }
   if (t.hasAttribute('data-ok')) { if (dirty) { toast('먼저 저장해 주세요'); return; } confirmOk(t.getAttribute('data-ok'), true); return; }
   if (t.hasAttribute('data-unok')) { if (t.getAttribute('data-ask') !== '1') { t.setAttribute('data-ask', '1'); t.textContent = '한 번 더'; return; } confirmOk(t.getAttribute('data-unok'), false); return; }
+  if (t.hasAttribute('data-delrep') && role && role.k === 'boss') {
+    if (t.getAttribute('data-ask') !== '1') { t.setAttribute('data-ask', '1'); t.textContent = '한 번 더 누르면 지워요'; return; }
+    busy = true; draw();
+    S.del('night/' + date).then(() => { dropDraft(); toast(md(date) + ' 밤 보고서를 지웠어요'); busy = false; load(date); }, er => { busy = false; toast('지우지 못했어요: ' + (er && (er.code || er.message) || er)); draw(); });
+    return;
+  }
   if (!form) return;
   if (canEdit()) {
     if (t.hasAttribute('data-zone')) { const [k, z] = t.getAttribute('data-zone').split(':'), L = form.linen[k]; L.zone = L.zone.indexOf(z) >= 0 ? L.zone.filter(x => x !== z) : ZONES.filter(x => x === z || L.zone.indexOf(x) >= 0); dirty = true; saveDraft(); draw(); return; }

@@ -68,7 +68,10 @@ label.f>span{display:block;margin:0 0 3px}
 .st.보통{background:var(--wait-soft);color:var(--wait)}
 .st.여유{background:var(--ok-soft);color:var(--ok)}
 .stk .pl{grid-column:1/-1;margin-top:-2px}
+.stk .pl{display:grid;grid-template-columns:3fr 2fr;gap:6px}
 .stk .pl input{min-height:36px;font-size:13px}
+.stk .pv{grid-column:1/-1;text-align:right;font-size:12px;color:var(--muted);margin-top:-4px}
+input.t::placeholder{color:#A9B1BC;font-weight:500}
 .stk hr{grid-column:1/-1;border:0;border-top:1px solid var(--line);margin:2px 0}
 .ln{border:1px solid var(--line);border-radius:12px;padding:10px;margin:0 0 8px}
 .ln b{display:block;margin:0 0 6px}
@@ -102,22 +105,22 @@ label.f>span{display:block;margin:0 0 3px}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;z-index:20;max-width:90%}
 #print{display:none}
 
-/* ---------- 인쇄 (A4 한 장, 엑셀 양식과 같은 순서) */
+/* ---------- 인쇄 (A4 한 장, 옛 엑셀 양식과 같은 칸 · 색 · 글꼴 크기) */
+.xl table{width:100%;border-collapse:collapse;table-layout:fixed;font-family:"Noto Sans KR","Malgun Gothic",sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.xl td{border:.75pt solid #C5CEDB;padding:0 2.5pt;vertical-align:middle;line-height:1.15;overflow:hidden;word-break:keep-all}
+.xl tr.gap td{border:0;padding:0}
+.xl tr.sec td{background:#1F3864;color:#fff;font-weight:700;border:0;border-bottom:1.5pt solid #C8A96A;white-space:pre}
+.xl tr.sec td .sub{float:right;font-weight:400;color:#C8A96A;margin-top:1.5pt}
+.xl td.title{font-size:14.6pt;font-weight:700;text-align:center;color:#111;border-bottom:1.5pt solid #C8A96A}
+.xl td.sign{text-align:center;font-size:7.5pt;font-weight:700;color:#1F3864}
+.xl td.sign small{font-weight:400;color:#5A6472}
+.xl td.foot{border:0;color:#8C99A8;font-size:7.3pt;font-weight:400;text-align:left}
 @media print{
-  @page{size:A4 portrait;margin:10mm}
-  body{background:#fff;font-size:10.5px}
+  @page{size:A4 portrait;margin:0}
+  html,body{background:#fff}
   .top,main,.bar,.toast{display:none!important}
   #print{display:block}
-  .pp h1{font-size:20px;text-align:center;margin:0 0 6px;letter-spacing:6px}
-  .pp table{width:100%;border-collapse:collapse;margin:0 0 6px}
-  .pp th,.pp td{border:1px solid #333;padding:3px 5px;vertical-align:middle}
-  .pp th{background:#E8ECF2;font-weight:700}
-  .pp .h{background:#10233F;color:#fff;text-align:left;font-weight:900}
-  .pp .c{text-align:center}
-  .pp .r{text-align:right}
-  .pp .sign td{height:44px;width:72px;text-align:center;font-size:9.5px}
-  .pp .foot{font-size:9.5px;color:#333;margin-top:4px}
-  .pp .bad{color:#B23A48;font-weight:900}
+  .xl{font-size:9pt;padding:8.9mm 7.6mm}
 }
 </style>
 </head>
@@ -125,6 +128,6 @@ label.f>span{display:block;margin:0 0 3px}
 <header class="top"><a class="back" href="../" aria-label="허브로">‹</a><h1>🌙 야간 업무 보고서<small id="who"></small></h1></header>
 <main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
 <div id="print"></div>
-<script type="module" src="./night.js?v=2026.11.18-1"></script>
+<script type="module" src="./night.js?v=2026.11.18-2"></script>
 </body>
 </html>
