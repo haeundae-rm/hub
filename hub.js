@@ -14,10 +14,12 @@
 // 룸메이드 연차 Firebase 전환 (2026-11-18): 📋 바로가기 → hub/leave/ 따로 쪽 (옛 Apps Script 연차 관리 페이지를 옮김, leave_* 컬렉션)
 // 첫 화면 개편 (2026-11-18-4): 칸 11개를 위아래로 늘어놓던 것을 '지금 확인할 것' + 업무 버튼 7개로. 버튼을 누르면 안쪽 화면(#work · #quality · #people · #assign · #apps)
 //   주소 끝 # 로 나눠서 휴대폰 '뒤로'로 첫 화면에 돌아옴. 더티·활동 자료는 그 탭을 열 때만 읽음 (읽기 아끼기). 안쪽 카드(자동 배정 · 인스펙션 · VOC …)는 그대로 옮기기만
+// 정비 레포트 관리자 기능 허브로 (2026-11-18-5): 오늘 정비 → '메이드별 현황' · '배정 변경 · 대조', 📱 현장 관리(공지 확인 · 2인 1조 · 휴대폰 등록 · 휴대폰 오류)
+//   = 정비 레포트 관리자 화면을 허브 안 전체 창(iframe ../rm/?hub=today|assign|set)으로 엶 (같은 화면 파일 · 같은 계산). 열려 있는 동안만 구독. 자동 배정은 오늘 정비 탭으로 옮김
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 
-const VER = '2026.11.18-4';
+const VER = '2026.11.18-5';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -411,8 +413,38 @@ function closeAct() { const p = document.getElementById('actp'); if (!p) return;
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || !e.data || !e.data.hub) return;
   if (e.data.hub === 'close') closeAct();
-  if (e.data.hub === 'noadmin') { const m = document.getElementById('actmsg'); if (m) m.textContent = '정비 지원 관리자 확인이 안 돼요 — 닫고 다시 열어 주세요'; }
+  if (e.data.hub === 'noadmin') {
+    const m = document.getElementById('actmsg'); if (m) m.textContent = '정비 지원 관리자 확인이 안 돼요 — 닫고 다시 열어 주세요';
+    const r = document.getElementById('rmmsg'); if (r) r.textContent = '정비 레포트 관리자 확인이 안 돼요 — 닫고 다시 열어 주세요';
+  }
 });
+// ---------- 정비 레포트 관리자 화면을 허브 안에서 (2026-11-18-5)
+const RM_T = { today: '👩 메이드별 현황', assign: '🔁 배정 변경 · 대조', set: '📱 현장 관리' };
+function rmCardHtml() {
+  return '<div class="card"><h2>메이드별 · 배정 변경 <small>정비 레포트 관리자와 같은 화면</small></h2>' +
+    '<p class="note" style="margin:0 0 12px">메이드별 진행 · 시간 정해진 객실 · 단체 · 객실 메모를 보고, 메이드 화면으로 들어가 대신 처리해요. 배정 변경에서는 추가 · 제외 · 교환 내역과 시트 대조를 봐요.</p>' +
+    '<div class="btn2"><button class="big-btn" data-rm="today">👩 메이드별 현황</button><button class="big-btn sec" data-rm="assign">🔁 배정 변경 · 대조</button></div></div>';
+}
+function fieldHtml() {
+  const e = view.st && Array.isArray(view.st.errs) ? view.st.errs.length : 0;
+  return '<div class="card"><h2>📱 현장 관리 <small>정비 레포트 관리자와 같은 화면</small></h2>' +
+    '<ul class="st" style="margin:0 0 12px">' + [['📢', '공지 확인', '공지별로 누가 아직 확인 안 했는지'], ['👫', '2인 1조', '부부 메이드 짝 정하기'], ['📲', '휴대폰 등록', '메이드 휴대폰 등록 보기 · 잘못 등록한 것 해제'],
+      ['📵', '휴대폰 오류', e ? '오늘 ' + e + '건 있어요' : '오늘 없음']].map(x => '<li class="' + (x[1] === '휴대폰 오류' && e ? 'wait' : '') + '"><span style="font-size:17px">' + x[0] + '</span><div><b>' + x[1] + '</b><span>' + esc(x[2]) + '</span></div></li>').join('') + '</ul>' +
+    '<button class="big-btn" data-rm="set">현장 관리 열기</button>' +
+    '<p class="note">공지 올리기와 연차 · 휴대폰 승인은 지금처럼 각각 기존 앱 · 📋 연차 관리에서 해요.</p></div>';
+}
+function openRm(tab) {
+  if (!admin || document.getElementById('rmp') || !RM_T[tab]) return;
+  const p = document.createElement('div'); p.className = 'vp'; p.id = 'rmp'; p.style.overflow = 'hidden';
+  p.innerHTML = '<div class="act-bar"><b>' + RM_T[tab] + '</b><span id="rmmsg">여는 중…</span><button class="vp-x" data-rmclose="1" aria-label="닫기">✕</button></div>' +
+    '<iframe id="rmf" title="' + RM_T[tab] + '" src="' + new URL('../rm/?hub=' + tab, import.meta.url).href + '"></iframe>';
+  document.body.appendChild(p); document.body.classList.add('sb-lock');
+  try { history.pushState({ rmp: 1 }, ''); } catch (e) {}   // 휴대폰 '뒤로' = 이 창 닫기
+  p.querySelector('iframe').addEventListener('load', () => { const m = document.getElementById('rmmsg'); if (m) m.textContent = ''; });
+}
+function closeRm() { if (history.state && history.state.rmp) { history.back(); return; } closeRmNow(); }   // ✕ = 뒤로와 같게 (기록 한 칸 정리)
+window.addEventListener('popstate', () => { if (document.getElementById('rmp') && !(history.state && history.state.rmp)) closeRmNow(); });
+function closeRmNow() { const p = document.getElementById('rmp'); if (!p) return; p.remove(); document.body.classList.remove('sb-lock'); reload(true); }   // 닫으면 정비 레포트 구독도 같이 끊김
 // ---------- 📣 고객만족도 VOC (2단계 ③)
 let VOC = null, vocOpen = false, vocToast = null;
 function vocSay(msg) {
@@ -540,25 +572,27 @@ function staffHtml() {
 // ---------- 첫 화면 · 안쪽 화면 (2026-11-18-4)
 // 주소 끝 # 로 어느 화면인지 나눔: '' 첫 화면 · #work(/now|up|dirty) · #quality · #people · #assign · #apps
 const SECS = {
-  work: { ic: '🧹', t: '오늘 정비', tabs: [['now', '상황'], ['up', '보고서 올리기'], ['dirty', '더티 · 활동']] },
+  work: { ic: '🧹', t: '오늘 정비', tabs: [['now', '상황'], ['up', '보고서 올리기'], ['dirty', '더티 · 활동'], ['asg', '자동 배정']] },
   quality: { ic: '🔍', t: '품질 관리' },
   people: { ic: '👥', t: '인사' },
-  assign: { ic: '🧩', t: '자동 배정' },
+  field: { ic: '📱', t: '현장 관리' },
   apps: { ic: '🔗', t: '현장 앱 열기' }
 };
 const TILES = [
-  { go: 'work', ic: '🧹', t: '오늘 정비', s: '상황 · 보고서 올리기 · 더티 배분 · 활동판' },
+  { go: 'work', ic: '🧹', t: '오늘 정비', s: '메이드별 현황 · 보고서 올리기 · 더티 배분 · 활동판 · 자동 배정' },
   { go: 'quality', ic: '🔍', t: '품질 관리', s: '인스펙션 · 고객만족도 VOC' },
   { href: './leave/', ic: '📋', t: '연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
-  { go: 'assign', ic: '🧩', t: '자동 배정', s: '시험 · 하우스키퍼와 대조 · 장기 미정비' },
+  { go: 'field', ic: '📱', t: '현장 관리', s: '공지 확인 · 2인 1조 · 휴대폰 등록 · 휴대폰 오류' },
   { go: 'apps', ic: '🔗', t: '현장 앱 열기', s: '정비 레포트 · 정비 지원 · 입퇴사 서류', wide: 1 }
 ];
 const FIELD = ['../rm/', '../dirty/', '../unies-contract/'];
 let route = { sec: '', tab: '' }, fromHome = false;
 function parseRoute() {
-  const m = location.hash.replace(/^#/, '').split('/'), sec = SECS[m[0]] ? m[0] : '';
+  const m = location.hash.replace(/^#/, '').split('/');
+  if (m[0] === 'assign') { m[0] = 'work'; m[1] = 'asg'; }   // 11/18-4 주소 (자동 배정 따로 쪽) 그대로 열리게
+  const sec = SECS[m[0]] ? m[0] : '';
   const tabs = sec && SECS[sec].tabs;
   let tab = tabs && tabs.some(t => t[0] === m[1]) ? m[1] : '';
   if (tabs && !tab) tab = up ? 'up' : tabs[0][0];
@@ -576,7 +610,7 @@ function goHome() {
 }
 // 첫 화면 '지금 확인할 것': 오늘 한눈에에서 문제·주의만 + 이상 보고 · 연차 승인 대기 · 퇴사일 지남
 function todoItems(v) {
-  const L = statusItems(v).filter(x => x.lv !== 'ok').map(x => Object.assign({ go: 'work/now' }, x));
+  const L = statusItems(v).filter(x => x.lv !== 'ok').map(x => Object.assign({ go: /휴대폰 오류/.test(x.title) ? 'field' : 'work/now' }, x));
   const p = progress(v);
   if (p.issue) L.push({ lv: 'wait', title: '이상 보고 ' + p.issue + '실', sub: '메이드가 이상으로 표시한 객실 · 정비 레포트에서 보기', go: 'work/now' });
   if (typeof v.lvq === 'number' && v.lvq) L.push({ lv: 'bad', title: '휴가신청서 승인 대기 ' + v.lvq + '건', sub: '연차 관리에서 승인 · 반려', href: './leave/' });
@@ -592,6 +626,7 @@ function badgeOf(t, v) {
     if (nb) return B('bad', '확인 ' + nb);
     return p.total ? B('ok', p.pct + '%') : '';
   }
+  if (t.go === 'field') return Array.isArray(v.errs) && v.errs.length ? B('wait', '오류 ' + v.errs.length) : '';
   if (t.href === './leave/') return typeof v.lvq === 'number' && v.lvq ? B('bad', '승인 ' + v.lvq) : '';
   if (t.go === 'people') {
     const r = v.hr; if (!r || r.__err) return '';
@@ -630,10 +665,11 @@ function secHtml() {
   if (sec === 'work') {
     if (route.tab === 'up') h += upHtml();
     else if (route.tab === 'dirty') h += exHtml();
-    else h += statusHtml() + progHtml();
+    else if (route.tab === 'asg') h += assignCardHtml();
+    else h += statusHtml() + progHtml() + rmCardHtml();
   } else if (sec === 'quality') h += inspCardHtml() + vocCardHtml();
   else if (sec === 'people') h += (view.st ? hrHtml(view.st) : '<div class="card"><p class="note" style="margin:0">읽는 중…</p></div>') + staffHtml();
-  else if (sec === 'assign') h += assignCardHtml();
+  else if (sec === 'field') h += fieldHtml();
   else if (sec === 'apps') h += linksHtml();
   return h;
 }
@@ -668,8 +704,10 @@ function openStaff() {
 
 // ---------- 누르기
 document.addEventListener('click', e => {
-  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg],[data-go],[data-tab],[data-home]');
+  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose]');
   if (!t || (t.closest && t.closest('#dz'))) return;
+  if (t.hasAttribute('data-rm')) { openRm(t.getAttribute('data-rm')); return; }
+  if (t.hasAttribute('data-rmclose')) { closeRm(); return; }
   if (t.hasAttribute('data-go')) { const g = t.getAttribute('data-go').split('/'); goSec(g[0], g[1] || ''); return; }
   if (t.hasAttribute('data-tab')) { goSec(route.sec, t.getAttribute('data-tab')); return; }
   if (t.hasAttribute('data-home')) { goHome(); return; }
