@@ -16,10 +16,12 @@
 //   주소 끝 # 로 나눠서 휴대폰 '뒤로'로 첫 화면에 돌아옴. 더티·활동 자료는 그 탭을 열 때만 읽음 (읽기 아끼기). 안쪽 카드(자동 배정 · 인스펙션 · VOC …)는 그대로 옮기기만
 // 정비 레포트 관리자 기능 허브로 (2026-11-18-5): 오늘 정비 → '메이드별 현황' · '배정 변경 · 대조', 📱 현장 관리(공지 확인 · 2인 1조 · 휴대폰 등록 · 휴대폰 오류)
 //   = 정비 레포트 관리자 화면을 허브 안 전체 창(iframe ../rm/?hub=today|assign|set)으로 엶 (같은 화면 파일 · 같은 계산). 열려 있는 동안만 구독. 자동 배정은 오늘 정비 탭으로 옮김
+// 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
+import { setupNotice } from './notice.js?v=2026.11.18-6';
 
-const VER = '2026.11.18-5';
+const VER = '2026.11.18-6';
 const ADMINS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com' },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com' }
@@ -425,13 +427,18 @@ function rmCardHtml() {
     '<p class="note" style="margin:0 0 12px">메이드별 진행 · 시간 정해진 객실 · 단체 · 객실 메모를 보고, 메이드 화면으로 들어가 대신 처리해요. 배정 변경에서는 추가 · 제외 · 교환 내역과 시트 대조를 봐요.</p>' +
     '<div class="btn2"><button class="big-btn" data-rm="today">👩 메이드별 현황</button><button class="big-btn sec" data-rm="assign">🔁 배정 변경 · 대조</button></div></div>';
 }
+let NT = null;
 function fieldHtml() {
+  if (!NT) NT = setupNotice({ S, esc, ymd, addDays, md, draw: () => draw(), who: () => (admin ? admin.label : '') });
+  return NT.html() + fieldRmHtml();
+}
+function fieldRmHtml() {
   const e = view.st && Array.isArray(view.st.errs) ? view.st.errs.length : 0;
   return '<div class="card"><h2>📱 현장 관리 <small>정비 레포트 관리자와 같은 화면</small></h2>' +
     '<ul class="st" style="margin:0 0 12px">' + [['📢', '공지 확인', '공지별로 누가 아직 확인 안 했는지'], ['👫', '2인 1조', '부부 메이드 짝 정하기'], ['📲', '휴대폰 등록', '메이드 휴대폰 등록 보기 · 잘못 등록한 것 해제'],
       ['📵', '휴대폰 오류', e ? '오늘 ' + e + '건 있어요' : '오늘 없음']].map(x => '<li class="' + (x[1] === '휴대폰 오류' && e ? 'wait' : '') + '"><span style="font-size:17px">' + x[0] + '</span><div><b>' + x[1] + '</b><span>' + esc(x[2]) + '</span></div></li>').join('') + '</ul>' +
     '<button class="big-btn" data-rm="set">현장 관리 열기</button>' +
-    '<p class="note">공지 올리기와 연차 · 휴대폰 승인은 지금처럼 각각 기존 앱 · 📋 연차 관리에서 해요.</p></div>';
+    '<p class="note">연차 · 휴대폰 승인은 📋 연차 관리에서 해요.</p></div>';
 }
 function openRm(tab) {
   if (!admin || document.getElementById('rmp') || !RM_T[tab]) return;
@@ -584,7 +591,7 @@ const TILES = [
   { href: './leave/', ic: '📋', t: '연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
-  { go: 'field', ic: '📱', t: '현장 관리', s: '공지 확인 · 2인 1조 · 휴대폰 등록 · 휴대폰 오류' },
+  { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
   { go: 'apps', ic: '🔗', t: '현장 앱 열기', s: '정비 레포트 · 정비 지원 · 입퇴사 서류', wide: 1 }
 ];
 const FIELD = ['../rm/', '../dirty/', '../unies-contract/'];
@@ -755,6 +762,7 @@ S.onUser(u => {
   admin = u && !u.anon ? ADMINS.filter(a => a.uid === u.uid)[0] || null : null;
   view = { st: null, busy: false, err: '', at: 0 };
   ex = { rows: null, acts: null, at: 0, busy: false, d: '' };
+  if (NT) NT.reset();
   draw();
   if (admin) reload(true);
 });

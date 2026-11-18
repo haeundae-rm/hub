@@ -217,13 +217,29 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 60px}
 .hm-tabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;scrollbar-width:none}
 .hm-tabs button{flex:none;border:1.5px solid var(--line);background:var(--surface);border-radius:99px;padding:8px 15px;font-family:inherit;font-weight:700;font-size:14px;color:var(--ink);cursor:pointer}
 .hm-tabs button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.nt-list{list-style:none;margin:0;padding:0}
+.nt-list li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.nt-list li:first-child{border-top:0}
+.nt-list li b{display:block;font-size:15px}.nt-list li span{display:block;font-size:12.5px;color:var(--muted)}
+.nt-list i{font-style:normal;font-size:12px;font-weight:800;border-radius:99px;padding:3px 8px;white-space:nowrap}
+.nt-on{background:var(--ok-soft);color:var(--ok)}.nt-soon{background:var(--wait-soft);color:var(--wait)}.nt-end{background:var(--tile);color:var(--muted)}
+.nt-form h3{margin:0 0 10px;font-size:16px}
+.nt-form label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-top:10px}
+.nt-form input:not([type=checkbox]),.nt-form textarea{display:block;width:100%;margin-top:4px;border:1.5px solid var(--line);border-radius:12px;padding:11px 12px;font-family:inherit;font-size:16px;color:var(--ink);background:var(--surface)}
+.nt-form textarea{resize:vertical;line-height:1.5}
+.nt-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.nt-row label{min-width:0}
+.nt-ck{display:flex!important;align-items:center;gap:8px;font-size:15px!important;color:var(--ink)!important}.nt-ck input{width:20px;height:20px}
+.nt-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.nt-names button{border:1.5px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 12px;font-family:inherit;font-weight:700;font-size:14px;color:var(--ink);cursor:pointer}
+.nt-names button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+.nt-img{margin-top:12px}.nt-img img{display:block;max-width:100%;max-height:260px;border-radius:12px;margin-bottom:8px;border:1px solid var(--line)}
+.nt-del{margin-top:10px;color:var(--warn)!important}
 </style>
 </head>
 <body>
 <header class="top"><div class="top-in"><div class="top-row"><div class="cal" aria-hidden="true"><i id="calm"></i><b id="cald"></b></div><div class="tt"><h1>객실 통합 관리 시스템</h1><div class="sub" id="today">한화리조트 해운대</div></div><div class="ring" id="ring" hidden></div></div><div class="line" id="hline"></div></div></header>
 <main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
 <noscript><div class="card">이 화면은 자바스크립트가 켜져 있어야 해요.</div></noscript>
-<script type="module" src="hub.js?v=2026.11.18-5"></script>
+<script type="module" src="hub.js?v=2026.11.18-6"></script>
 <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); }); }</script>
 </body>
 </html>
