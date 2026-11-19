@@ -103,6 +103,11 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   await sleep(1600); await p.screenshot({ path: path.join(OUT, 'k5_반납블라인드.png') });
   await p.click('[data-gatepeek]'); await sleep(300);
   ok(await p.locator('#keygate').count() === 0 && await p.locator('[data-room="1201"]').isVisible(), '[아직 일이 남았어요] → 블라인드 걷히고 레포트 보임');
+  // 레포트로 돌아가 완료 취소 → 다시 완료하면 블라인드 다시 (30분 안 기다림)
+  await p.click('[data-room="1301"]'); await p.waitForSelector('.panel [data-act="undo"]'); await p.click('.panel [data-act="undo"]'); await sleep(300);
+  ok(await p.locator('#keygate').count() === 0, '완료 취소 → 남은 객실 있으면 블라인드 없음');
+  await p.click('[data-room="1301"]'); await p.waitForSelector('.panel .chk'); await p.click('.panel [data-act="allok"]');
+  await p.waitForSelector('#keygate .kgo', { timeout: 9000 }).then(() => ok(true, '다시 완료 → 약 5초 뒤 반납 블라인드 다시 뜸'), () => ok(false, '다시 완료 → 블라인드 다시'));
   await p.reload(); await p.waitForSelector('#keygate .kgo', { timeout: 8000 });
   ok(true, '앱을 다시 열면 블라인드 다시 뜸 (기다림 없이)');
   await p.click('[data-gatedone]'); await sleep(400);
