@@ -70,7 +70,7 @@ export function hrRows(staff, M, note, today) {
 // ---------- 근속 도래 (3단계, 2026-11-19): 입사일로부터 1 · 3 · 5 · 10년 되는 분 → 급여 인상 특이사항 (예전엔 손으로 적다 누락 · 미지급이 생김)
 //   입퇴사 시트 근속인상.gs 와 같은 규칙: 근속 도달일이 15일(기준일)까지면 그 달 인상, 16일부터면 다음 달 인상
 //   사람 = 직원 명단 staff + 연차 명단 leave_people(입사일 · 퇴사일, 룸메이드). 같은 이름이면 한 사람 (입사일은 더 이른 쪽)
-export const TENURE_YEARS = [1, 3, 5, 10], TENURE_CUT = 15;
+export const TENURE_YEARS = [1, 3, 5, 10], TENURE_CUT = 15, TENURE_JOBS = ['룸메이드'];   // 1·3·5·10년 구간 인상은 룸메이드만 (11/19 소장님)
 const nm = s => String(s == null ? '' : s).replace(/\s+/g, '');
 /** staff + leave_people → 근속 계산용 사람 목록 (staff 모양: id · name · job · hired · left · status) */
 export function tenPeople(staff, lp) {
@@ -78,7 +78,7 @@ export function tenPeople(staff, lp) {
   (lp || []).forEach(q => {
     if (!q || !q.name) return;
     const s2 = out.find(p => nm(p.name) === nm(q.name)), hire = /^\d{4}-\d{2}-\d{2}$/.test(q.hire || '') ? q.hire : '', quit = /^\d{4}-\d{2}-\d{2}$/.test(q.quit || '') ? q.quit : '';
-    if (s2) { if (hire && (!s2.hired || hire < s2.hired)) s2.hired = hire; if (quit && !s2.left) s2.left = quit; }
+    if (s2) { if (hire && (!s2.hired || hire < s2.hired)) s2.hired = hire; if (quit && !s2.left) s2.left = quit; if (!s2.job) s2.job = '룸메이드'; }
     else if (hire) out.push({ id: q.id, name: q.name, job: '룸메이드', hired: hire, left: quit, status: '' });
   });
   return out;
@@ -96,7 +96,7 @@ export function tenureDue(staff, M, done, cut) {
   const CUT = cut || TENURE_CUT;
   const out = [], from = ymAdd(M, -3), next = ymAdd(M, 1), has = id => !!(done && (done.has ? done.has(id) : done[id]));
   (staff || []).forEach(p => {
-    if (!p || !p.hired || p.status === '퇴사') return;
+    if (!p || !p.hired || p.status === '퇴사' || TENURE_JOBS.indexOf(p.job) < 0) return;
     TENURE_YEARS.forEach(n => {
       const day = annivOf(p.hired, n); if (!day) return;
       const late = +day.slice(8, 10) > CUT, ym = late ? ymAdd(day.slice(0, 7), 1) : day.slice(0, 7);   // ym = 인상 적용 월
@@ -177,7 +177,7 @@ export function setupClosing(c) {
     const ten = tenureDue(tenPeople(st.staff, st.lp), M, st.tenDone);
     if (ten.length) {
       const lab = { miss: '놓침', now: ymLabel(M), next: '다음 달' };
-      h += '<div class="cs-head"><h3>근속 도래 ' + ten.length + '명' + (ten.some(t => !t.added) ? ' · 남은 ' + ten.filter(t => !t.added).length : ' · 다 챙김') + '</h3></div><p class="note" style="margin:0 0 8px">입사일로부터 ' + TENURE_YEARS.join(' · ') + '년이 되는 분이에요. 도달일이 ' + TENURE_CUT + '일까지면 그 달, 넘으면 다음 달 인상이에요. 「특이사항에 넣기」를 누르면 임금인상 건으로 들어가요.</p><ul class="cs-list">' +
+      h += '<div class="cs-head"><h3>근속 도래 ' + ten.length + '명' + (ten.some(t => !t.added) ? ' · 남은 ' + ten.filter(t => !t.added).length : ' · 다 챙김') + '</h3></div><p class="note" style="margin:0 0 8px">' + TENURE_JOBS.join(' · ') + ' 중 입사일로부터 ' + TENURE_YEARS.join(' · ') + '년이 되는 분이에요. 도달일이 ' + TENURE_CUT + '일까지면 그 달, 넘으면 다음 달 인상이에요. 「특이사항에 넣기」를 누르면 임금인상 건으로 들어가요.</p><ul class="cs-list">' +
         ten.map(t => '<li class="cs-ten ' + t.when + (t.added ? ' added' : '') + '"><div><span class="cs-tag" style="--tc:' + (t.when === 'miss' ? '#B91C1C' : t.when === 'now' ? '#1D4ED8' : '#6B7280') + '">' + esc(lab[t.when]) + '</span><b>' + esc(t.name) + '</b> <small>' + esc(t.dept) + '</small>' +
           '<div class="cs-sub">근속 ' + t.n + '년 · ' + esc(md(t.day)) + ' 도달 → <b>' + esc(ymLabel(t.ym)) + ' 인상</b> (입사 ' + esc(t.hired) + ')</div></div>' +
           (t.added ? '<span class="cs-tdone' + (t.skip ? ' skip' : '') + '">' + (t.skip ? '안 함' : '넣음 ✓') + '</span>' : locked() && t.ym <= M ? '' : '<div class="cs-tbtn"><button class="ref" data-cs="tenadd" data-id="' + esc(t.id) + '">특이사항에 넣기</button><button class="ref" data-cs="tenskip" data-id="' + esc(t.id) + '">안 함</button></div>') + '</li>').join('') + '</ul>';
@@ -308,32 +308,61 @@ export function setupClosing(c) {
     const M = st.ym, rows = rowsFor(st.items || [], M), hr = hrRows(st.staff || [], M, note(), ymd());
     return { M, rows, hr, sm: summary(rows, hr), site: '한화리조트 해운대', made: ymd(), by: c.who() };
   }
+  // 엑셀 = PDF 와 같은 모양 한 장 (11/19 소장님: PDF 양식이 더 깔끔) — 14칸 격자: 제목 · 요약 5칸 · 유형 · 입퇴사 표 · 특이사항 표 · 합계 · 설명
   function xlsxOut() {
-    const P = pack(), W = c.xlsx;
-    const title = (t) => [{ v: t + '  ·  ' + P.M.replace('-', '년 ') + '월', s: 'title' }];
-    const sub = [{ v: P.site + ' 객실과  ·  작성 ' + P.made + (P.by ? ' ' + P.by : ''), s: 'sub' }];
-    // 1장 요약
-    const s1 = [title('결산마감 특이사항'), sub, [],
-      [{ v: '구분', s: 'head' }, { v: '값', s: 'head' }],
-      [{ v: '당월 입사', s: 'cell' }, { v: P.sm.hin, s: 'num' }], [{ v: '당월 퇴사', s: 'cell' }, { v: P.sm.hout, s: 'num' }], [{ v: '서류 미비', s: 'cell' }, { v: P.sm.dmiss, s: 'num' }],
-      [{ v: '특이사항', s: 'cell' }, { v: P.sm.n, s: 'num' }], [{ v: '미완료 (이월 포함)', s: 'cell' }, { v: P.sm.open, s: 'num' }],
-      [{ v: 'OT 합계 (시간)', s: 'cell' }, { v: P.sm.ot, s: 'num' }], [{ v: '특근 합계 (일)', s: 'cell' }, { v: P.sm.days, s: 'num' }], [{ v: '금액 합계 (원)', s: 'cell' }, { v: P.sm.amount, s: 'won' }],
-      [], [{ v: '유형', s: 'head' }, { v: '건수', s: 'head' }, { v: '금액 (원)', s: 'head' }]]
-      .concat(Object.keys(P.sm.byType).sort((a, b) => TYPES.indexOf(a) - TYPES.indexOf(b)).map(t => [{ v: t, s: 'cell' }, { v: P.sm.byType[t].n, s: 'num' }, { v: P.sm.byType[t].amount, s: 'won' }]));
-    // 2장 입퇴사
-    const H2 = ['순번', '부서', '성명', '구분', '입사일자', '근로여부', '마지막 근로일', '근로\n계약서', '입사\n지원서', '신분증\n사본', '통장\n사본', '서류 확인', '퇴사사유', '비고'];
-    const s2 = [title('입 / 퇴사자 현황'), sub, [], H2.map(v => ({ v, s: 'head' }))].concat(P.hr.length ? P.hr.map((p, i) => [{ v: i + 1, s: 'num' }, { v: p.dept, s: 'cell' }, { v: p.name, s: 'cellb' }, { v: p.isIn && p.isOut ? '입·퇴사' : p.isOut ? '퇴사' : '입사', s: p.isOut ? 'out' : 'in' },
-      { v: p.hired, s: 'cell' }, { v: p.state, s: 'cell' }, { v: p.left, s: 'cell' }].concat(DOCS.map(x => ({ v: p.docs ? docMark(p.docs[x[0]]) : '', s: 'num' })), [{ v: docCheck(p.docs), s: /^미비/.test(docCheck(p.docs)) ? 'carry' : docCheck(p.docs) === '완비' ? 'done' : 'num' }, { v: p.reason, s: 'wrap' }, { v: p.memo, s: 'wrap' }])) : [[{ v: '이 달 입사 · 퇴사자 없음', s: 'cell' }]]);
-    // 3장 특이사항
-    const H3 = ['번호', '부서', '대상자', '유형', '내용', 'OT', '특근', '금액 (원)', '적용 월', '조치', '비고'];
-    const s3 = [title('특 이 사 항'), sub, [], H3.map(v => ({ v, s: 'head' }))].concat(P.rows.length ? P.rows.map((r, i) => [{ v: i + 1, s: 'num' }, { v: r.it.dept, s: 'cell' }, { v: r.it.name, s: 'cellb' }, { v: r.it.type, s: 'cell' },
-      { v: r.it.text + (r.it.docs && r.it.docs.length ? '\n(동봉: ' + r.it.docs.join(', ') + ')' : ''), s: 'wrap' }, { v: r.it.ot || '', s: 'num' }, { v: r.it.days || '', s: 'num' }, { v: r.it.amount || '', s: 'won' },
-      { v: (r.carry ? ymLabel(r.ym) + ' 이월' : ymLabel(r.ym)) + (r.round ? ' · ' + r.round : ''), s: r.carry ? 'carry' : 'cell' }, { v: r.st, s: r.st === '완료' ? 'done' : 'cell' }, { v: r.it.memo || '', s: 'wrap' }]) : [[{ v: '이 달 특이사항 없음', s: 'cell' }]]);
-    const blob = W.book([
-      { name: '요약', rows: s1, cols: [22, 14, 16], merge: ['A1:C1', 'A2:C2'] },
-      { name: '입퇴사 현황', rows: s2, cols: [6, 13, 11, 8, 12, 10, 13, 7, 7, 7, 7, 22, 14, 28], merge: ['A1:N1', 'A2:N2'], freeze: 4 },
-      { name: '특이사항', rows: s3, cols: [6, 11, 12, 11, 52, 6, 6, 12, 14, 9, 22], merge: ['A1:K1', 'A2:K2'], freeze: 4 }
-    ]);
+    const P = pack(), W = c.xlsx, N = 14, rows = [], merge = [], heights = {};
+    const cw = [6, 12, 10, 9, 11, 9, 11, 7, 7, 7, 11, 16, 10, 24];
+    const L = i => W.col(i);
+    const put = (r, ci, v, sty) => { (rows[r] = rows[r] || [])[ci] = { v: v == null ? '' : v, s: sty }; };
+    const span = (r, a, b2, v, sty, all) => { put(r, a, v, sty); if (all) for (let i = a + 1; i <= b2; i++) put(r, i, '', sty); if (b2 > a) merge.push(L(a) + (r + 1) + ':' + L(b2) + (r + 1)); };
+    const box = (r1, r2, a, b2, sty) => { for (let r = r1; r <= r2; r++) for (let i = a; i <= b2; i++) if (!(rows[r] && rows[r][i])) put(r, i, '', sty); };
+    const wdt = t => [...String(t || '')].reduce((n, ch) => n + (/[ᄀ-ᇿ㄰-㆏가-힯一-鿿]/.test(ch) ? 1.75 : 1), 0);
+    const lines = (t, w) => String(t || '').split('\n').reduce((n, x) => n + Math.max(1, Math.ceil(wdt(x) / Math.max(4, w - 1))), 0);
+    const fit = (r, pairs) => { const n = Math.max(1, ...pairs.map(x => lines(x[0], x[1]))); if (n > 1) heights[r] = Math.min(409, n * 13.5 + 5); };
+    let r = 0;
+    span(r, 0, 9, '결산마감 특이사항  ' + P.M.replace('-', '년 ') + '월', 'title', true);
+    span(r, 10, 13, P.site + ' 객실과\n작성 ' + P.made + (P.by ? ' · ' + P.by : ''), 'subr'); for (let i = 11; i <= 13; i++) put(r, i, '', 'title');
+    heights[r] = 32; r += 2;
+    // 요약 5칸 (PDF 위쪽 상자)
+    const kpi = [['당월 입사', P.sm.hin + '명'], ['당월 퇴사', P.sm.hout + '명' + (P.sm.dmiss ? ' · 서류 미비 ' + P.sm.dmiss : '')], ['특이사항', P.sm.n + '건'], ['미완료', P.sm.open + '건' + (P.sm.carry ? ' (이월 ' + P.sm.carry + ')' : '')], ['금액 합계', P.sm.amount ? won(P.sm.amount) + '원' : '-']];
+    const kc = [[0, 2], [3, 5], [6, 8], [9, 11], [12, 13]];
+    kpi.forEach((k, i) => { span(r, kc[i][0], kc[i][1], k[0], 'kpil', true); span(r + 1, kc[i][0], kc[i][1], k[1], 'kpiv', true); });
+    heights[r] = 18; heights[r + 1] = 26; r += 2;
+    const types = Object.keys(P.sm.byType).sort((a2, b2) => TYPES.indexOf(a2) - TYPES.indexOf(b2));
+    if (types.length) { span(r, 0, N - 1, '유형별  ' + types.map(t => t + ' ' + P.sm.byType[t].n + '건' + (P.sm.byType[t].amount ? ' (' + won(P.sm.byType[t].amount) + '원)' : '')).join('   ·   '), 'sub'); r++; }
+    r++;
+    // 입퇴사
+    span(r, 0, N - 1, '입 / 퇴사자 현황 (' + P.hr.length + '명)', 'sec'); heights[r] = 22; r++;
+    ['순번', '부서', '성명', '구분', '입사일자', '근로여부', '마지막\n근로일', '근로\n계약서', '입사\n지원서', '신분증\n사본', '통장\n사본', '서류 확인', '퇴사사유', '비고'].forEach((h, i) => put(r, i, h, 'head')); heights[r] = 28; r++;
+    if (P.hr.length) P.hr.forEach((p, i) => {
+      [[i + 1, 'num'], [p.dept, 'cell'], [p.name, 'cellb'], [p.isIn && p.isOut ? '입·퇴사' : p.isOut ? '퇴사' : '입사', p.isOut ? 'out' : 'in'], [p.hired, 'num'], [p.state, 'num'], [p.left, 'num']]
+        .concat(DOCS.map(x => [p.docs ? docMark(p.docs[x[0]]) : '', 'num']), [[docCheck(p.docs), /^미비/.test(docCheck(p.docs)) ? 'carry' : docCheck(p.docs) === '완비' ? 'done' : 'num'], [p.reason, 'wrap'], [p.memo, 'wrap']])
+        .forEach((x, ci) => put(r, ci, x[0], x[1]));
+      fit(r, [[docCheck(p.docs), cw[11]], [p.reason, cw[12]], [p.memo, cw[13]]]); r++;
+    });
+    else { span(r, 0, N - 1, '이 달 입사 · 퇴사자 없음', 'num', true); r++; }
+    r++;
+    // 특이사항 (내용 = E~H 네 칸 합침)
+    span(r, 0, N - 1, '특이사항 (' + P.rows.length + '건)', 'sec'); heights[r] = 22; r++;
+    [[0, '번호'], [1, '부서'], [2, '대상자'], [3, '유형'], [4, '내용'], [8, 'OT'], [9, '특근'], [10, '금액 (원)'], [11, '적용 월'], [12, '조치'], [13, '비고']].forEach(x => put(r, x[0], x[1], 'head'));
+    for (let i = 5; i <= 7; i++) put(r, i, '', 'head'); merge.push('E' + (r + 1) + ':H' + (r + 1)); heights[r] = 22; r++;
+    const textW = cw[4] + cw[5] + cw[6] + cw[7];
+    if (P.rows.length) P.rows.forEach((x, i) => {
+      const txt = x.it.text + (x.it.docs && x.it.docs.length ? '\n(동봉: ' + x.it.docs.join(', ') + ')' : ''), when = (x.carry ? ymLabel(x.ym) + ' 이월' : ymLabel(x.ym)) + (x.round ? ' · ' + x.round : '');
+      put(r, 0, i + 1, 'num'); put(r, 1, x.it.dept, 'cell'); put(r, 2, x.it.name, 'cellb'); put(r, 3, x.it.type, 'cellb');
+      span(r, 4, 7, txt, 'wrap', true);
+      put(r, 8, x.it.ot || '', 'num'); put(r, 9, x.it.days || '', 'num'); put(r, 10, x.it.amount || '', 'won');
+      put(r, 11, when, x.carry ? 'carry' : 'num'); put(r, 12, x.st, x.st === '완료' ? 'done' : 'num'); put(r, 13, x.it.memo || '', 'wrap');
+      fit(r, [[txt, textW], [x.it.name, cw[2]], [when, cw[11]], [x.it.memo, cw[13]]]); r++;
+    });
+    else { span(r, 0, N - 1, '이 달 특이사항 없음', 'num', true); r++; }
+    if (P.sm.amount || P.sm.ot || P.sm.days) {
+      span(r, 0, 7, '합계', 'tot', true); put(r, 8, P.sm.ot || '', 'tot'); put(r, 9, P.sm.days || '', 'tot'); put(r, 10, P.sm.amount || '', 'tot'); for (let i = 11; i <= 13; i++) put(r, i, '', 'tot'); r++;
+    }
+    r++;
+    span(r, 0, N - 1, '이월 = 지난달까지 완료되지 않아 이번 달에 다시 올린 건 · 회차 = 나눠서 지급하는 건의 이번 순서 · 서류 - = 해당 없음(하도급 일용)', 'foot');
+    box(0, 0, 0, N - 1, 'title');
+    const blob = W.book([{ name: '결산마감 특이사항', rows, cols: cw, merge, heights }]);
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = P.M.slice(2, 4) + '년 ' + +P.M.slice(5, 7) + '월 해운대 결산마감 특이사항.xlsx';
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
   }

@@ -270,9 +270,10 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.evaluate(([a, b2, c2, d2, e2]) => { const S = window.__seed;
     S['staff/t1'] = { name: '근속가', job: '룸메이드', status: '재직', hired: a };      // 이번 달 1년
     S['staff/t2'] = { name: '근속나', job: '룸메이드', status: '재직', hired: b2 };     // 다음 달 10년
-    S['staff/t3'] = { name: '근속다', job: '미화', status: '재직', hired: c2 };         // 두 달 전 1년 → 놓침
-    S['staff/t4'] = { name: '근속라', job: '미화', status: '퇴사', hired: a };          // 퇴사 → 안 나옴
-    S['staff/t5'] = { name: '근속마', job: '미화', status: '재직', hired: d2 };         // 지난달 20일 3년 → 15일 넘어 이번 달 인상
+    S['staff/t3'] = { name: '근속다', job: '룸메이드', status: '재직', hired: c2 };         // 두 달 전 1년 → 놓침
+    S['staff/t4'] = { name: '근속라', job: '룸메이드', status: '퇴사', hired: a };          // 퇴사 → 안 나옴
+    S['staff/t6'] = { name: '근속바', job: '미화', status: '재직', hired: a };          // 룸메이드 아님 → 안 나옴
+    S['staff/t5'] = { name: '근속마', job: '룸메이드', status: '재직', hired: d2 };         // 지난달 20일 3년 → 15일 넘어 이번 달 인상
     S['leave_people/pA'] = { name: '연차가', hire: e2, quit: '' };                      // 연차 명단에만 → 이번 달 5년
     S['leave_people/pB'] = { name: '근속 가', hire: a, quit: '' }; },                    // 직원 명단과 같은 사람 → 한 번만
     [(+DAY.slice(0, 4) - 1) + DAY.slice(4, 8) + '05', (+ymOf(1).slice(0, 4) - 10) + ymOf(1).slice(4) + '-03', (+ymOf(-2).slice(0, 4) - 1) + ymOf(-2).slice(4) + '-10', (+ymOf(-1).slice(0, 4) - 3) + ymOf(-1).slice(4) + '-20', (+DAY.slice(0, 4) - 5) + DAY.slice(4, 8) + '01']);
@@ -310,11 +311,13 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   const xf2 = path.join(OUT, 'test_결산특이사항.xlsx'); await dl2.saveAs(xf2);
   let wb = ''; try { wb = require('child_process').execFileSync('python3', ['-c', 'import openpyxl,sys,json;wb=openpyxl.load_workbook(sys.argv[1]);print(json.dumps({ws.title:[[c for c in r] for r in ws.iter_rows(values_only=True)] for ws in wb},ensure_ascii=False,default=str))', xf2]).toString(); } catch (e) { wb = 'ERR ' + e.message; }
   const WB = /^\{/.test(wb) ? JSON.parse(wb) : {};
-  ok(Object.keys(WB).join(',') === '요약,입퇴사 현황,특이사항', '엑셀 3장: ' + Object.keys(WB).join(',') + (/^ERR/.test(wb) ? wb.slice(0, 200) : ''));
-  const sp = WB['특이사항'] || [], body = sp.slice(4);
-  ok(body.length === 3 && body.some(r => r[3] === '소개비' && /2\/3회차/.test(r[8])) && body.some(r => /이월/.test(r[8])), '특이사항 장: 3줄 · 회차 · 이월');
-  ok((WB['요약'] || []).some(r => r[0] === '금액 합계 (원)' && r[1] === 300000), '요약: 금액 합계 300,000 (매월 10만 + 소개비 1/3·2/3 20만, 완료된 경조는 빠짐) ' + JSON.stringify((WB['요약'] || []).find(r => r[0] === '금액 합계 (원)')) + ')');
-  ok((WB['입퇴사 현황'] || []).some(r => r[2] === '이예시' && r[13] === '경력수당 적용' && r[7] === '○' && r[8] === '-' && r[11] === '완비'), '입퇴사 장: 자동 + 서류 4칸(지원서 해당 없음 -) + 서류 확인 + 비고');
+  ok(Object.keys(WB).join(',') === '결산마감 특이사항', '엑셀 한 장 (PDF 와 같은 모양): ' + Object.keys(WB).join(',') + (/^ERR/.test(wb) ? wb.slice(0, 200) : ''));
+  const G2 = WB['결산마감 특이사항'] || [], iH = G2.findIndex(r => /^입 \/ 퇴사자 현황/.test(r[0] || '')), iS = G2.findIndex(r => /^특이사항 \(/.test(r[0] || ''));
+  ok(/결산마감 특이사항/.test(G2[0] && G2[0][0]) && G2.some(r => r[0] === '당월 입사') && iH > 0 && iS > iH, '제목 · 요약 5칸 · 입퇴사 · 특이사항 순서');
+  const sp = G2.slice(iS + 2).filter(r => typeof r[0] === 'number');
+  ok(sp.length === 3 && sp.some(r => r[3] === '소개비' && /2\/3회차/.test(r[11])) && sp.some(r => /이월/.test(r[11])), '특이사항: 3줄 · 회차 · 이월');
+  ok(G2.some(r => r[0] === '합계' && r[10] === 300000), '합계 줄: 금액 300,000 (완료된 경조는 빠짐) ' + JSON.stringify(G2.find(r => r[0] === '합계')));
+  ok(G2.slice(iH, iS).some(r => r[2] === '이예시' && r[13] === '경력수당 적용' && r[7] === '○' && r[8] === '-' && r[11] === '완비'), '입퇴사: 자동 + 서류 4칸(지원서 해당 없음 -) + 서류 확인 + 비고');
   const [pop] = await Promise.all([p.context().waitForEvent('page'), p.click('[data-cs="pdf"]')]);
   await pop.waitForLoadState(); await pop.setViewportSize({ width: 1123, height: 794 }); await sleep(400);
   ok(/결산마감 특이사항/.test(await pop.innerText('body')) && /입 \/ 퇴사자 현황/.test(await pop.innerText('body')), 'PDF 화면: 제목 · 입퇴사 · 특이사항');
@@ -323,7 +326,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await pop.close();
   console.log('⑤-4 근속 도래');
   let tt = await p.innerText('main');
-  ok(/근속 도래 5명 · 남은 5/.test(tt) && /근속가/.test(tt) && /근속나/.test(tt) && /근속다/.test(tt) && /근속마/.test(tt) && /연차가/.test(tt) && !/근속라/.test(tt) && (tt.match(/근속가/g) || []).length === 1, '근속 도래: 이번 달 1년 · 다음 달 10년 · 놓친 1년 · 20일 도달 3년(이번 달) · 연차 명단 5년 (퇴사자 빼고, 같은 사람 한 번) ' + ((tt.match(/근속 도래 \d+명/) || [''])[0]));
+  ok(/근속 도래 5명 · 남은 5/.test(tt) && /근속가/.test(tt) && /근속나/.test(tt) && /근속다/.test(tt) && /근속마/.test(tt) && /연차가/.test(tt) && !/근속라/.test(tt) && !/근속바/.test(tt) && (tt.match(/근속가/g) || []).length === 1, '근속 도래: 이번 달 1년 · 다음 달 10년 · 놓친 1년 · 20일 도달 3년(이번 달) · 연차 명단 5년 (퇴사자 빼고, 같은 사람 한 번) ' + ((tt.match(/근속 도래 \d+명/) || [''])[0]));
   ok(/놓침/.test(tt) && /다음 달/.test(tt) && /근속 10년/.test(tt) && /근속 3년 · \d+\/20 도달 → \d+월 인상/.test(tt) && /근속 5년/.test(tt), '표시: 놓침 · 다음 달 · 15일 넘으면 다음 달 인상');
   await p.click('[data-cs="tenadd"][data-id="ten-t1-1"]'); await sleep(400);
   const ti = await p.evaluate(() => window.__seed['close_items/ten-t1-1']);

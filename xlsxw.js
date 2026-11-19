@@ -1,7 +1,8 @@
 // 엑셀(.xlsx) 만들기 (2026-11-19) — 결산 문서용 작은 도구. 압축 없이 묶음 (엑셀 · 구글 시트 · 한셀 모두 열림)
 // book([{ name, rows: [[{v, s}]], cols: [폭…], merge: ['A1:C1'], freeze: 머리줄 행 번호 }]) → Blob
-// s(모양) = title · sub · head · cell · cellb · num · won · wrap · in · out · carry · done
-const ST = ['', 'title', 'sub', 'head', 'cell', 'cellb', 'num', 'won', 'wrap', 'in', 'out', 'carry', 'done'];
+// s(모양) = title · sub · head · cell · cellb · num · won · wrap · in · out · carry · done · kpil · kpiv · sec · subr · foot · tot
+// heights: { 행번호(0부터): 높이 } — 합친 칸은 엑셀이 높이를 저절로 못 맞춰서 직접 줌
+const ST = ['', 'title', 'sub', 'head', 'cell', 'cellb', 'num', 'won', 'wrap', 'in', 'out', 'carry', 'done', 'kpil', 'kpiv', 'sec', 'subr', 'foot', 'tot'];
 let CRC = null;
 function crc32(u8) {
   if (!CRC) { CRC = new Uint32Array(256); for (let n = 0; n < 256; n++) { let x = n; for (let k = 0; k < 8; k++) x = x & 1 ? 0xEDB88320 ^ (x >>> 1) : x >>> 1; CRC[n] = x >>> 0; } }
@@ -28,24 +29,32 @@ export function col(i) { let s = ''; i++; while (i) { const m = (i - 1) % 26; s 
 const FONT = 'Malgun Gothic';
 const STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
   '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>' +
-  '<fonts count="7"><font><sz val="10"/><name val="' + FONT + '"/></font><font><b/><sz val="16"/><color rgb="FF0E1E36"/><name val="' + FONT + '"/></font><font><sz val="9"/><color rgb="FF6B7280"/><name val="' + FONT + '"/></font>' +
-  '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="' + FONT + '"/></font><font><b/><sz val="10"/><name val="' + FONT + '"/></font><font><b/><sz val="10"/><color rgb="FFB91C1C"/><name val="' + FONT + '"/></font><font><b/><sz val="10"/><color rgb="FF047857"/><name val="' + FONT + '"/></font></fonts>' +
-  '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0E1E36"/></patternFill></fill></fills>' +
-  '<borders count="3"><border/><border><bottom style="thin"><color rgb="FFD6DCE5"/></bottom></border><border><bottom style="medium"><color rgb="FF0E1E36"/></bottom></border></borders>' +
-  '<cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="13">' +
+  '<fonts count="11"><font><sz val="10"/><name val="' + FONT + '"/></font><font><b/><sz val="16"/><color rgb="FF0E1E36"/><name val="' + FONT + '"/></font><font><sz val="9"/><color rgb="FF6B7280"/><name val="' + FONT + '"/></font>' +
+  '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="' + FONT + '"/></font><font><b/><sz val="10"/><name val="' + FONT + '"/></font><font><b/><sz val="10"/><color rgb="FFB91C1C"/><name val="' + FONT + '"/></font><font><b/><sz val="10"/><color rgb="FF047857"/><name val="' + FONT + '"/></font>' +
+  '<font><sz val="9"/><color rgb="FF4B5563"/><name val="' + FONT + '"/></font><font><b/><sz val="14"/><color rgb="FF111827"/><name val="' + FONT + '"/></font><font><b/><sz val="12"/><color rgb="FF0E1E36"/><name val="' + FONT + '"/></font><font><sz val="8.5"/><color rgb="FF6B7280"/><name val="' + FONT + '"/></font></fonts>' +
+  '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0E1E36"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F9FC"/></patternFill></fill></fills>' +
+  '<borders count="5"><border/><border><bottom style="thin"><color rgb="FFD6DCE5"/></bottom></border><border><bottom style="medium"><color rgb="FF0E1E36"/></bottom></border>' +
+  '<border><left style="thick"><color rgb="FF0E1E36"/></left></border><border><left style="thin"><color rgb="FFD6DCE5"/></left><right style="thin"><color rgb="FFD6DCE5"/></right><top style="thin"><color rgb="FFD6DCE5"/></top><bottom style="thin"><color rgb="FFD6DCE5"/></bottom></border></borders>' +
+  '<cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="19">' +
   '<xf/>' +
   '<xf fontId="1" borderId="2" applyFont="1" applyBorder="1"/>' +                                                                     // title
   '<xf fontId="2" applyFont="1"/>' +                                                                                                  // sub
   '<xf fontId="3" fillId="2" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' + // head
   '<xf borderId="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>' +                                             // cell
   '<xf fontId="4" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>' +                    // cellb
-  '<xf borderId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>' +                          // num
+  '<xf borderId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top" wrapText="1"/></xf>' +          // num
   '<xf numFmtId="164" borderId="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>' +        // won
   '<xf borderId="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>' +                                // wrap
   '<xf fontId="6" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>' + // in
   '<xf fontId="5" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>' + // out
   '<xf fontId="5" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>' +       // carry
   '<xf fontId="6" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>' + // done
+  '<xf fontId="7" fillId="3" borderId="4" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="bottom" indent="1"/></xf>' +   // kpil
+  '<xf fontId="8" fillId="3" borderId="4" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>' +   // kpiv
+  '<xf fontId="9" borderId="3" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>' +                        // sec
+  '<xf fontId="2" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom" wrapText="1"/></xf>' +                             // subr
+  '<xf fontId="10" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>' +                                                   // foot
+  '<xf fontId="4" numFmtId="164" borderId="2" applyFont="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf>' + // tot
   '</cellXfs></styleSheet>';
 function sheetXml(sh) {
   const rows = sh.rows.map((row, ri) => {
@@ -56,7 +65,8 @@ function sheetXml(sh) {
       if (typeof v === 'number' && isFinite(v)) return '<c r="' + ref + '"' + sa + '><v>' + v + '</v></c>';
       return '<c r="' + ref + '"' + sa + ' t="inlineStr"><is><t xml:space="preserve">' + x(v) + '</t></is></c>';
     }).join('');
-    const ht = ri === 0 ? ' ht="26" customHeight="1"' : (row || []).some(c => c && c.s === 'head') ? ' ht="22" customHeight="1"' : '';
+    const hv = sh.heights && sh.heights[ri];
+    const ht = hv ? ' ht="' + hv + '" customHeight="1"' : ri === 0 ? ' ht="26" customHeight="1"' : (row || []).some(c => c && c.s === 'head') ? ' ht="22" customHeight="1"' : '';
     return '<row r="' + (ri + 1) + '"' + ht + '>' + cells + '</row>';
   }).join('');
   const cols = sh.cols ? '<cols>' + sh.cols.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>').join('') + '</cols>' : '';
