@@ -21,13 +21,13 @@
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 import * as K from '../rm/app/keys.js';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.19-12';
-import * as PIN from './pin.js?v=2026.11.19-12';
-import { setupClose } from './close.js?v=2026.11.19-12';
-import { setupClosing } from './closing.js?v=2026.11.19-12';
-import * as XW from './xlsxw.js?v=2026.11.19-12';
+import { setupNotice } from './notice.js?v=2026.11.19-13';
+import * as PIN from './pin.js?v=2026.11.19-13';
+import { setupClose } from './close.js?v=2026.11.19-13';
+import { setupClosing } from './closing.js?v=2026.11.19-13';
+import * as XW from './xlsxw.js?v=2026.11.19-13';
 
-const VER = '2026.11.19-12';
+const VER = '2026.11.19-13';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -38,8 +38,10 @@ const ADMINS = [
 ];
 const ROYAL = { '3001': 1, '3002': 1, '3101': 1, '3102': 1 };   // 로얄 = 2실 (레포트 앱과 같음)
 const JOBS = ['관리', '룸메이드', '정비보조', '하우스키퍼', '하우스맨', '오더테이커', '미화', '사우나', '기타'];
+// 🧹 이모지는 윈도우에서 솔 끝이 잘린 것처럼 보여서 직접 그린 빗자루 (11/19)
+const BROOM = '<svg class="svgic" viewBox="0 0 60 60" width="1.1em" height="1.1em" aria-hidden="true" style="vertical-align:-.12em;overflow:visible"><g transform="translate(3 -3) rotate(40 32 34)"><rect x="29" y="0" width="6" height="32" rx="3" fill="#9a5b2e"/><path d="M22 36 L42 36 L54 61 Q32 67 10 61 Z" fill="#f4b93a"/><path d="M26.5 40 L18 60 M32 40 L32 63 M37.5 40 L46 60" stroke="#d8941c" stroke-width="2" stroke-linecap="round"/><path d="M17.6 46.5 Q32 50 46.4 46.5" stroke="#d9502f" stroke-width="3.4" fill="none"/><rect x="21" y="29.5" width="22" height="8" rx="3.5" fill="#d9502f"/></g></svg>';
 const LINKS = [
-  { ic: '🧹', t: '정비 레포트', s: '메이드별 현황 · 룸메이드 명단 · 메이드 화면', href: '../rm/' },
+  { ic: BROOM, t: '정비 레포트', s: '메이드별 현황 · 룸메이드 명단 · 메이드 화면', href: '../rm/' },
   { ic: '🛏', t: '정비 지원', s: '정비보조 명단 · 정비보조 화면', href: '../dirty/' },
   { ic: '🧾', t: '입퇴사 서류', s: '근로계약서 · 입사서류 · 사직서 (별도 비밀번호 · 새 창)', href: '../unies-contract/', tab: 1 },
   { ic: '📋', t: '연차 관리', s: '룸메이드 연차 · 휴가신청서 승인 · 내 근무 휴대폰 승인', href: './leave/' },
@@ -618,7 +620,7 @@ let CL = null, CLG = null;   // CLG = 결산마감 특이사항 (closing.js · 2
 // ---------- 첫 화면 · 안쪽 화면 (2026-11-18-4)
 // 주소 끝 # 로 어느 화면인지 나눔: '' 첫 화면 · #work(/now|up|dirty) · #quality · #people · #assign · #apps
 const SECS = {
-  work: { ic: '🧹', t: '오늘 정비', tabs: [['now', '상황'], ['up', '보고서 올리기'], ['dirty', '더티 · 활동'], ['asg', '자동 배정']] },
+  work: { ic: BROOM, t: '오늘 정비', tabs: [['now', '상황'], ['up', '보고서 올리기'], ['dirty', '더티 · 활동'], ['asg', '자동 배정']] },
   quality: { ic: '🔍', t: '품질 관리' },
   people: { ic: '👥', t: '인사' },
   field: { ic: '📱', t: '현장 관리' },
@@ -626,7 +628,7 @@ const SECS = {
   apps: { ic: '🔗', t: '현장 앱 열기' }
 };
 const TILES = [
-  { go: 'work', ic: '🧹', t: '오늘 정비', s: '메이드별 현황 · 보고서 올리기 · 더티 배분 · 활동판 · 자동 배정' },
+  { go: 'work', ic: BROOM, t: '오늘 정비', s: '메이드별 현황 · 보고서 올리기 · 더티 배분 · 활동판 · 자동 배정' },
   { go: 'quality', ic: '🔍', t: '품질 관리', s: '인스펙션 · 고객만족도 VOC' },
   { href: './leave/', ic: '📋', t: '연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
