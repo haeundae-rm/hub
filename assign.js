@@ -31,10 +31,12 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   const B_SUF = ['10', '11', '15', '16', '17'];
   const tick = opts.onProgress || (() => {});
 
+  // 취사형(FOR) = 5~22·25·26층 12호 이상 (assignui typeOf 와 같음)
+  const isCook = r => { const n = Number(r), f = Math.floor(n / 100), q = n % 100; return ((f >= 5 && f <= 22) || f === 25 || f === 26) && q >= 12; };
   const isTarget = x => (['1', '2', '3', '4'].includes(String(x.st == null ? '' : x.st).trim()) || /간단/.test(String(x.st == null ? '' : x.st))) && !/미정비/.test((x.m1 || '') + (x.m2 || ''));
   const T = rooms.filter(isTarget).map(x => Object.assign({}, x, { room: String(x.room), floor: Number(x.floor) || Math.floor(Number(x.room) / 100), suf: String(x.room).slice(-2),
     theme: !!x.theme, late: !!x.theme || /14시|VIP|르씨엘/i.test((x.m1 || '') + (x.m2 || '')), w: ROYAL.includes(String(x.room)) ? 2 : /간단/.test(String(x.st)) ? 0.5 : 1,
-    vip: /VIP|르씨엘/i.test((x.m1 || '') + (x.m2 || '')), grp: x.grp ? (Number(x.gh) > 0 ? Number(x.gh) : 17) : 0 }));
+    vip: /VIP|르씨엘/i.test((x.m1 || '') + (x.m2 || '')), cook: isCook(x.room), grp: x.grp ? (Number(x.gh) > 0 ? Number(x.gh) : 17) : 0 }));
   const TX = Object.fromEntries(T.map(x => [x.room, x]));
   const W = {}; Object.keys(HO).forEach(n => { W[n] = { cap: HO[n], load: 0, rooms: [], why: [] }; });
   // 11/15 특화 벽배딩 (23·24F 01~06): 노동 강도 때문에 그 층 A키 6 : B키 4 정도로 나눔 — 번호 뒤쪽 40% 를 B키 구역으로 봄 (B키가 출근했을 때만)
@@ -64,6 +66,8 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   //   신입(입사 3개월 미만 = opts.vipNo, 정량 8 미만 신입 포함)은 VIP 가급적 안 줌 — VIP 1실마다 VIP_NEW 벌점 (11/14 사용자)
   const VIP_NO = new Set([...(opts.vipNo || []), ...STAGE]), VIP_NEW = opts.vipNew != null ? opts.vipNew : 120;
   const KEEP_PRI = opts.keepPri != null ? opts.keepPri : 10;
+  const KEY_B = opts.keyB != null ? opts.keyB : 25, KEY_COVER = opts.keyCover != null ? opts.keyCover : 12;
+  const FOR_ON = opts.cookSpread !== false, FOR_MAX = opts.cookMax != null ? opts.cookMax : 3, FOR_PEN = opts.cookPen != null ? opts.cookPen : 15;
   const ROY_ON = opts.royPri !== false, ROY_PRI = opts.royPriPen != null ? opts.royPriPen : 40;
   const vipN = n => W[n].rooms.filter(r => TX[r] && TX[r].vip).length;
   const grpOf = n => { let t = 0, g = 0, h = 99; W[n].rooms.forEach(r => { const x = TX[r]; if (!x || r === '2901') return; t++; if (x.grp) { g++; h = Math.min(h, x.grp); } }); return { t, g, h }; };
@@ -95,7 +99,8 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   //   opts.bMoveMode = 'strict' 면 11/8 처음 조건(A키가 다 받고 남는 유닛 1 이하일 때만)
   const OVR = {}, OVR_WHY = {}, bMoves = [], MOVED = new Set(), FROM_B = {};
   const BM_MAX = opts.bMoveMax != null ? opts.bMoveMax : 3, BM_STRICT = opts.bMoveMode === 'strict', BM_SHARE = opts.bShare != null ? opts.bShare : 0.5, BM_MIN_BLOCK = opts.bMoveMin != null ? opts.bMoveMin : 4;
-  if (V2 && opts.bMove !== false) {
+  // 11/19 하우스맨 의견(11/18 배정): '층 B키 메이드 우선 배정' · '특화 객실은 A·B키 우선' → B키 옮기기는 기본 끔 (opts.bMove === true 일 때만)
+  if (V2 && opts.bMove === true) {
     const orphan = () => { const m = {}; free().forEach(x => { if (MOVED.has(x.room) || W[A_KEY[x.floor]] || W[B_KEY[x.floor]]) return; (m[x.floor] = m[x.floor] || []).push(x); }); return m; };
     const bNames = [...new Set(Object.values(B_KEY))].filter(n => W[n] && W[n].load === 0 && !(opts.noBMove || []).includes(n));
     const cands = bNames.map(b => { const fs = Object.keys(B_KEY).map(Number).filter(f => B_KEY[f] === b);
@@ -209,8 +214,13 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
     if (over > 1e-9) c += 500 * over;
     if (def > 1e-9) c += 200 * def;
     if (STAGE.includes(n)) c += w.rooms.filter(stageBad).length * 30;
-    for (const r of w.rooms) { const x = TX[r]; if (!x || r === '2901') continue; const ko = keyOf(x); if (ko && ko !== n && ko !== MATE[n]) { const real = (zone(x) === 'A' ? A_KEY : B_KEY)[x.floor] === ko; c += !real ? 1 : zone(x) === 'A' ? 25 : 12;
-        if (real && x.late) c += KEEP_PRI; } }   // 11/15 담당이 출근했으면 그 층 우선정비·테마(FAW 1707·1708 등)는 담당이 갖고, 남는 일반 방을 남이 받음
+    for (const r of w.rooms) { const x = TX[r]; if (!x || r === '2901') continue; const ko = keyOf(x); if (ko && ko !== n && ko !== MATE[n]) {
+        // 11/19: B키도 A키처럼 자기 구역 우선(12→KEY_B) · A키가 없으면 그 층 B키가 A구역도 담당(테마·우선정비 포함, 11/18 의견 3번)
+        const real = (zone(x) === 'A' ? A_KEY : B_KEY)[x.floor] === ko, cover = !real && zone(x) === 'A' && !W[A_KEY[x.floor]] && B_KEY[x.floor] === ko;
+        c += real ? (zone(x) === 'A' ? 25 : KEY_B) : cover ? KEY_COVER : 1;
+        if ((real || cover) && x.late) c += KEEP_PRI * (cover ? 2 : 1); } }
+    // 11/19 취사(FOR) 분산 (11/18 의견 4번): 담당 아닌 취사 객실은 한 분 FOR_MAX 실까지, 넘으면 1실마다 FOR_PEN
+    if (FOR_ON) { const k = w.rooms.filter(r => { const x = TX[r]; if (!x || !x.cook) return false; const ko = keyOf(x); return ko !== n && !(ko && ko === MATE[n]); }).length; if (k > FOR_MAX) c += (k - FOR_MAX) * FOR_PEN; }   // 11/15 담당이 출근했으면 그 층 우선정비·테마(FAW 1707·1708 등)는 담당이 갖고, 남는 일반 방을 남이 받음
     if (opts.chunk !== false) { const byF = {}; w.rooms.forEach(r => { const x = TX[r]; if (!x || r === '2901') return; const ko = keyOf(x); if (ko === n || (ko && ko === MATE[n])) return; byF[x.floor] = (byF[x.floor] || 0) + 1; });
       Object.values(byF).forEach(s => { c += s <= 2 ? 10 : s <= 4 ? 4 : 0; }); }
     c += w.rooms.filter(r => FROM_B[r] === n).length * 12;
