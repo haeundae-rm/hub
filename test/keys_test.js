@@ -94,22 +94,26 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   await p.click('[data-room="1301"]'); await p.waitForSelector('.panel .chk'); await p.click('.panel [data-act="allok"]');
   await p.waitForSelector('.fincard'); await sleep(300);
   await p.click('.fincard'); await sleep(400);
-  const ret = await p.textContent('#sheet');
-  ok(/12층 B키 챙겨서 사무실에 반납/.test(ret) && !/13층/.test(ret), '마지막 객실 완료 → 받은 키만 반납 안내 (안 가져간 13층은 빠짐)');
-  ok(/유실물/.test(ret), '고객 유실물 반납 줄도 같이');
-  await p.screenshot({ path: path.join(OUT, 'k5_반납안내.png') });
-  await p.click('[data-kret]'); await sleep(200);
-  ok(await p.locator('.sum .keyret').count() === 1, '확인 누르면 닫히고, 요약 칸에 반납 안내가 남음');
-  // [반납했어요] (선택): 정비 끝나면 받은 키 칸이 버튼으로 → 누르면 반납 표시, 다시 누르면 취소
-  ok(await p.locator('.kchip.ret[data-keyret="12"]').count() === 1 && await p.locator('[data-keyret="13"]').count() === 0, '정비 끝 → 받은 키(12층)만 [반납했어요] 버튼, 안 가져간 13층은 없음');
-  await p.click('[data-keyret="12"]'); await sleep(300);
-  ok(/✔ 반납/.test(await p.textContent('[data-keyret="12"]')), '누르면 「✔ 반납 시각」');
+  ok(await p.locator('#keygate').count() === 0, '완료 직후엔 블라인드 아직 안 뜸 (10초 기다림)');
+  await p.waitForSelector('#keygate .kgo', { timeout: 15000 });
+  const ret = await p.textContent('#keygate');
+  ok(/12층 B키/.test(ret) && !/13층/.test(ret), '10초 뒤 반납 블라인드: 받은 키(12층 B키)만, 안 가져간 13층은 빠짐');
+  ok(/유실물/.test(ret), '고객 유실물 안내도 같이');
+  ok(await p.evaluate(() => document.body.classList.contains('gated')), '뒤 레포트는 흐리게 가려짐');
+  await p.screenshot({ path: path.join(OUT, 'k5_반납블라인드.png') });
+  await p.click('[data-gatepeek]'); await sleep(300);
+  ok(await p.locator('#keygate').count() === 0 && await p.locator('[data-room="1201"]').isVisible(), '[아직 일이 남았어요] → 블라인드 걷히고 레포트 보임');
+  await p.reload(); await p.waitForSelector('#keygate .kgo', { timeout: 8000 });
+  ok(true, '앱을 다시 열면 블라인드 다시 뜸 (10초 기다림 없이)');
+  await p.click('[data-gatedone]'); await sleep(400);
   let rt = await p.evaluate(d => Object.keys(window.__seed).filter(k => k.startsWith('days/' + d + '/keyret/')).map(k => window.__seed[k]), DAY);
-  ok(rt.length === 1 && rt[0].on === true && rt[0].maid === '김하나' && rt[0].floor === 12, '반납 표시 줄 저장 (keyret)');
-  await p.screenshot({ path: path.join(OUT, 'k5b_반납했어요.png') });
-  await p.click('[data-keyret="12"]'); await sleep(300);
+  ok(rt.length === 1 && rt[0].on === true && rt[0].maid === '김하나' && rt[0].floor === 12, '[키 반납 완료] → 반납 표시 줄 저장 (keyret)');
+  ok(await p.locator('#keygate').count() === 0 && !(await p.evaluate(() => document.body.classList.contains('gated'))), '블라인드 사라지고 레포트 다시 보임');
+  ok(/✔ 반납/.test(await p.textContent('[data-keyret="12"]')), '한 줄 띠에 「12층 B키 ✔ 반납 시각」');
+  await p.screenshot({ path: path.join(OUT, 'k5b_반납완료.png') });
+  await p.click('[data-keyret="12"]'); await sleep(400);
   rt = await p.evaluate(d => Object.keys(window.__seed).filter(k => k.startsWith('days/' + d + '/keyret/')).map(k => window.__seed[k]), DAY);
-  ok(rt.length === 2 && !/✔/.test(await p.textContent('[data-keyret="12"]')), '다시 누르면 취소 (줄은 쌓임)');
+  ok(rt.length === 2 && await p.locator('#keygate').count() === 1, '띠의 반납 칸을 다시 누르면 취소 (줄은 쌓임) → 블라인드 다시');
   ok(!p.errs.length, '오류 없음 ' + p.errs.join(' | '));
   await p.context().close();
 
@@ -135,6 +139,24 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
     ok(!n && await p.locator('.panel .chk').count() === 1, lb + ': 키 띠 없음 · 객실 바로 열림 (지금과 같음)');
     await p.context().close();
   }
+
+  // 다음 근무 날: 지난번 [키 반납 완료] 안 눌렀으면 맨 위 안내 (대조로 사무실에 있었으면 부드러운 문구)
+  for (const [chk, lb] of [[false, '대조 기록 없음'], [true, '대조로 사무실에 있음']]) {
+    const YD = fmt(Date.now() - 864e5), ex = { ['days/' + YD + '/keys/y1']: { floor: 12, maid: '김하나', key: 'A', reason: '', by: '본인', who: '', at: now - 864e5, clientAt: now - 864e5, uid: 'dvA' } };
+    if (chk) ex['days/' + YD + '/keychk/y2'] = { floor: 12, key: 'A', st: 'in', by: '하우스키퍼', at: now - 80000e3, clientAt: now - 80000e3 };
+    p = await ctxOf(browser, seed({ cfg: { from: YD, on: true }, keys: ex }), null, 'dvA');
+    await p.goto(BASE + 'rm/app/'); await p.waitForSelector('.band.keypast', { timeout: 8000 }).catch(() => {});
+    const t = await p.locator('.band.keypast').count() ? await p.textContent('.band.keypast') : '';
+    ok(/지난번.*키 반납 확인이 되지 않았어요/.test(t) && (chk ? /사무실에 잘 들어왔는데/.test(t) : /꼭 반납하고/.test(t)), '다음 날 안내 (' + lb + ')');
+    if (!chk) await p.screenshot({ path: path.join(OUT, 'k9_지난번안내.png') });
+    await p.click('[data-keypastx]'); await sleep(200);
+    ok(await p.locator('.band.keypast').count() === 0, '[확인했어요] 누르면 사라짐');
+    await p.context().close();
+  }
+  p = await ctxOf(browser, seed({ cfg: { from: fmt(Date.now() - 864e5), on: true }, keys: { ['days/' + fmt(Date.now() - 864e5) + '/keys/y1']: { floor: 12, maid: '김하나', key: 'A', at: now - 864e5, clientAt: now - 864e5, by: '본인' }, ['days/' + fmt(Date.now() - 864e5) + '/keyret/y3']: { floor: 12, maid: '김하나', on: true, at: now - 80000e3, clientAt: now - 80000e3 } } }), null, 'dvA');
+  await p.goto(BASE + 'rm/app/'); await p.waitForSelector('.keyband'); await sleep(800);
+  ok(await p.locator('.band.keypast').count() === 0, '지난번 반납 완료 눌렀으면 안내 없음');
+  await p.context().close();
 
   // 전체 키 현황 · 다른 분 키 (이두리 휴대폰, 김하나 12층 A키 · 하우스키퍼 대조 25층 A 있음)
   p = await ctxOf(browser, seed({ keys: { ['days/' + DAY + '/keys/x1']: { floor: 12, maid: '김하나', key: 'A', reason: '', by: '본인', who: '', at: now - 3600e3, clientAt: now - 3600e3, uid: 'dvA' },
