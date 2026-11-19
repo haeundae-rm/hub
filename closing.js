@@ -67,6 +67,34 @@ export function hrRows(staff, M, note, today) {
   out.sort((x, y) => (x.dept || '').localeCompare(y.dept || '', 'ko') || (x.hired || x.left || '').localeCompare(y.hired || y.left || '') || (x.name || '').localeCompare(y.name || '', 'ko'));
   return out;
 }
+// ---------- 근속 도래 (3단계, 2026-11-19): 입사일로부터 1년 · 10년 되는 분 → 급여 인상 특이사항 (예전엔 손으로 적다 누락 · 미지급이 생김)
+export const TENURE_YEARS = [1, 10];
+/** 입사일 + n년 (2월 29일 입사는 평년엔 2월 28일) */
+export function annivOf(hired, n) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(hired || '')) return '';
+  const y = +hired.slice(0, 4) + n, m = hired.slice(5, 7); let d = hired.slice(8, 10);
+  if (m === '02' && d === '29' && !(y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0))) d = '28';
+  return y + '-' + m + '-' + d;
+}
+export const tenId = (staffId, n) => ('ten-' + staffId + '-' + n).slice(0, 40);
+/** 그 달(M) 과 다음 달에 근속 n년이 되는 분 + 지난 3개월 중 특이사항에 안 넣은 분(놓침). done = 이미 넣었거나 '안 함' 한 특이사항 id 모음 */
+export function tenureDue(staff, M, done) {
+  const out = [], from = ymAdd(M, -3), next = ymAdd(M, 1), has = id => !!(done && (done.has ? done.has(id) : done[id]));
+  (staff || []).forEach(p => {
+    if (!p || !p.hired || p.status === '퇴사') return;
+    TENURE_YEARS.forEach(n => {
+      const day = annivOf(p.hired, n), ym = day.slice(0, 7);
+      if (!day || ym < from || ym > next) return;
+      if (p.left && p.left < day) return;                                    // 그날 전에 그만둠
+      const id = tenId(p.id, n), added = has(id), skip = !!(done && !done.has && done[id] === 'skip');
+      if (ym < M && added) return;                                          // 지난달 몫은 넣었으면 안 보임 (특이사항 쪽에서 이월로 챙김)
+      out.push({ id, staffId: p.id, name: p.name || '', dept: p.job || '', hired: p.hired, n, day, ym, when: ym < M ? 'miss' : ym === M ? 'now' : 'next', added, skip });
+    });
+  });
+  const ord = { miss: 0, now: 1, next: 2 };
+  out.sort((a, b) => ord[a.when] - ord[b.when] || a.day.localeCompare(b.day) || a.name.localeCompare(b.name, 'ko'));
+  return out;
+}
 // 서류 4종 (2단계, 2026-11-19): 입퇴사 앱 HrStaff 가 staff/{id}.docs = {c,a,i,b} (1 = 있음) 로 보냄. 허브에서 고치면 그 달 메모 hr[id].docs 가 우선
 export const DOCS = [['c', '근로계약서'], ['a', '입사지원서'], ['i', '신분증 사본'], ['b', '통장 사본']];
 // 값: 1 = 있음 · 0 = 없음 · 2 = 해당 없음(하도급 일용은 지원서·신분증·통장을 안 받음 — 미비로 안 셈)
@@ -86,7 +114,7 @@ const md = d => (d ? +d.slice(5, 7) + '/' + +d.slice(8, 10) : '');
 export function setupClosing(c) {
   const { S, esc, ymd, PIN } = c;
   const thisYm = () => ymd().slice(0, 7);
-  const st = { ym: thisYm(), items: null, staff: null, notes: {}, err: '', busy: false, form: null, hrForm: null, msg: '', filter: 'all', loadedAt: 0 };
+  const st = { ym: thisYm(), tenDone: {}, items: null, staff: null, notes: {}, err: '', busy: false, form: null, hrForm: null, msg: '', filter: 'all', loadedAt: 0 };
   const say = m => { st.msg = m; c.draw(); clearTimeout(say.t); say.t = setTimeout(() => { st.msg = ''; c.draw(); }, 3000); };
   const errTxt = e => String(e && (e.code || e.message) || e);
 
@@ -95,6 +123,7 @@ export function setupClosing(c) {
     st.busy = true; st.err = ''; c.draw();
     try {
       const [xs, staff] = await Promise.all([S.getQuery('close_items', []), st.staff ? Promise.resolve(null) : S.getQuery('staff', [])]);
+      st.tenDone = {}; xs.forEach(x => { if (/^ten-/.test(x.id)) st.tenDone[x.id] = x.data && x.data.del ? 'skip' : 1; });   // 근속: 넣었거나 '안 함'(del) 한 것
       st.items = xs.map(x => Object.assign({}, x.data, { id: x.id })).filter(x => !x.del);
       if (staff) st.staff = staff.map(x => Object.assign({}, x.data, { id: x.id }));
       st.loadedAt = Date.now();
@@ -127,6 +156,15 @@ export function setupClosing(c) {
     h += '<div class="cs-head"><h3>특이사항 ' + rows.length + '건</h3><div class="cs-fil">' + [['all', '전체'], ['open', '미완료'], ['done', '완료']].map(o => '<button data-cs="filter" data-v="' + o[0] + '" aria-pressed="' + (F === o[0]) + '">' + o[1] + '</button>').join('') + '</div></div>';
     if (!locked()) h += '<button class="big-btn" data-cs="add">＋ 특이사항 추가</button>';
     h += shown.length ? '<ul class="cs-list">' + shown.map(rowHtml).join('') + '</ul>' : '<p class="note">' + (rows.length ? '해당하는 건이 없어요.' : '이 달 특이사항이 아직 없어요. 생길 때마다 한 건씩 넣어 두면 월말에 그대로 문서가 돼요.') + '</p>';
+    // 근속 도래
+    const ten = tenureDue(st.staff || [], M, st.tenDone);
+    if (ten.length) {
+      const lab = { miss: '놓침', now: ymLabel(M), next: '다음 달' };
+      h += '<div class="cs-head"><h3>근속 도래 ' + ten.length + '명' + (ten.some(t => !t.added) ? ' · 남은 ' + ten.filter(t => !t.added).length : ' · 다 챙김') + '</h3></div><p class="note" style="margin:0 0 8px">입사일로부터 ' + TENURE_YEARS.join('년 · ') + '년이 되는 분이에요. 「특이사항에 넣기」를 누르면 임금인상 건으로 들어가요.</p><ul class="cs-list">' +
+        ten.map(t => '<li class="cs-ten ' + t.when + (t.added ? ' added' : '') + '"><div><span class="cs-tag" style="--tc:' + (t.when === 'miss' ? '#B91C1C' : t.when === 'now' ? '#1D4ED8' : '#6B7280') + '">' + esc(lab[t.when]) + '</span><b>' + esc(t.name) + '</b> <small>' + esc(t.dept) + '</small>' +
+          '<div class="cs-sub">근속 ' + t.n + '년 · ' + esc(md(t.day)) + ' (입사 ' + esc(t.hired) + ')</div></div>' +
+          (t.added ? '<span class="cs-tdone' + (t.skip ? ' skip' : '') + '">' + (t.skip ? '안 함' : '넣음 ✓') + '</span>' : locked() && t.ym <= M ? '' : '<div class="cs-tbtn"><button class="ref" data-cs="tenadd" data-id="' + esc(t.id) + '">특이사항에 넣기</button><button class="ref" data-cs="tenskip" data-id="' + esc(t.id) + '">안 함</button></div>') + '</li>').join('') + '</ul>';
+    }
     // 입퇴사
     h += '<div class="cs-head"><h3>입퇴사 현황 ' + hr.length + '명</h3></div><p class="note" style="margin:0 0 8px">직원 명단에서 이 달 입사일 · 퇴사일인 분을 자동으로 넣어요. 누르면 서류 4종 체크 · 퇴사사유 · 비고를 적을 수 있어요.</p>';
     h += hr.length ? '<ul class="cs-list">' + hr.map(p => '<li class="cs-hr"><button data-cs="hr" data-id="' + esc(p.id) + '"' + (locked() ? ' disabled' : '') + '><span class="cs-tag" style="--tc:' + (p.isOut ? '#B91C1C' : '#047857') + '">' + (p.isIn && p.isOut ? '입·퇴사' : p.isOut ? '퇴사' : '입사') + '</span><b>' + esc(p.name) + '</b> <small>' + esc(p.dept) + (p.manual ? ' · 직접 추가' : '') + '</small>' +
@@ -333,6 +371,18 @@ export function setupClosing(c) {
     else if (k === 'cancel') { st.form = st.hrForm = null; c.draw(); }
     else if (k === 'del' && st.form) { if (!confirm('이 특이사항을 지울까요? 지난달 기록에서도 빠져요.\n끝난 건은 지우지 말고 「완료」로 두는 게 좋아요.')) return; const fid = st.form.id; if (await patchItem(fid, x => { x.del = true; }, '지웠어요.')) st.form = null; c.draw(); }
     else if (k === 'stop' && st.form) { const fid = st.form.id, ym = st.ym; if (await patchItem(fid, x => { x.end = ym; }, ymLabel(ym) + '까지만 나오게 했어요.')) st.form = null; c.draw(); }
+    else if (k === 'tenadd' || k === 'tenskip') {
+      const t = tenureDue(st.staff || [], st.ym, st.tenDone).find(x => x.id === id); if (!t || t.added) return;
+      const sm = t.ym < st.ym ? st.ym : t.ym;                                // 놓친 건은 이번 달에 넣음
+      if (k === 'tenskip' && !confirm(t.name + ' 근속 ' + t.n + '년 인상을 「안 함」으로 둘까요?\n(대상이 아닌 분 · 이미 처리한 분) 다시 안 보여요.')) return;
+      if ((st.notes[sm] || {}).locked) { say(ymLabel(sm) + '은 마감됐어요.'); return; }
+      const d = { name: t.name, staffId: t.staffId, dept: DEPTS.indexOf(t.dept) >= 0 ? t.dept : '기타', type: '임금인상',
+        text: '근속 ' + t.n + '년 도래 (' + md(t.day) + ') 급여 인상 적용' + (t.ym < st.ym ? ' — ' + ymLabel(t.ym) + ' 누락분 포함 확인' : ''), ot: 0, days: 0, amount: 0,
+        kind: 'once', start: sm, end: '', n: 0, docs: [], memo: '', tag: 'tenure', tenure: { n: t.n, day: t.day }, st: {}, del: k === 'tenskip', at: Date.now(), by: c.who(), upd: S.SERVER_TIME, uid: c.uid() };
+      try { await S.set('close_items/' + id, d); } catch (x) { say('저장하지 못했어요: ' + errTxt(x)); return; }
+      st.tenDone[id] = d.del ? 'skip' : 1; if (!d.del) st.items = st.items.filter(x => x.id !== id).concat([Object.assign({}, d, { id, upd: Date.now() })]);
+      say(k === 'tenskip' ? t.name + ' · 안 함으로 뒀어요.' : t.name + ' · 근속 ' + t.n + '년 인상을 ' + ymLabel(sm) + ' 특이사항에 넣었어요.');
+    }
     else if (k === 'hr') openHr(id);
     else if (k === 'hradd') { st.hrForm = { manual: true, idx: -1, name: '', dept: DEPTS[0], state: '재직', hired: st.ym + '-01', left: '', reason: '', memo: '', err: '' }; c.draw(); window.scrollTo(0, 0); }
     else if (k === 'doc' && st.hrForm) { const f = st.hrForm, v = t.getAttribute('data-v'); f.docs = Object.assign({ c: 0, a: 0, i: 0, b: 0 }, f.docs || {}); f.docs[v] = (f.docs[v] + 1) % 3; f.docsTouched = true; c.draw(); }

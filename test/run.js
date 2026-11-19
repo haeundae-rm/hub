@@ -266,6 +266,13 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   const YM = DAY.slice(0, 7), PYM = (() => { const d = new Date(Date.UTC(+YM.slice(0, 4), +YM.slice(5, 7) - 2, 1)); return d.toISOString().slice(0, 7); })();
   ok(/비밀번호 넣고 열기/.test(await p.innerText('main')), '특이사항은 화면 비밀번호 먼저');
   await p.evaluate(() => { window.__seed['staff/s1'].docs = { c: 1, a: 2, i: 0, b: 1 }; });
+  const ymOf = (n) => { const d = new Date(Date.UTC(+DAY.slice(0, 4), +DAY.slice(5, 7) - 1 + n, 1)); return d.toISOString().slice(0, 7); };
+  await p.evaluate(([a, b2, c2]) => { const S = window.__seed;
+    S['staff/t1'] = { name: '근속가', job: '룸메이드', status: '재직', hired: a };      // 이번 달 1년
+    S['staff/t2'] = { name: '근속나', job: '룸메이드', status: '재직', hired: b2 };     // 다음 달 10년
+    S['staff/t3'] = { name: '근속다', job: '미화', status: '재직', hired: c2 };         // 두 달 전 1년 → 놓침
+    S['staff/t4'] = { name: '근속라', job: '미화', status: '퇴사', hired: a }; },          // 퇴사 → 안 나옴
+    [(+DAY.slice(0, 4) - 1) + DAY.slice(4, 8) + '05', (+ymOf(1).slice(0, 4) - 10) + ymOf(1).slice(4) + '-03', (+ymOf(-2).slice(0, 4) - 1) + ymOf(-2).slice(4) + '-10']);
   await p.click('[data-cs="unlock"]'); await pin(p, ['1234', '1234']); await p.waitForSelector('[data-cs="add"]', { timeout: 6000 });
   const addItem = async (o) => {
     await p.click('[data-cs="add"]'); await p.waitForSelector('[data-csf="name"]');
@@ -311,6 +318,21 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await pop.screenshot({ path: path.join(OUT, '16_결산_PDF.png'), fullPage: true });
   await pop.pdf({ path: path.join(OUT, 'test_결산특이사항.pdf'), format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true }).catch(() => {});
   await pop.close();
+  console.log('⑤-4 근속 도래');
+  let tt = await p.innerText('main');
+  ok(/근속 도래 3명 · 남은 3/.test(tt) && /근속가/.test(tt) && /근속나/.test(tt) && /근속다/.test(tt) && !/근속라/.test(tt), '근속 도래: 이번 달 1년 · 다음 달 10년 · 놓친 1년 (퇴사자 빼고) ' + ((tt.match(/근속 도래 \d+명/) || [''])[0]));
+  ok(/놓침/.test(tt) && /다음 달/.test(tt) && /근속 10년/.test(tt), '표시: 놓침 · 다음 달 · 근속 10년');
+  await p.click('[data-cs="tenadd"][data-id="ten-t1-1"]'); await sleep(400);
+  const ti = await p.evaluate(() => window.__seed['close_items/ten-t1-1']);
+  ok(ti && ti.type === '임금인상' && ti.start === DAY.slice(0, 7) && ti.kind === 'once' && /근속 1년 도래/.test(ti.text) && ti.staffId === 't1' && !ti.del, '특이사항에 넣기 → 임금인상 1건 (id 고정, 두 번 안 들어감) ' + JSON.stringify(ti && { t: ti.text, s: ti.start }));
+  tt = await p.innerText('main');
+  ok(/넣음 ✓/.test(tt) && /근속 도래 3명 · 남은 2/.test(tt) && /근속 1년 도래/.test(tt), '넣은 분은 「넣음 ✓」, 특이사항 목록에 보임');
+  await p.click('[data-cs="tenadd"][data-id="ten-t3-1"]'); await sleep(400);
+  const tm = await p.evaluate(() => window.__seed['close_items/ten-t3-1']);
+  ok(tm && tm.start === DAY.slice(0, 7) && /누락분/.test(tm.text) && !/근속다/.test((await p.innerText('main')).split('입퇴사 현황')[0].split('근속 도래')[1] || ''), '놓친 분 → 이번 달에 넣고 누락분 확인 문구, 근속 목록에서 빠짐');
+  await p.click('[data-cs="tenskip"][data-id="ten-t2-10"]'); await sleep(400);
+  ok(await p.evaluate(() => window.__seed['close_items/ten-t2-10'].del === true) && !/data-cs="tenadd"/.test(await p.innerHTML('main')) && /안 함<\/span>/.test(await p.innerHTML('main')) && /다 챙김/.test(await p.innerText('main')), '안 함 → 지운 표시로 남겨 다시 안 물음');
+  await shot(p, '17_결산_근속도래.png');
   await p.click('[data-cs="lockm"]'); await sleep(400);
   ok(await p.locator('[data-cs="add"]').count() === 0 && /마감됨/.test(await p.innerText('main')), '마감하면 추가 버튼 없음 · 상태만 바꿈');
   ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
