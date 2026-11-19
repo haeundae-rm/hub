@@ -19,13 +19,14 @@ function score(res, d) {
     bAll++; if (res.workers[b].floors.includes(f)) bOn++;
     keyLost += bz.filter(x => res.owner[x.room] !== b).length;
     if (!d.ho[C.aKey[f]]) d.rooms.filter(x => x.floor === f && x.theme).forEach(x => { themeBAll++; if (res.owner[x.room] === b) themeB++; }); }
+  let both = 0, pairs = 0; for (let f = 5; f <= 26; f++) { const a = C.aKey[f], b = C.bKey[f]; if (!b || a === b || !d.ho[a] || !d.ho[b]) continue; if (!d.rooms.some(x => x.floor === f)) continue; pairs++; const fa = res.workers[a].floors, fb = res.workers[b].floors; if (fa.length > 1 && fb.length > 1) both++; }
   const ws = Object.values(res.workers).filter(w => w.rooms.length);
   const keyOwn = (n, r) => { const f = Math.floor(r / 100), z = B_SUF.includes(String(r).slice(-2)) && !(f >= 27) ? 'B' : 'A'; return (z === 'B' ? C.bKey[f] : C.aKey[f]) === n; };
   const cookMax = Math.max(...Object.entries(res.workers).map(([n, w]) => w.rooms.filter(r => r !== '2901' && cook(+r) && !keyOwn(n, +r)).length));
-  return { bOn, bAll, keyLost, themeB, themeBAll, avgF: ws.reduce((s, w) => s + w.floors.length, 0) / ws.length, three: ws.filter(w => w.floors.length >= 3).length, cookMax, left: res.left.length };
+  return { both, pairs, bOn, bAll, keyLost, themeB, themeBAll, avgF: ws.reduce((s, w) => s + w.floors.length, 0) / ws.length, three: ws.filter(w => w.floors.length >= 3).length, cookMax, left: res.left.length };
 }
 const tot = { O: {}, N: {} }; const add = (t, s) => Object.keys(s).forEach(k => { t[k] = (t[k] || 0) + s[k]; });
 const K = Number(process.argv[2] || 12);
 for (let i = 1; i <= K; i++) { const d = day(i * 97 + 1); const o = { seeds: [11, 23], iter: 60000 };
   add(tot.O, score(O.runAssign(d.rooms, d.ho, C, [], {}, o), d)); add(tot.N, score(N.runAssign(d.rooms, d.ho, C, [], {}, Object.assign({}, o, JSON.parse(process.env.NO || '{}'))), d)); }
-for (const k of ['O', 'N']) { const t = tot[k]; console.log(k === 'O' ? '지금' : '고친 뒤', '| B키 자기 층 ' + t.bOn + '/' + t.bAll, '| B구역 남에게 ' + t.keyLost, '| A키 없을 때 테마→B키 ' + t.themeB + '/' + t.themeBAll, '| 평균 층 ' + (t.avgF / K).toFixed(2), '| 3개 층 ' + (t.three / K).toFixed(1) + '명/일', '| 남의 취사 최대 ' + (t.cookMax / K).toFixed(1), '| 미배정 ' + t.left); }
+for (const k of ['O', 'N']) { const t = tot[k]; console.log(k === 'O' ? '지금' : '고친 뒤', '| B키 자기 층 ' + t.bOn + '/' + t.bAll, '| B구역 남에게 ' + t.keyLost, '| A키 없을 때 테마→B키 ' + t.themeB + '/' + t.themeBAll, '| 평균 층 ' + (t.avgF / K).toFixed(2), '| 3개 층 ' + (t.three / K).toFixed(1) + '명/일', '| 남의 취사 최대 ' + (t.cookMax / K).toFixed(1), '| A·B 둘 다 층 이동 ' + t.both + '/' + t.pairs + '층', '| 미배정 ' + t.left); }

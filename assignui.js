@@ -70,9 +70,10 @@ export async function openAssign(hub, o) {
   H = hub;
   const S = H.S;
   const h = Number(new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 13));
-  A = { date: h >= 15 ? H.addDays(H.ymd(), 1) : H.ymd(), file: '', data: null, done: null, err: '', busy: '', cfgDoc: null, staff: [], rows: [], prev: '', res: null, prog: 0, cmp: null, showAll: false, open: {} };
+  A = { date: h >= 15 ? H.addDays(H.ymd(), 1) : H.ymd(), file: '', data: null, done: null, err: '', busy: '', cfgDoc: null, staff: [], rows: [], prev: '', res: null, prog: 0, cmp: null, showAll: false, open: {}, tr: [] };
   const box = document.createElement('div'); box.className = 'vp'; box.id = 'asp'; document.body.appendChild(box); document.body.classList.add('sb-lock');
   draw();
+  try { const t = JSON.parse(lsGet('asg_tr') || 'null'); A.tr = t && t.date === A.date ? t.list : []; } catch (e) { A.tr = []; }
   if (o && o.view === 'blocks') { A.view = 'blocks'; A.back = 'close'; }
   const [cfgDoc, staff, teams, bdoc] = await Promise.all([S.get('meta/assign').catch(() => null), S.getQuery('staff', [['job', '==', '룸메이드']]).catch(() => []), S.get('meta/teams').catch(() => null), S.get('meta/blocks').catch(() => null)]);
   if (!A) return;
@@ -91,7 +92,7 @@ function close() { const b = document.getElementById('asp'); if (b) b.remove(); 
 // 담당표·정량 (11/13 설정 화면): meta/assign.cfg 가 있으면 그것, 없으면 엔진 기본값(DEF_CFG). 예전 meta/assign.quota 도 이어받음
 function cfg() {
   const c = (A.cfgDoc && A.cfgDoc.cfg) || {};
-  return { aKey: c.aKey || DEF_CFG.aKey, bKey: c.bKey || DEF_CFG.bKey, royalOk: c.royalOk || DEF_CFG.royalOk, pltBlue: c.pltBlue || DEF_CFG.pltBlue,
+  return { aKey: c.aKey || DEF_CFG.aKey, bKey: c.bKey || DEF_CFG.bKey, royalOk: c.royalOk || DEF_CFG.royalOk, pltBlue: c.pltBlue || DEF_CFG.pltBlue, specOk: c.specOk || DEF_CFG.specOk || [],
     quota: c.quota || Object.assign({}, DEF_CFG.quota, (A.cfgDoc && A.cfgDoc.quota) || {}) };
 }
 function quota() { return cfg().quota; }
@@ -108,7 +109,19 @@ function buildRows(fromCards) {
     return { name: n, on: n in last || !Object.keys(last).length, unit: u };
   });
 }
-function ho() { const o = {}; A.rows.forEach(r => { if (r.on && r.unit > 0) o[r.name] = Number(r.unit); }); return o; }
+function ho() { const o = {}; A.rows.forEach(r => { if (r.on && r.unit > 0) o[r.name] = Number(r.unit); }); trList().forEach(t => { o[t.name] = t.n; }); return o; }
+// 🎓 교육생 (11/19, 11/16 하우스맨 의견): 그날만 — 이름 · 객실 수 · 가능 층 · 최대 층 수. 이 휴대폰에 날짜별로 기억
+const parseFloors = t => { const out = []; String(t || '').split(/[,·\s]+/).forEach(p => { const m = /^(\d{1,2})\s*[-~]\s*(\d{1,2})$/.exec(p); if (m) { for (let f = Math.min(+m[1], +m[2]); f <= Math.max(+m[1], +m[2]); f++) out.push(f); } else if (/^\d{1,2}$/.test(p)) out.push(+p); }); return [...new Set(out)].filter(f => f >= 2 && f <= 31); };
+function trList() { return (A.tr || []).map(t => ({ name: String(t.name || '').replace(/\s+/g, ''), n: Math.max(0, Math.min(15, Number(t.n) || 0)), floors: parseFloors(t.fl), max: Math.max(1, Math.min(3, Number(t.max) || 1)) })).filter(t => t.name && t.n > 0); }
+function trOpts() { const o = {}; trList().forEach(t => { o[t.name] = { floors: t.floors, max: t.max }; }); return o; }
+function trRead() { document.querySelectorAll('#asp [data-tr]').forEach(el => { const [k, i] = el.getAttribute('data-tr').split(':'); const t = A.tr[Number(i)]; if (t) t[k] = el.value; }); lsSet('asg_tr', JSON.stringify({ date: A.date, list: A.tr })); }
+function trHtml() {
+  const esc = H.esc, L = A.tr || [];
+  return '<div class="asg-tr"><b>🎓 교육생</b> <small style="color:var(--muted)">그날만 · 엔진이 가능 층 안에서 최대 층 수까지만 줘요 (VIP·우선정비 빼고)</small>' +
+    L.map((t, i) => '<div class="cf-q" style="grid-template-columns:1.3fr .7fr 1fr .7fr auto;margin-top:6px"><input data-tr="name:' + i + '" value="' + esc(t.name || '') + '" placeholder="이름"><input data-tr="n:' + i + '" type="number" min="1" max="15" inputmode="numeric" value="' + esc(t.n || 3) + '" title="객실 수"><input data-tr="fl:' + i + '" value="' + esc(t.fl || '') + '" placeholder="가능 층 예: 12 또는 10-12"><input data-tr="max:' + i + '" type="number" min="1" max="3" inputmode="numeric" value="' + esc(t.max || 1) + '" title="최대 층 수"><button class="vp-x" data-as="trdel" data-v="' + i + '" aria-label="빼기">✕</button></div>').join('') +
+    (L.length ? '<p class="note" style="margin:4px 0 0">칸: 이름 · 객실 수 · 가능 층(비우면 아무 층) · 최대 층 수</p>' : '') +
+    '<button class="big-btn sec" style="margin-top:6px" data-as="tradd">+ 교육생 추가</button></div>';
+}
 
 // ---------- 파일
 function pick() {
@@ -171,7 +184,7 @@ function run() {
     draw();
   };
   w.onerror = e => { if (!A) return; A.worker = null; A.running = false; A.err = '배정 계산을 못 했어요: ' + (e.message || e); draw(); };
-  const input = { rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo, teams: A.teams || [] } };
+  const input = { rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo, teams: A.teams || [], trainees: trOpts() } };
   A.input = input;   // 📝 배정 의견 · asg_days 에 같이 남김 (나중에 같은 계산을 다시 돌려 보려고)
   w.postMessage(input);
 }
@@ -290,7 +303,7 @@ async function confirmUpload() {
 // ---------- ⚙️ 담당표·정량 설정
 function cfgOpen() {
   const c = cfg();
-  A.cf = { aKey: Object.assign({}, c.aKey), bKey: Object.assign({}, c.bKey), royal: c.royalOk.join(', '), blue: c.pltBlue.join(', '),
+  A.cf = { aKey: Object.assign({}, c.aKey), bKey: Object.assign({}, c.bKey), royal: c.royalOk.join(', '), blue: c.pltBlue.join(', '), spec: (c.specOk || []).join(', '),
     quota: Object.keys(c.quota).map(n => ({ name: n, v: c.quota[n] })), err: '', saving: false };
   A.view = 'cfg'; draw();
   const b = document.getElementById('asp'); if (b) b.scrollTop = 0;
@@ -305,13 +318,14 @@ function cfgRead() {
   });
   const r = document.getElementById('cfroyal'), bl = document.getElementById('cfblue');
   if (r) F.royal = r.value; if (bl) F.blue = bl.value;
+  const sp = document.getElementById('cfspec'); if (sp) F.spec = sp.value;
 }
 const splitNames = t => String(t || '').split(/[,·\s]+/).map(x => x.trim()).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i);
 function cfgSave() {
   cfgRead();
   const F = A.cf, q = {};
   for (const x of F.quota) { if (!x.name) continue; const v = Number(x.v); if (!(v >= 1 && v <= 15)) { F.err = x.name + ' 님 정량을 1~15 사이로 적어 주세요.'; draw(); return; } q[x.name] = v; }
-  const c = { aKey: F.aKey, bKey: F.bKey, royalOk: splitNames(F.royal), pltBlue: splitNames(F.blue), quota: q };
+  const c = { aKey: F.aKey, bKey: F.bKey, royalOk: splitNames(F.royal), pltBlue: splitNames(F.blue), specOk: splitNames(F.spec), quota: q };
   if (!c.royalOk.length) { F.err = '로얄 가능자를 한 분 이상 적어 주세요.'; draw(); return; }
   F.saving = true; F.err = ''; draw();
   const d = Object.assign({}, A.cfgDoc, { cfg: c, cfgAt: H.S.SERVER_TIME, cfgBy: H.admin().label });
@@ -335,7 +349,9 @@ function cfgHtml() {
     '<button class="big-btn sec" style="margin-top:8px" data-as="cfqadd">+ 정량 한 분 추가</button></div>';
   h += '<div class="card"><h2>로얄 · 2901</h2><label class="asg-prev" style="grid-template-columns:110px 1fr"><span>로얄 가능자</span><input id="cfroyal" value="' + esc(F.royal) + '"></label>' +
     '<label class="asg-prev" style="grid-template-columns:110px 1fr"><span>2901 파란 명단</span><input id="cfblue" value="' + esc(F.blue) + '"></label>' +
-    '<p class="note">로얄 3001·3002·3101·3102 는 가능자만 맡아요. 2901 은 파란 명단 → 로얄 가능자 순으로 3명 (로얄 2실 맡은 분·전날 한 분은 뒤로). 이름은 쉼표로.</p></div>';
+    '<p class="note">로얄 3001·3002·3101·3102 는 가능자만 맡아요. 2901 은 파란 명단 → 로얄 가능자 순으로 3명 (로얄 2실 맡은 분·전날 한 분은 뒤로). 이름은 쉼표로.</p>' +
+    '<label class="asg-prev" style="grid-template-columns:110px 1fr"><span>특화 가능자</span><input id="cfspec" value="' + esc(F.spec || '') + '" placeholder="비우면 누구나"></label>' +
+    '<p class="note">23·24층 특화 객실은 여기 적은 분과 그 층 A·B키만 맡아요. 비워 두면 제한 없어요.</p></div>';
   if (F.err) h += '<p class="err">' + esc(F.err) + '</p>';
   h += '<div class="btn2"><button class="big-btn sec" data-as="cfx">취소</button><button class="big-btn" data-as="cfsave"' + (F.saving ? ' disabled' : '') + '>' + (F.saving ? '저장 중…' : '저장') + '</button></div>' +
     '<p style="text-align:center"><button class="sb-link" style="border:0;background:none;color:var(--muted);text-decoration:underline;font:600 13px inherit;cursor:pointer" data-as="cfdef">기본값(26.10~27.3 담당표)으로 되돌리기</button></p>' +
@@ -497,6 +513,7 @@ function draw() {
         (r.on ? '<span class="asg-u"><button data-as="u-" data-v="' + esc(r.name) + '">−</button><b>' + r.unit + '</b><button data-as="u+" data-v="' + esc(r.name) + '">+</button></span>' : '') + '</div>').join('') + '</div>' +
       '<div class="btn2"><button class="big-btn sec" data-as="all">' + (A.showAll ? '출근자만 보기' : '휴무자도 보기 (' + (A.rows.length - on.length) + ')') + '</button></div>' +
       (() => { const g = gapInfo(); return g && g.over ? '<p class="err" style="margin-top:8px">⚠️ 정비 대상 <b>' + g.units + '유닛</b> / 인계 <b>' + g.ho + '유닛</b> → <b>' + g.over + '유닛 넘침</b> (한 분당 약 +' + g.per + '). 이월할 객실은 정비보고서 메모에 <b>미정비</b>를 적고 파일을 다시 넣어 주세요.</p>' : ''; })() +
+      trHtml() +
       '<label class="asg-prev"><span>전날 2901</span><input id="asprev" value="' + esc(A.prev) + '" placeholder="예: 이분남, 강태금, 박순자"></label>' +
       '<p class="note" style="margin-top:0">전날 2901 한 분은 연속 배정을 피해요. 대조 기록을 저장하면 다음 날 자동으로 채워져요.</p>' +
       '<button class="big-btn" style="margin-top:6px" data-as="run"' + (A.running ? ' disabled' : '') + '>' + (A.running ? '배정 계산 중…' : '🧩 배정 돌리기') + '</button>' +
@@ -596,6 +613,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest && e.target.closest('#asp [data-as]'); if (!t) return;
   const a = t.getAttribute('data-as'), v = t.getAttribute('data-v');
   const pv = document.getElementById('asprev'); if (pv) A.prev = pv.value;
+  if (document.querySelector('#asp [data-tr]')) trRead();
   if (a === 'close') { close(); return; }
   A.saved = '';
   if (a === 'cfg') { cfgOpen(); return; }
@@ -604,7 +622,7 @@ document.addEventListener('click', e => {
   if (a === 'cfqadd') { cfgRead(); A.cf.quota.push({ name: '', v: 8 }); draw(); return; }
   if (a === 'cfqdel') { cfgRead(); A.cf.quota.splice(Number(v), 1); draw(); return; }
   if (a === 'cfdef') { if (!confirm('담당표·정량·로얄/2901 을 기본값(26.10~27.3 담당표)으로 되돌릴까요? 저장을 눌러야 바뀌어요.')) return;
-    A.cf = { aKey: Object.assign({}, DEF_CFG.aKey), bKey: Object.assign({}, DEF_CFG.bKey), royal: DEF_CFG.royalOk.join(', '), blue: DEF_CFG.pltBlue.join(', '), quota: Object.keys(DEF_CFG.quota).map(n => ({ name: n, v: DEF_CFG.quota[n] })), err: '', saving: false }; draw(); return; }
+    A.cf = { aKey: Object.assign({}, DEF_CFG.aKey), bKey: Object.assign({}, DEF_CFG.bKey), royal: DEF_CFG.royalOk.join(', '), blue: DEF_CFG.pltBlue.join(', '), spec: (DEF_CFG.specOk || []).join(', '), quota: Object.keys(DEF_CFG.quota).map(n => ({ name: n, v: DEF_CFG.quota[n] })), err: '', saving: false }; draw(); return; }
   if (a === 'pick') { pick(); return; }
   if (a === 'blocks') { A.view = 'blocks'; A.back = ''; A.bk.ok = ''; A.bk.day = A.date; draw(); const bx = document.getElementById('asp'); if (bx) bx.scrollTop = 0; return; }
   if (a && a.startsWith('bk')) { bkClick(a, v, t); return; }
@@ -613,10 +631,12 @@ document.addEventListener('click', e => {
   if (a === 'cqpick') { carryRead(); const r = carryPick(A.cq); A.carry = r.set; A.cshort = r.short; A.res = null; A.cmp = null; draw(); return; }
   if (a === 'cqx') { A.carry.delete(v); const t = typeOf(v); if (A.cq[t]) A.cq[t]--; A.res = null; A.cmp = null; draw(); return; }
   if (a === 'cqdone') { carryRead(); A.view = ''; draw(); return; }
-  if (a === 'date') { if (A.date === v) return; A.date = v; bmapUpd(); A.data = null; A.done = null; A.res = null; A.cmp = null; A.file = ''; draw(); return; }
+  if (a === 'date') { if (A.date === v) return; A.date = v; A.tr = []; bmapUpd(); A.data = null; A.done = null; A.res = null; A.cmp = null; A.file = ''; draw(); return; }
   if (a === 'tog') { const r = A.rows.find(x => x.name === v); if (r) { r.on = !r.on; A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'u-' || a === 'u+') { const r = A.rows.find(x => x.name === v); if (r) { r.unit = Math.max(1, Math.min(15, Number(r.unit) + (a === 'u+' ? 1 : -1))); A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'all') { A.showAll = !A.showAll; draw(); return; }
+  if (a === 'tradd') { A.tr.push({ name: '', n: 3, fl: '', max: 1 }); A.res = null; A.cmp = null; trRead(); draw(); return; }
+  if (a === 'trdel') { A.tr.splice(Number(v), 1); A.res = null; A.cmp = null; trRead(); draw(); return; }
   if (a === 'run') { run(); return; }
   if (a === 'open') { A.open[v] = !A.open[v]; draw(); return; }
   if (a === 'room') { const f = t.getAttribute('data-f'); A.mv = A.mv && A.mv.room === v && A.mv.from === f ? null : { room: v, from: f }; draw(); return; }
