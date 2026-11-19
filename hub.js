@@ -21,13 +21,13 @@
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 import * as K from '../rm/app/keys.js';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.19-8';
-import * as PIN from './pin.js?v=2026.11.19-8';
-import { setupClose } from './close.js?v=2026.11.19-8';
-import { setupClosing } from './closing.js?v=2026.11.19-8';
-import * as XW from './xlsxw.js?v=2026.11.19-8';
+import { setupNotice } from './notice.js?v=2026.11.19-9';
+import * as PIN from './pin.js?v=2026.11.19-9';
+import { setupClose } from './close.js?v=2026.11.19-9';
+import { setupClosing } from './closing.js?v=2026.11.19-9';
+import * as XW from './xlsxw.js?v=2026.11.19-9';
 
-const VER = '2026.11.19-8';
+const VER = '2026.11.19-9';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -124,11 +124,11 @@ async function load(force) {
   const kc = await safe(S.get('meta/keys'));
   let ks = null;
   if (kc && !kc.__err && K.enabled(kc, d)) {
-    const [pl, ch, kk, kx, tmz] = await Promise.all([safe(S.getQuery('days/' + d + '/plans', [])), safe(S.getQuery('days/' + d + '/changes', [])),
-      safe(S.getQuery('days/' + d + '/keys', [])), safe(S.getQuery('days/' + d + '/keychk', [])), safe(S.get('meta/teams'))]);
+    const [pl, ch, kk, kx, tmz, kr] = await Promise.all([safe(S.getQuery('days/' + d + '/plans', [])), safe(S.getQuery('days/' + d + '/changes', [])),
+      safe(S.getQuery('days/' + d + '/keys', [])), safe(S.getQuery('days/' + d + '/keychk', [])), safe(S.get('meta/teams')), safe(S.getQuery('days/' + d + '/keyret', []))]);
     if (Array.isArray(kk)) {
       const P = {}; (Array.isArray(pl) ? pl : []).forEach(x => { P[x.id] = (x.data && x.data.rooms) || []; });
-      ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], mf: K.maidFloors(P, Array.isArray(ch) ? ch : []), mate: (tmz && !tmz.__err && tmz.mate) || {} });
+      ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, Array.isArray(ch) ? ch : []), mate: (tmz && !tmz.__err && tmz.mate) || {} });
     }
   }
   view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks };

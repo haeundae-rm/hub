@@ -100,6 +100,16 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   await p.screenshot({ path: path.join(OUT, 'k5_반납안내.png') });
   await p.click('[data-kret]'); await sleep(200);
   ok(await p.locator('.sum .keyret').count() === 1, '확인 누르면 닫히고, 요약 칸에 반납 안내가 남음');
+  // [반납했어요] (선택): 정비 끝나면 받은 키 칸이 버튼으로 → 누르면 반납 표시, 다시 누르면 취소
+  ok(await p.locator('.kchip.ret[data-keyret="12"]').count() === 1 && await p.locator('[data-keyret="13"]').count() === 0, '정비 끝 → 받은 키(12층)만 [반납했어요] 버튼, 안 가져간 13층은 없음');
+  await p.click('[data-keyret="12"]'); await sleep(300);
+  ok(/✔ 반납/.test(await p.textContent('[data-keyret="12"]')), '누르면 「✔ 반납 시각」');
+  let rt = await p.evaluate(d => Object.keys(window.__seed).filter(k => k.startsWith('days/' + d + '/keyret/')).map(k => window.__seed[k]), DAY);
+  ok(rt.length === 1 && rt[0].on === true && rt[0].maid === '김하나' && rt[0].floor === 12, '반납 표시 줄 저장 (keyret)');
+  await p.screenshot({ path: path.join(OUT, 'k5b_반납했어요.png') });
+  await p.click('[data-keyret="12"]'); await sleep(300);
+  rt = await p.evaluate(d => Object.keys(window.__seed).filter(k => k.startsWith('days/' + d + '/keyret/')).map(k => window.__seed[k]), DAY);
+  ok(rt.length === 2 && !/✔/.test(await p.textContent('[data-keyret="12"]')), '다시 누르면 취소 (줄은 쌓임)');
   ok(!p.errs.length, '오류 없음 ' + p.errs.join(' | '));
   await p.context().close();
 
@@ -146,6 +156,7 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   console.log('허브 키 대장');
   const K = (id, f, m, k, min, x) => [['days/' + DAY + '/keys/' + id], Object.assign({ floor: f, maid: m, key: k, reason: '', by: '본인', who: '', at: now - min * 60000, clientAt: now - min * 60000, uid: 'u' }, x || {})];
   const KS = Object.fromEntries([K('a1', 12, '김하나', 'A', 300), K('a2', 13, '김하나', '없음', 299, { reason: '짝이 열어 줌' }), K('a3', 12, '이두리', 'A', 290), K('a4', 12, '이두리', 'B', 280), K('a5', 14, '박세나', 'AB', 270)]);
+  KS['days/' + DAY + '/keyret/r1'] = { floor: 12, maid: '이두리', on: true, at: now - 30 * 60000, clientAt: now - 30 * 60000, uid: 'u' };
   KS['days/' + DAY + '/keychk/c1'] = { floor: 14, key: 'A', st: 'out', by: '하우스키퍼', at: now - 60000, clientAt: now - 60000 };
   p = await ctxOf(browser, seed({ keys: KS }), { viewport: { width: 430, height: 932 } });
   await p.goto(BASE + 'hub/keys/'); await p.waitForSelector('#pw'); await p.click('[data-who="0"]'); await p.fill('#pw', 'pw'); await p.click('[data-login]');
@@ -155,6 +166,7 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   ok(/1\s*미반납/.test(sumT), '대조 때 14층 A키 없음 → 미반납 1');
   ok(/1\s*바꾼 기록/.test(sumT), '바꾼 기록 1 (이두리 12층 A→B)');
   ok(await p.locator('.lc.bad').count() === 1, '미반납 칸 빨강');
+  ok(await p.locator('.lc.rt').count() === 1 && /메이드 반납 표시/.test(await p.textContent('.lc.rt')), '메이드가 [반납했어요] 누른 칸(12층 B키)은 「메이드 반납 표시 · 대조 전」');
   ok(await p.locator('[data-quickoff]').count() === 0 && await p.locator('[data-cfg]').count() === 0, '하우스키퍼: 설정 · 끄기 버튼 없음');
   await p.screenshot({ path: path.join(OUT, 'h1_키대장_하우스키퍼.png'), fullPage: true });
   await p.click('[data-ck="12:A:in"]'); await sleep(300);

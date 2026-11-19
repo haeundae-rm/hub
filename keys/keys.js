@@ -6,7 +6,7 @@
 import * as S from '../../rm/app/store.js';
 import * as K from '../../rm/app/keys.js';
 
-const VER = '2026.11.19-1';
+const VER = '2026.11.19-2';
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
   { k: 'boss', label: '소장', email: 'unieshaeundae+admin@gmail.com', uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2' },
@@ -38,15 +38,15 @@ async function load(d, quiet) {
   if (!quiet) { busy = true; draw(); }
   const D = 'days/' + date, safe = p => p.then(x => x, () => null);
   try {
-    const [cfg, teams, day, plans, chg, keys, chk] = await Promise.all([
+    const [cfg, teams, day, plans, chg, keys, chk, ret] = await Promise.all([
       safe(S.get('meta/keys')), safe(S.get('meta/teams')), safe(S.get(D)),
       safe(S.getQuery(D + '/plans', [])), safe(S.getQuery(D + '/changes', [])),
-      S.getQuery(D + '/keys', []), safe(S.getQuery(D + '/keychk', []))
+      S.getQuery(D + '/keys', []), safe(S.getQuery(D + '/keychk', [])), safe(S.getQuery(D + '/keyret', []))
     ]);
     const pl = {}; (plans || []).forEach(x => { pl[x.id] = (x.data && x.data.rooms) || []; });
     const mf = K.maidFloors(pl, chg || []);
     const mate = (teams && teams.mate) || {};
-    const sum = K.summary({ keys, chk: chk || [], mf, mate });
+    const sum = K.summary({ keys, chk: chk || [], ret: ret || [], mf, mate });
     st = { cfg: cfg || {}, mf, mate, keys, chk: chk || [], sum, maids: ((day && day.maids) || Object.keys(pl)).slice(), at: Date.now() };
     msg = '';
   } catch (e) { msg = '읽지 못했어요: ' + errOf(e); if (!st) st = null; }
@@ -118,8 +118,8 @@ function dateBar() {
   return '<div class="card"><div class="datebar"><button data-day="-1" aria-label="전날">‹</button><div class="d"><b>' + md(date) + (date === ymd() ? ' 오늘' : '') + '</b><small>' + (st ? '읽은 시각 ' + hm(st.at) : '') + '</small></div>' +
     '<button data-day="1" aria-label="다음 날"' + (date >= ymd() ? ' disabled' : '') + '>›</button><button class="ref" data-ref="1">' + (busy ? '…' : '↻') + '</button></div></div>';
 }
-const nm = list => list.map(d => esc(d.maid) + ' <small>' + hm(tOf(d)) + (d.by === '관리자' ? ' · ' + esc(d.who || '관리자') : '') + '</small>').join('<br>');
-const CELL = { in: ['ok', '반납 확인'], late: ['bad', '미반납'], nosign: ['bad', '서명 없이 없음'], out: ['wait', '가져감 · 대조 전'], '': ['', ''] };
+const nm = list => list.map(d => esc(d.maid) + ' <small>' + hm(tOf(d)) + (d.by === '관리자' ? ' · ' + esc(d.who || '관리자') : '') + (d.ret ? ' · <b class="rt">반납 표시 ' + hm(d.ret) + '</b>' : '') + '</small>').join('<br>');
+const CELL = { ret: ['rt', '메이드 반납 표시 · 대조 전'], in: ['ok', '반납 확인'], late: ['bad', '미반납'], nosign: ['bad', '서명 없이 없음'], out: ['wait', '가져감 · 대조 전'], '': ['', ''] };
 function mainHtml() {
   const s = st.sum, c = cfgState(st.cfg), today = date === ymd();
   let h = '';
@@ -191,7 +191,7 @@ function printHtml() {
   const s = st.sum;
   const who = x => x.takers.map(d => esc(d.maid)).join(', ');
   const out = x => x.takers.map(d => hm(tOf(d))).join(', ');
-  const ret = x => x.st === 'in' ? (x.takers.length ? hm(tOf(x.chk)) : '') : x.st === 'late' ? '<b class="r">미반납</b>' : x.st === 'nosign' ? '<b class="r">서명없이 없음</b>' : '';
+  const ret = x => x.st === 'in' ? (x.takers.length ? hm(tOf(x.chk)) : '') : x.st === 'ret' ? '(본인 ' + x.takers.map(d => hm(d.ret)).join(', ') + ')' : x.st === 'late' ? '<b class="r">미반납</b>' : x.st === 'nosign' ? '<b class="r">서명없이 없음</b>' : '';
   const none = []; s.ledger.forEach(r => r.none.forEach(d => none.push(r.floor + '층 ' + esc(d.maid) + (d.reason ? '(' + esc(d.reason) + ')' : ''))));
   const chkBy = {}; (st.chk || []).forEach(x => { const d = x.data || x; if (d.by) chkBy[d.by] = Math.max(chkBy[d.by] || 0, tOf(d) || 0); });
   return '<div class="pg"><h1>플로어 키 불출 대장 <small>A키 · B키</small></h1><div class="pd">' + longDate(date) + '</div>' +
