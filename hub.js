@@ -20,13 +20,13 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import { setupNotice } from './notice.js?v=2026.11.19-6';
-import * as PIN from './pin.js?v=2026.11.19-6';
-import { setupClose } from './close.js?v=2026.11.19-6';
-import { setupClosing } from './closing.js?v=2026.11.19-6';
-import * as XW from './xlsxw.js?v=2026.11.19-6';
+import { setupNotice } from './notice.js?v=2026.11.19-7';
+import * as PIN from './pin.js?v=2026.11.19-7';
+import { setupClose } from './close.js?v=2026.11.19-7';
+import { setupClosing } from './closing.js?v=2026.11.19-7';
+import * as XW from './xlsxw.js?v=2026.11.19-7';
 
-const VER = '2026.11.19-6';
+const VER = '2026.11.19-7';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -425,7 +425,7 @@ function actLogin() {
   const f = document.getElementById('actf'), w = f && f.contentWindow;
   try {
     if (!w || typeof w.openDlg !== 'function') throw new Error('no');
-    w.openDlg('pin', { pin: '', who: admin && /부소장/.test(admin.label) ? '부소장' : '소장' });
+    w.openDlg('pin', { pin: '', who: admin && admin.hk ? '하우스키퍼' : admin && /부소장/.test(admin.label) ? '부소장' : '소장' });
     const m = document.getElementById('actmsg'); if (m) m.textContent = '아래 창에 비밀번호를 넣어 주세요';
     const t0 = Date.now(), iv = setInterval(() => {
       let ok = false; try { ok = !!(f.contentWindow && f.contentWindow.adminTok); } catch (e) {}
@@ -441,8 +441,7 @@ window.addEventListener('message', e => {
   if (e.data.hub === 'noadmin') {
     // 정비 지원은 로그인을 따로 보관(Firebase 앱 'sup') → 비밀번호를 바꾸면 거기 로그인만 풀려 있음 (2026-11-19). 이 창 안에서 바로 다시 로그인
     const m = document.getElementById('actmsg');
-    if (m) m.innerHTML = admin && admin.hk ? '하우스키퍼 계정은 아직 정비 지원 관리자 권한이 없어요 — 소장 계정으로 열어 주세요'
-      : '정비 지원 관리자 로그인이 풀려 있어요 <button class="act-login" data-actlogin="1">관리자 로그인</button>';
+    if (m) m.innerHTML = '정비 지원 관리자 로그인이 풀려 있어요 <button class="act-login" data-actlogin="1">관리자 로그인</button>';
     const r = document.getElementById('rmmsg'); if (r) r.textContent = '정비 레포트 관리자 확인이 안 돼요 — 닫고 다시 열어 주세요';
   }
 });
