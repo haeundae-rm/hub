@@ -79,7 +79,7 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   ks = await keysOf(p);
   ok(ks.some(k => k.floor === 13 && k.key === '없음' && k.reason === '짝이 열어 줌'), '13층 안 가져감 (짝이 열어 줌) 기록 → 객실 창으로');
   await p.click('.panel [data-x]'); await sleep(200);
-  ok(await p.locator('.keyband.done').count() === 1, '모든 층 답하면 초록 띠 (계속 보임)');
+  ok(await p.locator('.keyband.done').count() === 1, '모든 층 답하면 한 줄 띠로 줄어듦 (계속 보임)');
   await p.screenshot({ path: path.join(OUT, 'k3_답한뒤.png') });
   // 바꾸기
   await p.click('[data-keychg="12"]'); await p.waitForSelector('.k4');
@@ -88,7 +88,7 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   await p.click('.panel [data-kdo]'); await sleep(300);
   ks = await keysOf(p);
   ok(ks.filter(k => k.floor === 12).length === 2, '바꾸기: 처음 줄은 남고 새 줄이 쌓임 (지우기 없음)');
-  ok(/B키/.test(await p.textContent('.keyband .krow.ok')), '띠에 바꾼 값(B키) 보임');
+  ok(/B키/.test(await p.textContent('.kchip[data-keychg="12"]')), '한 줄 띠의 12층 칸에 바꾼 값(B키) 보임');
   // 마지막 객실 → 반납 안내
   await p.click('[data-room="1202"]'); await p.waitForSelector('.panel .chk'); await p.click('.panel [data-act="allok"]'); await sleep(200);
   await p.click('[data-room="1301"]'); await p.waitForSelector('.panel .chk'); await p.click('.panel [data-act="allok"]');
