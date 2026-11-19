@@ -421,12 +421,28 @@ function openAct() {
   document.body.appendChild(p); document.body.classList.add('sb-lock');
   const f = p.querySelector('iframe'); f.addEventListener('load', () => { const m = document.getElementById('actmsg'); if (m) m.textContent = ''; });
 }
+function actLogin() {
+  const f = document.getElementById('actf'), w = f && f.contentWindow;
+  try {
+    if (!w || typeof w.openDlg !== 'function') throw new Error('no');
+    w.openDlg('pin', { pin: '', who: admin && /부소장/.test(admin.label) ? '부소장' : '소장' });
+    const m = document.getElementById('actmsg'); if (m) m.textContent = '아래 창에 비밀번호를 넣어 주세요';
+    const t0 = Date.now(), iv = setInterval(() => {
+      let ok = false; try { ok = !!(f.contentWindow && f.contentWindow.adminTok); } catch (e) {}
+      if (ok) { clearInterval(iv); const mm = document.getElementById('actmsg'); if (mm) mm.textContent = '여는 중…'; f.src = f.src; }   // 로그인되면 다시 열어서 활동판으로
+      else if (Date.now() - t0 > 180000 || !document.getElementById('actf')) clearInterval(iv);
+    }, 500);
+  } catch (e) { window.open(new URL('../dirty/', import.meta.url).href, '_blank'); const m = document.getElementById('actmsg'); if (m) m.textContent = '새 창의 정비 지원에서 「관리자로 보기」로 로그인한 뒤, 이 창을 닫고 다시 열어 주세요'; }
+}
 function closeAct() { const p = document.getElementById('actp'); if (!p) return; p.remove(); document.body.classList.remove('sb-lock'); reload(true); }
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || !e.data || !e.data.hub) return;
   if (e.data.hub === 'close') closeAct();
   if (e.data.hub === 'noadmin') {
-    const m = document.getElementById('actmsg'); if (m) m.textContent = '정비 지원 관리자 확인이 안 돼요 — 닫고 다시 열어 주세요';
+    // 정비 지원은 로그인을 따로 보관(Firebase 앱 'sup') → 비밀번호를 바꾸면 거기 로그인만 풀려 있음 (2026-11-19). 이 창 안에서 바로 다시 로그인
+    const m = document.getElementById('actmsg');
+    if (m) m.innerHTML = admin && admin.hk ? '하우스키퍼 계정은 아직 정비 지원 관리자 권한이 없어요 — 소장 계정으로 열어 주세요'
+      : '정비 지원 관리자 로그인이 풀려 있어요 <button class="act-login" data-actlogin="1">관리자 로그인</button>';
     const r = document.getElementById('rmmsg'); if (r) r.textContent = '정비 레포트 관리자 확인이 안 돼요 — 닫고 다시 열어 주세요';
   }
 });
@@ -757,7 +773,7 @@ function openStaff() {
 
 // ---------- 누르기
 document.addEventListener('click', e => {
-  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"]');
+  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-actlogin],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"]');
   if (!t || (t.closest && t.closest('#dz'))) return;
   if (t.matches('a[href="./leave/"]') && !PIN.passed()) { e.preventDefault(); PIN.gate('연차 · 근무').then(ok => { if (ok) location.href = './leave/'; }); return; }
   if (t.matches('a[href="./leave/"]')) return;
@@ -771,6 +787,7 @@ document.addEventListener('click', e => {
   if (t.hasAttribute('data-home')) { goHome(); return; }
   if (t.hasAttribute('data-voc')) { openVoc(); return; }
   if (t.hasAttribute('data-act')) { openAct(); return; }
+  if (t.hasAttribute('data-actlogin')) { actLogin(); return; }
   if (t.hasAttribute('data-asg')) { openAssignUI(t.getAttribute('data-asg') === 'blocks' ? 'blocks' : ''); return; }
   if (t.hasAttribute('data-actclose')) { closeAct(); return; }
   if (t.hasAttribute('data-vclose')) { closeVoc(); load(false); return; }
