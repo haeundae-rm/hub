@@ -236,13 +236,28 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 60px}
 .cl-ym{display:flex;align-items:center;justify-content:center;gap:16px}.cl-ym b{font-size:18px;min-width:120px;text-align:center}.cl-ym .ref{min-width:44px;font-size:20px}
 .cl-wrap{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:12px}.cl-t{width:100%;border-collapse:collapse;font-size:14px}.cl-t th,.cl-t td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left}.cl-t th{position:sticky;top:0;background:var(--surface);font-size:12px;color:var(--muted)}.cl-t td:last-child,.cl-t th:last-child{text-align:right}
 .cl-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.cl-acts .big-btn{margin:0}
+.cs-msg{background:#ECFDF5;color:#065F46;border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:700;margin:10px 0 0}
+.cs-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0 0}.cs-kpi div{background:var(--tile);border-radius:12px;padding:8px 6px;text-align:center}.cs-kpi div.wide{grid-column:1/-1}.cs-kpi b{display:block;font-size:19px}.cs-kpi span{font-size:11.5px;color:var(--muted)}.cs-kpi .hot b{color:#B45309}
+.cs-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 8px}.cs-head h3{margin:0;font-size:15.5px}
+.cs-list{list-style:none;margin:10px 0;padding:0;display:grid;gap:8px}.cs-it{border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--surface)}.cs-it.done{opacity:.62}
+.cs-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.cs-tag{display:inline-block;background:var(--tc);color:#fff;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:800;margin-right:4px}
+.cs-carry{background:#FEF2F2;color:#B91C1C;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:800}.cs-round{background:#ECFEFF;color:#0E7490;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:800}
+.cs-st{margin-left:auto;border:1.5px solid var(--sc);color:var(--sc);background:var(--surface);border-radius:99px;padding:4px 8px;font:800 13px inherit;font-family:inherit}
+.cs-body,.cs-hr button{display:block;width:100%;text-align:left;background:none;border:0;padding:6px 0 0;font:inherit;color:var(--ink);cursor:pointer;font-size:14.5px;line-height:1.45}.cs-body small,.cs-hr small{color:var(--muted)}
+.cs-hr{border:1.5px solid var(--line);border-radius:14px;padding:4px 12px 10px}.cs-sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+.cs-form{margin-top:14px;display:grid;gap:10px}.cs-form h3{margin:4px 0 0;font-size:16px}.cs-form label{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
+.cs-form input,.cs-form select,.cs-form textarea{width:100%;box-sizing:border-box;min-height:44px;border:1.5px solid var(--line);border-radius:12px;padding:8px 12px;font:16px inherit;font-family:inherit;color:var(--ink);background:var(--surface)}
+.cs-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cs-3{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:8px}
+.cs-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.cs-seg button{min-height:42px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);font:700 13.5px inherit;font-family:inherit;color:var(--ink)}.cs-seg button[aria-pressed=true]{border-color:#0E1E36;background:#0E1E36;color:#fff}
+.cs-fil{display:flex;gap:4px}.cs-fil button{border:1.5px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 10px;font:700 12.5px inherit;font-family:inherit;color:var(--muted)}.cs-fil button[aria-pressed=true]{background:#0E1E36;border-color:#0E1E36;color:#fff}
+.cs-del{color:#B91C1C}.cs-lock{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)}
 </style>
 </head>
 <body>
 <header class="top"><div class="top-in"><div class="top-row"><div class="cal" aria-hidden="true"><i id="calm"></i><b id="cald"></b></div><div class="tt"><h1>객실 통합 관리 시스템</h1><div class="sub" id="today">한화리조트 해운대</div></div><div class="ring" id="ring" hidden></div></div><div class="line" id="hline"></div></div></header>
 <main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
 <noscript><div class="card">이 화면은 자바스크립트가 켜져 있어야 해요.</div></noscript>
-<script type="module" src="hub.js?v=2026.11.19-1"></script>
+<script type="module" src="hub.js?v=2026.11.19-2"></script>
 <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); }); }</script>
 </body>
 </html>

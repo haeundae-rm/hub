@@ -262,6 +262,54 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.click('[data-cl="prev"]'); await sleep(200);
   ok(!/\[data-cl="xlsx"\]/.test(await p.innerHTML('main')) && /출역표 만들기/.test(await p.innerText('main')), '이전 달로 가면 새로 만들기');
   ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
+  console.log('⑤-3 📋 결산마감 특이사항');
+  const YM = DAY.slice(0, 7), PYM = (() => { const d = new Date(Date.UTC(+YM.slice(0, 4), +YM.slice(5, 7) - 2, 1)); return d.toISOString().slice(0, 7); })();
+  ok(/비밀번호 넣고 열기/.test(await p.innerText('main')), '특이사항은 화면 비밀번호 먼저');
+  await p.click('[data-cs="unlock"]'); await pin(p, ['1234', '1234']); await p.waitForSelector('[data-cs="add"]', { timeout: 6000 });
+  const addItem = async (o) => {
+    await p.click('[data-cs="add"]'); await p.waitForSelector('[data-csf="name"]');
+    await p.fill('[data-csf="name"]', o.name); await p.selectOption('[data-csf="dept"]', o.dept); await p.selectOption('[data-csf="type"]', o.type);
+    await p.fill('[data-csf="text"]', o.text); if (o.amount) await p.fill('[data-csf="amount"]', o.amount); if (o.days) await p.fill('[data-csf="days"]', o.days);
+    if (o.kind) { await p.click('[data-cs="kind"][data-v="' + o.kind + '"]'); await sleep(100); }
+    if (o.start) await p.fill('[data-csf="start"]', o.start); if (o.n) await p.fill('[data-csf="n"]', o.n);
+    if (o.docs) await p.fill('[data-csf="docs"]', o.docs);
+    await p.click('[data-cs="save"]'); await p.waitForSelector('[data-cs="add"]', { timeout: 4000 }); await sleep(150);
+  };
+  await addItem({ name: '홍길순', dept: '룸메이드', type: '인센티브', text: '키즈방 정비 인센티브', amount: '100,000', kind: 'monthly' });
+  await addItem({ name: '김예시', dept: '룸메이드', type: '소개비', text: '소개비 10만원 (3회 나눠 지급)', amount: '100000', kind: 'times', start: PYM, n: '3' });
+  await addItem({ name: '박예시', dept: '사우나', type: '경조', text: '자녀 결혼 경조비', amount: '100000', days: '2', start: PYM, docs: '가족관계증명서, 청첩장' });
+  let cst = await p.innerText('main');
+  ok(/특이사항 4건/.test(cst), '이번 달 4건 = 매월 1 + 회차 2/3 + 지난달 회차 1/3 이월 + 지난달 경조 이월 (' + (cst.match(/특이사항 \d+건/) || [''])[0] + ')');
+  ok(/2\/3회차/.test(cst) && /1\/3회차/.test(cst) && (cst.match(/이월/g) || []).length >= 2, '회차 · 이월 표시');
+  const items = await p.evaluate(() => Object.keys(window.__seed).filter(k => /^close_items\//.test(k)).map(k => window.__seed[k]));
+  ok(items.length === 3 && items.find(x => x.type === '인센티브').amount === 100000 && items.find(x => x.type === '경조').docs.length === 2, '저장: 3건 · 금액 숫자 · 동봉 서류');
+  // 지난달 경조 이월 → 완료 하면 이번 달에서 빠짐
+  const kyId = await p.evaluate(() => Object.keys(window.__seed).find(k => /^close_items\//.test(k) && window.__seed[k].type === '경조').split('/')[1]);
+  await p.selectOption('select[data-cs="st"][data-id="' + kyId + '"]', '완료'); await sleep(400);
+  cst = await p.innerText('main');
+  ok(/특이사항 3건/.test(cst) && await p.evaluate(([id, y]) => window.__seed['close_items/' + id].st[y] === '완료', [kyId, PYM]), '지난달 몫 완료 → 이월에서 빠짐 (st[지난달]=완료)');
+  ok(/이예시/.test(cst), '입퇴사 현황: 직원 명단에서 이 달 입사자 자동');
+  await p.click('[data-cs="hr"][data-id="s1"]'); await p.fill('[data-csh="memo"]', '경력수당 적용'); await p.click('[data-cs="hrsave"]'); await sleep(400);
+  ok(await p.evaluate(y => ((window.__seed['close_month/' + y] || {}).hr || {}).s1.memo === '경력수당 적용', YM), '입퇴사 비고 저장 (close_month)');
+  await shot(p, '15_결산_특이사항.png');
+  const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('[data-cs="xlsx"]')]);
+  const xf2 = path.join(OUT, 'test_결산특이사항.xlsx'); await dl2.saveAs(xf2);
+  let wb = ''; try { wb = require('child_process').execFileSync('python3', ['-c', 'import openpyxl,sys,json;wb=openpyxl.load_workbook(sys.argv[1]);print(json.dumps({ws.title:[[c for c in r] for r in ws.iter_rows(values_only=True)] for ws in wb},ensure_ascii=False,default=str))', xf2]).toString(); } catch (e) { wb = 'ERR ' + e.message; }
+  const WB = /^\{/.test(wb) ? JSON.parse(wb) : {};
+  ok(Object.keys(WB).join(',') === '요약,입퇴사 현황,특이사항', '엑셀 3장: ' + Object.keys(WB).join(',') + (/^ERR/.test(wb) ? wb.slice(0, 200) : ''));
+  const sp = WB['특이사항'] || [], body = sp.slice(4);
+  ok(body.length === 3 && body.some(r => r[3] === '소개비' && /2\/3회차/.test(r[8])) && body.some(r => /이월/.test(r[8])), '특이사항 장: 3줄 · 회차 · 이월');
+  ok((WB['요약'] || []).some(r => r[0] === '금액 합계 (원)' && r[1] === 300000), '요약: 금액 합계 300,000 (매월 10만 + 소개비 1/3·2/3 20만, 완료된 경조는 빠짐) ' + JSON.stringify((WB['요약'] || []).find(r => r[0] === '금액 합계 (원)')) + ')');
+  ok((WB['입퇴사 현황'] || []).some(r => r[2] === '이예시' && r[8] === '경력수당 적용'), '입퇴사 장: 자동 + 비고');
+  const [pop] = await Promise.all([p.context().waitForEvent('page'), p.click('[data-cs="pdf"]')]);
+  await pop.waitForLoadState(); await pop.setViewportSize({ width: 1123, height: 794 }); await sleep(400);
+  ok(/결산마감 특이사항/.test(await pop.innerText('body')) && /입 \/ 퇴사자 현황/.test(await pop.innerText('body')), 'PDF 화면: 제목 · 입퇴사 · 특이사항');
+  await pop.screenshot({ path: path.join(OUT, '16_결산_PDF.png'), fullPage: true });
+  await pop.pdf({ path: path.join(OUT, 'test_결산특이사항.pdf'), format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true }).catch(() => {});
+  await pop.close();
+  await p.click('[data-cs="lockm"]'); await sleep(400);
+  ok(await p.locator('[data-cs="add"]').count() === 0 && /마감됨/.test(await p.innerText('main')), '마감하면 추가 버튼 없음 · 상태만 바꿈');
+  ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
   console.log('⑨ 하우스키퍼 공용 계정 (허브)');
   p = await open(b, phone, 'busy', '', 2);
   const ht = await p.locator('.hm-tile').allInnerTexts();

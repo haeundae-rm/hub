@@ -20,11 +20,13 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import { setupNotice } from './notice.js?v=2026.11.19-1';
-import * as PIN from './pin.js?v=2026.11.19-1';
-import { setupClose } from './close.js?v=2026.11.19-1';
+import { setupNotice } from './notice.js?v=2026.11.19-2';
+import * as PIN from './pin.js?v=2026.11.19-2';
+import { setupClose } from './close.js?v=2026.11.19-2';
+import { setupClosing } from './closing.js?v=2026.11.19-2';
+import * as XW from './xlsxw.js?v=2026.11.19-2';
 
-const VER = '2026.11.19-1';
+const VER = '2026.11.19-2';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -585,7 +587,7 @@ function staffHtml() {
     '<button class="big-btn" data-staff="1">명단 열기</button></div>';
 }
 // ---------- 📊 결산 (2026-11-19): close.js — 정비보조 월 출역표(엑셀·인쇄) · 연차 대장 길. 하우스키퍼에겐 안 보임 (출퇴근 기록)
-let CL = null;
+let CL = null, CLG = null;   // CLG = 결산마감 특이사항 (closing.js · 2026-11-19)
 // ---------- 첫 화면 · 안쪽 화면 (2026-11-18-4)
 // 주소 끝 # 로 어느 화면인지 나눔: '' 첫 화면 · #work(/now|up|dirty) · #quality · #people · #assign · #apps
 const SECS = {
@@ -604,7 +606,7 @@ const TILES = [
   { href: './night/', ic: '🌙', t: '야간 보고서', s: '하우스키퍼 야간 업무 보고 · 확인 · 인쇄' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
   { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
-  { go: 'close', ic: '📊', t: '결산', s: '정비보조 월 출역표 · 연차 대장' },
+  { go: 'close', ic: '📊', t: '결산', s: '결산 특이사항 · 입퇴사 현황 · 출역표 · 연차 대장' },
   { go: 'apps', ic: '🔗', t: '현장 앱 열기', s: '정비 레포트 · 정비 지원 · 입퇴사 서류', wide: 1 }
 ];
 const FIELD = ['../rm/', '../dirty/', '../unies-contract/'];
@@ -702,7 +704,7 @@ function secHtml() {
   else if (sec === 'people') h += (view.st ? hrHtml(view.st) : '<div class="card"><p class="note" style="margin:0">읽는 중…</p></div>') + staffHtml() +
     '<div class="card"><h2>🔒 화면 비밀번호</h2><p class="note" style="margin:0 0 12px">인사 · 연차·근무 화면에 들어갈 때 묻는 숫자 4자리예요. 한 번 넣으면 이 창에서 30분 동안 다시 안 물어요.</p><button class="big-btn sec" data-pinchg="1">비밀번호 바꾸기</button></div>';
   else if (sec === 'field') h += fieldHtml();
-  else if (sec === 'close') { if (!CL) CL = setupClose({ S, esc, ymd, draw: () => draw() }); h += CL.html(); }
+  else if (sec === 'close') { if (!CL) CL = setupClose({ S, esc, ymd, draw: () => draw() }); if (!CLG) CLG = setupClosing({ S, esc, ymd, PIN, xlsx: XW, draw: () => draw(), who: () => (admin ? admin.label : ''), uid: () => (user ? user.uid : '') }); h += CLG.html() + CL.html(); }
   else if (sec === 'apps') h += linksHtml();
   return h;
 }
