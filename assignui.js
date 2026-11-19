@@ -164,13 +164,16 @@ function run() {
     if (e.data.p != null) { A.prog = e.data.p; const b = document.getElementById('asprog'); if (b) b.style.width = Math.round(A.prog * 100) + '%'; return; }
     w.terminate(); A.worker = null; A.running = false;
     if (e.data.err) { A.err = '배정 계산 오류: ' + e.data.err; draw(); return; }
-    A.res = e.data.done; A.edits = []; A.mv = null; A.open = {}; A.xmsg = '';
+    A.res = e.data.done; A.res0 = byName(A.res); A.edits = []; A.mv = null; A.open = {}; A.xmsg = '';
     if (A.done) A.cmp = compare(A.done, A.res);
     saveLast(H0);
+    if (A.done) saveDay({ hk: hkByName(), cmp: cmpLite() });
     draw();
   };
   w.onerror = e => { if (!A) return; A.worker = null; A.running = false; A.err = '배정 계산을 못 했어요: ' + (e.message || e); draw(); };
-  w.postMessage({ rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo, teams: A.teams || [] } });
+  const input = { rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo, teams: A.teams || [] } };
+  A.input = input;   // 📝 배정 의견 · asg_days 에 같이 남김 (나중에 같은 계산을 다시 돌려 보려고)
+  w.postMessage(input);
 }
 // 대상 유닛 − 인계 유닛. +1 은 베테랑 몇 분이 받는 게 보통이라 출근자 1/4 까지는 괜찮게 봄
 function gapInfo() {
@@ -179,6 +182,27 @@ function gapInfo() {
   const units = T.reduce((s, x) => s + (String(x.room) === '2901' ? (/당직|H\/U/i.test((x.m1 || '') + (x.m2 || '')) ? 1 : 3) : unitOf(x)), 0);
   const hs = Object.values(H0).reduce((a, b) => a + b, 0), d = units - hs, ok = Math.ceil(n / 4);
   return { units, ho: hs, d, over: d > ok ? d : 0, per: Math.round(d / n * 10) / 10 };
+}
+// 📝 배정 의견 (2026-11-19): 그날 배정 결과 한 벌 — 엔진안(처음) · 지금(고친 뒤) · 고친 것 · 대조 · 계산 입력
+function byName(R) { const o = {}; Object.keys((R && R.workers) || {}).forEach(n => { o[n] = R.workers[n].rooms.slice(); }); return o; }
+function hkByName() { const o = {}; (A.done || []).forEach(x => { String(x.name || '').split(',').map(s => s.replace(/ /g, '')).filter(Boolean).forEach(n => { (o[n] = o[n] || []).push(String(x.room)); }); }); return o; }
+function cmpLite() { const C = A.cmp; return C ? { pct: C.pct, same: C.same, total: C.total, hkAvg: Math.round(C.hkAvg * 100) / 100, hkThree: C.hkThree.length } : null; }
+export function snapshot() {
+  if (!A || !A.res) return null;
+  const s = A.res.stats || {};
+  return { date: A.date, file: A.file || '', kind: A.done ? '완성본 대조' : '초안', engine: A.res0 || byName(A.res), final: byName(A.res), edits: (A.edits || []).slice(), left: (A.res.left || []).slice(),
+    stats: { avgFloors: Math.round((s.avgFloors || 0) * 100) / 100, three: (s.three || []).slice(), target: s.target || 0, units: s.units || 0 }, cmp: cmpLite(), input: A.input || null, ver: VER };
+}
+// asg_days/{날짜}: 매일 품질 기록 (확정해서 올릴 때 · 완성본 대조할 때). 관리자만 씀, 매일 점검 계정이 읽음 (규칙 v19)
+function saveDay(extra) {
+  const s = snapshot(); if (!s) return;
+  const d = Object.assign({ date: A.date, at: H.S.SERVER_TIME, by: (H.admin() || {}).label || '' }, extra || {});
+  if (!extra || !extra.hk) Object.assign(d, { engine: s.engine, final: s.final, edits: s.edits, nEdits: s.edits.length, stats: s.stats, input: s.input, ver: VER });
+  else d.engineHk = s.engine;
+  H.S.merge('asg_days/' + A.date, d).catch(() => {});
+}
+function openNote() {
+  import(new URL('./asgnote.js?v=' + (new URL(import.meta.url).searchParams.get('v') || VER), import.meta.url).href).then(m => m.openNotes(H, { snap: snapshot() })).catch(e => { A.err = '배정 의견 화면을 못 불러왔어요: ' + (e && e.message || e); draw(); });
 }
 function saveLast(H0) {
   lsSet('asg_ho', JSON.stringify(H0));
@@ -256,6 +280,7 @@ async function confirmUpload() {
     const summary = { ok: !R.left.length, maids: new Set(rows.map(r => r[1])).size, rooms: rows.length, units, checks: [], tags: {}, groups: [], due: [] };
     await downXlsx(true);
     H.upload({ date: A.date, file: '자동 배정 · ' + A.file, res: { csv, rows, sheet: A.sheet, summary, data: d2 } });
+    saveDay({ sentAt: Date.now() });
     const d = Object.assign({}, A.cfgDoc, { lastSent: { date: A.date, edits: A.edits.length, at: Date.now() } });
     H.S.set('meta/assign', d).catch(() => {});
     close();
@@ -513,6 +538,7 @@ function resultHtml() {
     (s.bMove && s.bMove.length ? '<br>B키 옮기기: ' + esc(s.bMove.map(m => m.b + ' ' + m.from.join('·') + 'F B ' + m.rooms.length + '실 → ' + m.a.join('·') + ((m.shared || []).length ? '(옆 분 ' + m.shared.length + '실)' : '') + ' / ' + m.b + ' 님은 ' + ((m.bFloors || []).length ? m.bFloors.join('·') + 'F' : m.to + 'F')).join(', ')) : '') +
     (s.three.length ? '<br>3개 층: ' + esc(s.three.join(', ')) : '') + mixNote() + (R.left.length ? '<br><span style="color:var(--warn)">미배정: ' + R.left.map(r => '<button class="asg-chip bad" data-as="room" data-v="' + esc(r) + '" data-f="(미배정)">' + esc(r) + '</button>').join(' ') + '</span>' : '') + '</p>' +
     (A.edits && A.edits.length ? '<p class="note">✏️ 고친 것 ' + A.edits.length + '건: ' + esc(A.edits.slice(-5).join(' / ')) + (A.edits.length > 5 ? ' …' : '') + '</p>' : '') +
+    '<button class="big-btn sec" style="margin-top:8px" data-as="note">📝 배정 의견 남기기 (이 결과와 같이 저장)</button>' +
     (A.done ? '<p class="note">완성본으로 대조하는 중이라 앱에는 올리지 않아요. 초안을 넣으면 확정 버튼이 생겨요.</p>'
       : '<button class="big-btn" style="margin-top:10px" data-as="send">✅ 확정 → 앱에 올리기 + 엑셀 받기</button>' +
         '<button class="big-btn sec" style="margin-top:8px" data-as="xlsx"' + (A.xbusy ? ' disabled' : '') + '>' + (A.xbusy ? '엑셀 만드는 중…' : '📄 정비보고서 엑셀만 받기 (오더테이커용)') + '</button>' +
@@ -596,6 +622,7 @@ document.addEventListener('click', e => {
   if (a === 'room') { const f = t.getAttribute('data-f'); A.mv = A.mv && A.mv.room === v && A.mv.from === f ? null : { room: v, from: f }; draw(); return; }
   if (a === 'mvx') { A.mv = null; draw(); return; }
   if (a === 'mvok') { const to = (document.getElementById('asto') || {}).value; if (A.mv) moveRoom(A.mv.room, A.mv.from, to); A.mv = null; draw(); return; }
+  if (a === 'note') { openNote(); return; }
   if (a === 'send') { confirmUpload(); return; }
   if (a === 'xlsx') { downXlsx(); return; }
 });

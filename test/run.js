@@ -26,6 +26,7 @@ function seed(kind) {
   s['days/' + DAY + '/changes/c1'] = { kind: '추가', maid: '메이드3', room: '2001', by: '본인', at: now - 7200e3, parties: ['메이드3'] };
   s['devices/dv1'] = { name: '메이드1', at: now - 864e5 };
   s['notices/n1'] = { title: '시험 공지', body: '예시', from: DAY, to: DAY };
+  s['asg_notes/an1'] = { d: DAY, text: '1203·1205는 같은 분이 가야 해요', by: '하우스맨예시', kind: 'rule', re: '', st: 'ask', reply: '두 방을 늘 같은 분에게 줄까요, 그날 담당 층 분에게 줄까요?', rAt: now - 600000, ver: '', at: now - 3600e3, snap: null };
   if (kind === 'busy') s['errors/e1'] = { day: DAY, name: '메이드2', where: '저장', msg: '예시 오류', at: now - 600000 };
   if (kind === 'busy') {
     s['leave_apps/L1'] = { status: '대기', deleted: false, name: '홍길순' };
@@ -125,6 +126,17 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.click('[data-go="work"]'); await sleep(300);
   await p.click('[data-tab="asg"]'); await sleep(200);
   ok(/자동 배정 열기/.test(await p.innerText('main')), '자동 배정은 오늘 정비 탭으로');
+  await p.click('[data-asg="notes"]'); await p.waitForSelector('#anp .an-list li', { timeout: 6000 }).catch(() => {});
+  const an = await p.innerText('#anp');
+  ok(/질문 있어요/.test(an) && /1203 · 1205/.test(an) && /같은 분에게 줄까요/.test(an), '배정 의견: 지난 의견 · 질문 · 답 · 객실 번호');
+  await p.click('#anp [data-an="re"]'); await sleep(150);
+  ok(/이어서 답하기/.test(await p.innerText('#anp')), '배정 의견: 이어서 적기');
+  await p.fill('#antext', '늘 같은 분이요'); await p.fill('#anby', '하우스맨예시'); await p.click('#anp [data-an="save"]'); await sleep(400);
+  const an2 = await p.evaluate(() => Object.keys(window.__seed).filter(k => /^asg_notes\//.test(k) && k !== 'asg_notes/an1').map(k => window.__seed[k]));
+  ok(an2.length === 1 && an2[0].re === 'an1' && an2[0].st === 'new' && an2[0].text === '늘 같은 분이요' && an2[0].by === '하우스맨예시' && an2[0].reply === '' && an2[0].acct === '소장', '배정 의견: 저장 (이어 쓴 id · 새 의견 · 계정)');
+  ok(/저장했어요/.test(await p.innerText('#anp')), '배정 의견: 저장 안내');
+  await p.click('#anp [data-an="close"]'); await sleep(150);
+  ok(await p.locator('#anp').count() === 0, '배정 의견: 닫기');
   await p.click('[data-tab="now"]'); await sleep(200);
   await p.click('[data-rm="today"]');
   const fr = () => p.frameLocator('#rmf');

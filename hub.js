@@ -21,13 +21,13 @@
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 import * as K from '../rm/app/keys.js';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.19-13';
-import * as PIN from './pin.js?v=2026.11.19-13';
-import { setupClose } from './close.js?v=2026.11.19-13';
-import { setupClosing } from './closing.js?v=2026.11.19-13';
-import * as XW from './xlsxw.js?v=2026.11.19-13';
+import { setupNotice } from './notice.js?v=2026.11.19-14';
+import * as PIN from './pin.js?v=2026.11.19-14';
+import { setupClose } from './close.js?v=2026.11.19-14';
+import { setupClosing } from './closing.js?v=2026.11.19-14';
+import * as XW from './xlsxw.js?v=2026.11.19-14';
 
-const VER = '2026.11.19-13';
+const VER = '2026.11.19-14';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -529,9 +529,15 @@ async function openAssignUI(view) {
   try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, admin: () => admin, user: () => user, upload: o => { up = { file: o.file, date: o.date, res: o.res, buf: null }; goSec('work', 'up'); draw(); upSend(true); scrollUp(); } }, { view }); }
   catch (e) { alert('자동 배정 화면을 못 불러왔어요: ' + (e && e.message || e)); }
 }
+// 📝 배정 의견 (2026-11-19): 하우스맨 의견 → 매일 오전 10시 점검이 답 (asgnote.js · asg_notes)
+async function openAsgNotes() {
+  try { const m = await import(new URL('./asgnote.js?v=' + VER, import.meta.url).href); m.openNotes({ S, esc, ymd, addDays, md, admin: () => admin, user: () => user }); }
+  catch (e) { alert('배정 의견 화면을 못 불러왔어요: ' + (e && e.message || e)); }
+}
 function assignCardHtml() {
   return '<div class="card"><h2>🧩 자동 배정 <small>시험 · 하우스키퍼와 대조</small></h2><p class="note" style="margin:0 0 12px">정비보고서 초안(또는 하우스키퍼 완성본)을 넣고 출근자·인계 유닛을 맞추면 엔진이 배정안을 만들어요. 완성본을 넣으면 하우스키퍼 배정과 바로 비교해요. 아직 메이드 휴대폰에는 안 올라가요.</p>' +
-    '<div class="btn2"><button class="big-btn" data-asg="1">자동 배정 열기</button><button class="big-btn sec" data-asg="blocks">🚧 장기 미정비</button></div></div>';
+    '<div class="btn2"><button class="big-btn" data-asg="1">자동 배정 열기</button><button class="big-btn sec" data-asg="blocks">🚧 장기 미정비</button></div>' +
+    '<button class="big-btn sec" style="margin-top:8px" data-asg="notes">📝 배정 의견 · 답 보기</button></div>';
 }
 // 🔍 객실 인스펙션 (2026-11-15 ① 새 구조) — 따로 쪽(insp/): 찍고 → 사진마다 지적 → 카톡 한 장 이미지. 점검자 공용 계정도 들어옴
 function inspCardHtml() {
@@ -817,7 +823,7 @@ document.addEventListener('click', e => {
   if (t.hasAttribute('data-voc')) { openVoc(); return; }
   if (t.hasAttribute('data-act')) { openAct(); return; }
   if (t.hasAttribute('data-actlogin')) { actLogin(); return; }
-  if (t.hasAttribute('data-asg')) { openAssignUI(t.getAttribute('data-asg') === 'blocks' ? 'blocks' : ''); return; }
+  if (t.hasAttribute('data-asg')) { if (t.getAttribute('data-asg') === 'notes') { openAsgNotes(); return; } openAssignUI(t.getAttribute('data-asg') === 'blocks' ? 'blocks' : ''); return; }
   if (t.hasAttribute('data-actclose')) { closeAct(); return; }
   if (t.hasAttribute('data-vclose')) { closeVoc(); load(false); return; }
   if (t.hasAttribute('data-hdist')) { openDist(); return; }
