@@ -67,6 +67,7 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   //   신입(입사 3개월 미만 = opts.vipNo, 정량 8 미만 신입 포함)은 VIP 가급적 안 줌 — VIP 1실마다 VIP_NEW 벌점 (11/14 사용자)
   const VIP_NO = new Set([...(opts.vipNo || []), ...STAGE, ...Object.keys(opts.trainees || {})]), VIP_NEW = opts.vipNew != null ? opts.vipNew : 120;
   const KEEP_PRI = opts.keepPri != null ? opts.keepPri : 10;
+  const KEY_SPEC = opts.keySpec != null ? opts.keySpec : 200;
   const KEY_B = opts.keyB != null ? opts.keyB : 25, KEY_COVER = opts.keyCover != null ? opts.keyCover : 12;
   const EARLY_ON = opts.early !== false, EARLY_MAX = opts.earlyMax != null ? opts.earlyMax : 4, EARLY_PEN = opts.earlyPen != null ? opts.earlyPen : 20;
   const FOR_ON = opts.cookSpread !== false, FOR_MAX = opts.cookMax != null ? opts.cookMax : 3, FOR_PEN = opts.cookPen != null ? opts.cookPen : 15;
@@ -244,7 +245,7 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
     for (const r of w.rooms) { const x = TX[r]; if (!x || r === '2901') continue; const ko = keyOf(x); if (ko && ko !== n && ko !== MATE[n]) {
         // 11/19: B키도 A키처럼 자기 구역 우선(12→KEY_B) · A키가 없으면 그 층 B키가 A구역도 담당(테마·우선정비 포함, 11/18 의견 3번)
         const real = (zone(x) === 'A' ? A_KEY : B_KEY)[x.floor] === ko, cover = !real && zone(x) === 'A' && !W[A_KEY[x.floor]] && B_KEY[x.floor] === ko;
-        c += real ? (zone(x) === 'A' ? 25 : KEY_B) : cover ? KEY_COVER : 1;
+        c += real ? (isSpecF(x.floor) ? KEY_SPEC : zone(x) === 'A' ? 25 : KEY_B) : cover ? (isSpecF(x.floor) ? KEY_SPEC / 2 : KEY_COVER) : 1;   // 11/19 특화 층 담당은 최우선 (가능자는 담당 휴무 · 넘칠 때만)
         if ((real || cover) && x.late) c += KEEP_PRI * (cover ? 2 : 1); } }
     // 11/19 취사(FOR) 분산 (11/18 의견 4번): 담당 아닌 취사 객실은 한 분 FOR_MAX 실까지, 넘으면 1실마다 FOR_PEN
     if (FOR_ON) { const k = w.rooms.filter(r => { const x = TX[r]; if (!x || !x.cook) return false; const ko = keyOf(x); return ko !== n && !(ko && ko === MATE[n]); }).length; if (k > FOR_MAX) c += (k - FOR_MAX) * FOR_PEN; }   // 11/15 담당이 출근했으면 그 층 우선정비·테마(FAW 1707·1708 등)는 담당이 갖고, 남는 일반 방을 남이 받음

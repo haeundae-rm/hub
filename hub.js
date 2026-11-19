@@ -21,13 +21,13 @@
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
 import * as K from '../rm/app/keys.js';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.19-15';
-import * as PIN from './pin.js?v=2026.11.19-15';
-import { setupClose } from './close.js?v=2026.11.19-15';
-import { setupClosing } from './closing.js?v=2026.11.19-15';
-import * as XW from './xlsxw.js?v=2026.11.19-15';
+import { setupNotice } from './notice.js?v=2026.11.19-16';
+import * as PIN from './pin.js?v=2026.11.19-16';
+import { setupClose } from './close.js?v=2026.11.19-16';
+import { setupClosing } from './closing.js?v=2026.11.19-16';
+import * as XW from './xlsxw.js?v=2026.11.19-16';
 
-const VER = '2026.11.19-15';
+const VER = '2026.11.19-16';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
