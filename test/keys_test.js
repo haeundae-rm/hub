@@ -212,6 +212,11 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   await p.click('[data-allin]'); await sleep(500);
   ok(/56\/56/.test(await p.textContent('.sum4')), '대조 안 한 칸 모두 있음 → 56/56');
   await p.emulateMedia({ media: 'print' }); await p.screenshot({ path: path.join(OUT, 'h2_인쇄.png'), fullPage: true }); await p.emulateMedia({ media: 'screen' });
+  await p.click('[data-ckreset]'); await sleep(500);
+  ok(/0\/56/.test(await p.textContent('.sum4')), '대조 전체 초기화 → 0/56 ' + (await p.textContent('.sum4')));
+  const nChk2 = await p.evaluate(d => Object.keys(window.__seed).filter(k => k.startsWith('days/' + d + '/keychk/')).length, DAY);
+  ok(nChk2 > 56, '초기화도 줄 추가 (지우기 없음) ' + nChk2);
+  await p.click('[data-allin]'); await sleep(500);
   ok(!p.errs.length, '오류 없음 ' + p.errs.join(' | '));
   await p.evaluate(() => sessionStorage.clear());
   await p.context().close();

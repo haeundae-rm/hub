@@ -6,7 +6,7 @@
 import * as S from '../../rm/app/store.js';
 import * as K from '../../rm/app/keys.js';
 
-const VER = '2026.11.19-2';
+const VER = '2026.11.19-3';
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
   { k: 'boss', label: '소장', email: 'unieshaeundae+admin@gmail.com', uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2' },
@@ -69,6 +69,15 @@ async function checkAllIn() {
   if (!confirm('대조 안 한 ' + todo.length + '칸을 모두 「있음」으로 할까요?\n(없는 키는 먼저 「없음」으로 눌러 두세요)')) return;
   busy = true; draw();
   try { await Promise.all(todo.map(([f, k]) => S.add('days/' + date + '/keychk', { floor: f, key: k, st: 'in', by: role.label, at: S.SERVER_TIME, clientAt: new Date(), uid: user.uid }).done)); toast(todo.length + '칸 있음으로 했어요'); }
+  catch (e) { toast('저장하지 못했어요: ' + errOf(e)); }
+  await load(null, true);
+}
+async function checkReset() {
+  const todo = []; st.sum.ledger.forEach(r => ['A', 'B'].forEach(k => { if (r[k].chk && r[k].chk.st) todo.push([r.floor, k]); }));
+  if (!todo.length) { toast('대조한 칸이 없어요'); return; }
+  if (!confirm('대조한 ' + todo.length + '칸(있음 · 없음)을 모두 처음 상태로 돌릴까요?\n(누른 기록은 지워지지 않고 남아요)')) return;
+  busy = true; draw();
+  try { await Promise.all(todo.map(([f, k]) => S.add('days/' + date + '/keychk', { floor: f, key: k, st: '', by: role.label, at: S.SERVER_TIME, clientAt: new Date(), uid: user.uid }).done)); toast(todo.length + '칸을 처음 상태로 돌렸어요'); }
   catch (e) { toast('저장하지 못했어요: ' + errOf(e)); }
   await load(null, true);
 }
@@ -146,7 +155,7 @@ function mainHtml() {
       return '<div class="lr"><div class="lf"><b>' + r.floor + '층</b>' + (mine.length ? '<small>' + mine.map(esc).join('<br>') + '</small>' : '') + (ed ? '<button class="fx" data-fix="' + r.floor + '">고치기</button>' : '') + '</div>' + cell('A') + cell('B') +
         (r.none.length ? '<div class="ln">안 가져감 · ' + r.none.map(d => esc(d.maid) + (d.reason ? ' (' + esc(d.reason) + ')' : '')).join(', ') + '</div>' : '') + '</div>';
     }).join('') + '</div>' +
-    (ed && today ? '<button class="big sec" data-allin="1" style="margin-top:10px">대조 안 한 칸 모두 「있음」</button>' : '') +
+    (ed && today ? '<div style="display:flex;gap:8px;margin-top:10px"><button class="big sec" data-allin="1" style="flex:2">대조 안 한 칸 모두 「있음」</button><button class="big sec" data-ckreset="1" style="flex:1">대조 전체 초기화</button></div>' : '') +
     '<p class="note">대조는 하루 몇 번 해도 돼요. 마지막으로 누른 값이 남고, 누가 언제 눌렀는지 기록돼요. 같은 버튼을 다시 누르면 비워져요.</p></div>';
   // 바꾼 기록
   const hist = {}; (st.keys || []).map(x => Object.assign({ id: x.id }, x.data)).sort((a, b) => (tOf(a) || 0) - (tOf(b) || 0)).forEach(d => { const k = d.maid + '|' + d.floor; (hist[k] = hist[k] || []).push(d); });
@@ -233,6 +242,7 @@ document.addEventListener('click', e => {
   if (!st) return;
   if (t.hasAttribute('data-ck')) { const [f, k, v] = t.getAttribute('data-ck').split(':'); check(Number(f), k, v); return; }
   if (t.hasAttribute('data-allin')) { checkAllIn(); return; }
+  if (t.hasAttribute('data-ckreset')) { checkReset(); return; }
   if (t.hasAttribute('data-fix')) { fix = { floor: Number(t.getAttribute('data-fix')), maid: '', key: '', reason: '' }; draw(); return; }
   if (fix) {
     if (t.hasAttribute('data-fk')) { const m = $('#fx-maid'); if (m) fix.maid = m.value; fix.key = t.getAttribute('data-fk'); fix.err = ''; draw(); return; }
