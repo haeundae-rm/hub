@@ -71,13 +71,10 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   // 13층은 아직 잠김
   await p.click('[data-room="1301"]'); await p.waitForSelector('.panel');
   ok(/13층 키를 먼저/.test(await p.textContent('.panel')), '다른 층(13층)은 여전히 잠김');
-  await p.click('.panel [data-keynone="13"]'); await p.waitForSelector('.kreasons');
-  await p.click('.panel [data-kdo]');
-  ok(/이유를/.test(await p.textContent('.panel')), '안 가져가요: 이유 안 고르면 저장 안 됨');
-  await p.click('[data-kreason="짝이 열어 줌"]'); await p.click('.panel [data-kdo]');
+  await p.click('.panel [data-keynone="13"]');
   await p.waitForSelector('.panel .chk');
   ks = await keysOf(p);
-  ok(ks.some(k => k.floor === 13 && k.key === '없음' && k.reason === '짝이 열어 줌'), '13층 안 가져감 (짝이 열어 줌) 기록 → 객실 창으로');
+  ok(ks.some(k => k.floor === 13 && k.key === '없음' && !k.reason), '13층 안 가져가요: 이유 안 묻고 바로 저장 → 객실 창으로');
   await p.click('.panel [data-x]'); await sleep(200);
   ok(await p.locator('.keyband.done').count() === 1, '모든 층 답하면 한 줄 띠로 줄어듦 (계속 보임)');
   await p.screenshot({ path: path.join(OUT, 'k3_답한뒤.png') });
@@ -175,10 +172,9 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   ok(/사무실에 있음/.test(kl), '전체 키 현황: 대조로 반납 확인된 키는 「사무실에 있음」');
   ok(await p.locator('.kl.me').count() === 1, '내 층(12층)은 노란색');
   await p.screenshot({ path: path.join(OUT, 'k7_전체키현황.png') });
+  const sc = await p.evaluate(() => { const pn = document.querySelector('.panel'), kl = document.querySelector('.klist'); pn.scrollTop = 99999; const r = kl.lastElementChild.getBoundingClientRect(); return { cut: kl.scrollHeight - kl.clientHeight, top: pn.scrollTop, vis: r.bottom <= window.innerHeight + 1 }; });
+  ok(sc.cut <= 1 && sc.top > 0 && sc.vis, '현황 창: 목록이 잘리지 않고 끝(31층)까지 내려감 ' + JSON.stringify(sc));
   await p.click('.panel [data-x]'); await sleep(100);
-  await p.click('[data-keynone="12"]'); await p.click('[data-kreason="다른 분 키"]');
-  ok(/12층 키.*김하나 님이 가지고 있어요/.test(await p.textContent('.kwho')), '「다른 분 키」 고르면 그 층 키 가진 분 이름이 바로 나옴');
-  await p.screenshot({ path: path.join(OUT, 'k8_다른분키.png') });
   await p.context().close();
 
   // ---------- 2. 허브 키 대장
