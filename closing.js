@@ -69,7 +69,11 @@ export function hrRows(staff, M, note, today) {
 }
 // 서류 4종 (2단계, 2026-11-19): 입퇴사 앱 HrStaff 가 staff/{id}.docs = {c,a,i,b} (1 = 있음) 로 보냄. 허브에서 고치면 그 달 메모 hr[id].docs 가 우선
 export const DOCS = [['c', '근로계약서'], ['a', '입사지원서'], ['i', '신분증 사본'], ['b', '통장 사본']];
-const docsNorm = d => (d && typeof d === 'object' ? { c: d.c ? 1 : 0, a: d.a ? 1 : 0, i: d.i ? 1 : 0, b: d.b ? 1 : 0 } : null);
+// 값: 1 = 있음 · 0 = 없음 · 2 = 해당 없음(하도급 일용은 지원서·신분증·통장을 안 받음 — 미비로 안 셈)
+const dv = v => (+v === 2 ? 2 : v ? 1 : 0);
+const docsNorm = d => (d && typeof d === 'object' ? { c: dv(d.c), a: dv(d.a), i: dv(d.i), b: dv(d.b) } : null);
+/** 표·파일에 쓰는 표시: ○ 있음 · - 해당 없음 · 빈칸 없음 */
+export const docMark = v => (+v === 2 ? '-' : v ? '○' : '');
 /** 서류 확인 글 (원래 엑셀 수식과 같게): 모름 '-' · 4종 다 '완비' · 아니면 '미비 : 빠진 것' */
 export function docCheck(d) {
   if (!d) return '-';
@@ -159,7 +163,7 @@ export function setupClosing(c) {
   }
   function docsLine(p) {
     const ck = docCheck(p.docs);
-    return '<div class="cs-docs">' + DOCS.map(x => '<i class="' + (p.docs && p.docs[x[0]] ? 'on' : '') + '">' + (p.docs ? (p.docs[x[0]] ? '○ ' : '× ') : '') + esc(x[1].replace(' 사본', '')) + '</i>').join('') +
+    return '<div class="cs-docs">' + DOCS.map(x => '<i class="' + (p.docs && p.docs[x[0]] ? 'on' : '') + '"' + (p.docs && p.docs[x[0]] === 2 ? ' title="해당 없음"' : '') + '>' + (p.docs ? (p.docs[x[0]] === 2 ? '- ' : p.docs[x[0]] ? '○ ' : '× ') : '') + esc(x[1].replace(' 사본', '')) + '</i>').join('') +
       '<b class="' + (ck === '완비' ? 'ok' : ck === '-' ? 'unk' : 'bad') + '">' + (ck === '-' ? '서류 정보 없음' : esc(ck.replace(' : ', ': '))) + '</b></div>';
   }
   function hrFormHtml() {
@@ -168,7 +172,7 @@ export function setupClosing(c) {
       (f.manual ? '<label>성명<input data-csh="name" maxlength="20" value="' + esc(f.name) + '"></label><div class="cs-2"><label>부서<select data-csh="dept">' + DEPTS.map(x => '<option' + (x === f.dept ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label><label>근로 여부<select data-csh="state">' + ['재직', '퇴사', '입사 진행'].map(x => '<option' + (x === f.state ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></label></div>' +
         '<div class="cs-2"><label>입사일<input type="date" data-csh="hired" value="' + esc(f.hired) + '"></label><label>마지막 근로일<input type="date" data-csh="left" value="' + esc(f.left) + '"></label></div>'
         : '<p class="note" style="margin:0 0 8px">' + esc(f.dept) + ' · 입사 ' + esc(f.hired || '-') + (f.left ? ' · 마지막 근로 ' + esc(f.left) : '') + '<br>이름 · 날짜는 입퇴사 앱 · 직원 명단에서 고쳐요.</p>') +
-      '<div class="cs-dform"><span>서류 확인' + (f.docsSrc && !f.docsTouched ? ' <small>(' + esc(f.docsSrc) + ' 기준)</small>' : '') + '</span><div>' + DOCS.map(x => '<button data-cs="doc" data-v="' + x[0] + '" aria-pressed="' + !!(f.docs && f.docs[x[0]]) + '">' + (f.docs && f.docs[x[0]] ? '○ ' : '') + esc(x[1]) + '</button>').join('') + '</div></div>' +
+      '<div class="cs-dform"><span>서류 확인' + (f.docsSrc && !f.docsTouched ? ' <small>(' + esc(f.docsSrc) + ' 기준)</small>' : '') + ' <small>누를 때마다 ○ 있음 → - 해당 없음 → 없음</small></span><div>' + DOCS.map(x => '<button data-cs="doc" data-v="' + x[0] + '" aria-pressed="' + !!(f.docs && f.docs[x[0]]) + '">' + (f.docs && f.docs[x[0]] === 2 ? '- ' : f.docs && f.docs[x[0]] ? '○ ' : '') + esc(x[1]) + (f.docs && f.docs[x[0]] === 2 ? ' <small>해당 없음</small>' : '') + '</button>').join('') + '</div></div>' +
       '<label>퇴사사유<input data-csh="reason" maxlength="60" value="' + esc(f.reason) + '" placeholder="예: 개인사유"></label>' +
       '<label>비고<input data-csh="memo" maxlength="120" value="' + esc(f.memo) + '" placeholder="예: 경력수당 적용 · 지난달 누락분 지급 필요"></label>' +
       (f.err ? '<p class="err">' + esc(f.err) + '</p>' : '') +
@@ -264,7 +268,7 @@ export function setupClosing(c) {
     // 2장 입퇴사
     const H2 = ['순번', '부서', '성명', '구분', '입사일자', '근로여부', '마지막 근로일', '근로\n계약서', '입사\n지원서', '신분증\n사본', '통장\n사본', '서류 확인', '퇴사사유', '비고'];
     const s2 = [title('입 / 퇴사자 현황'), sub, [], H2.map(v => ({ v, s: 'head' }))].concat(P.hr.length ? P.hr.map((p, i) => [{ v: i + 1, s: 'num' }, { v: p.dept, s: 'cell' }, { v: p.name, s: 'cellb' }, { v: p.isIn && p.isOut ? '입·퇴사' : p.isOut ? '퇴사' : '입사', s: p.isOut ? 'out' : 'in' },
-      { v: p.hired, s: 'cell' }, { v: p.state, s: 'cell' }, { v: p.left, s: 'cell' }].concat(DOCS.map(x => ({ v: p.docs ? (p.docs[x[0]] ? '○' : '') : '', s: 'num' })), [{ v: docCheck(p.docs), s: /^미비/.test(docCheck(p.docs)) ? 'carry' : docCheck(p.docs) === '완비' ? 'done' : 'num' }, { v: p.reason, s: 'wrap' }, { v: p.memo, s: 'wrap' }])) : [[{ v: '이 달 입사 · 퇴사자 없음', s: 'cell' }]]);
+      { v: p.hired, s: 'cell' }, { v: p.state, s: 'cell' }, { v: p.left, s: 'cell' }].concat(DOCS.map(x => ({ v: p.docs ? docMark(p.docs[x[0]]) : '', s: 'num' })), [{ v: docCheck(p.docs), s: /^미비/.test(docCheck(p.docs)) ? 'carry' : docCheck(p.docs) === '완비' ? 'done' : 'num' }, { v: p.reason, s: 'wrap' }, { v: p.memo, s: 'wrap' }])) : [[{ v: '이 달 입사 · 퇴사자 없음', s: 'cell' }]]);
     // 3장 특이사항
     const H3 = ['번호', '부서', '대상자', '유형', '내용', 'OT', '특근', '금액 (원)', '적용 월', '조치', '비고'];
     const s3 = [title('특 이 사 항'), sub, [], H3.map(v => ({ v, s: 'head' }))].concat(P.rows.length ? P.rows.map((r, i) => [{ v: i + 1, s: 'num' }, { v: r.it.dept, s: 'cell' }, { v: r.it.name, s: 'cellb' }, { v: r.it.type, s: 'cell' },
@@ -296,7 +300,7 @@ export function setupClosing(c) {
       (types.length ? '<div class="types">' + types.map(t => '<i style="background:' + (TCOL[t] || '#4B5563') + '">' + e(t) + ' ' + P.sm.byType[t].n + (P.sm.byType[t].amount ? ' · ' + won(P.sm.byType[t].amount) + '원' : '') + '</i>').join('') + '</div>' : '') +
       '<h2>입 / 퇴사자 현황 (' + P.hr.length + '명)</h2><table><colgroup><col style="width:3.5%"><col style="width:8%"><col style="width:7%"><col style="width:5.5%"><col style="width:7.5%"><col style="width:6%"><col style="width:7.5%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:13%"><col style="width:9%"><col></colgroup>' +
       '<thead><tr><th>순번</th><th>부서</th><th>성명</th><th>구분</th><th>입사일자</th><th>근로여부</th><th>마지막<br>근로일</th><th>근로<br>계약서</th><th>입사<br>지원서</th><th>신분증<br>사본</th><th>통장<br>사본</th><th>서류 확인</th><th>퇴사사유</th><th>비고</th></tr></thead><tbody>' +
-      (P.hr.length ? P.hr.map((p, i) => '<tr><td class="c">' + (i + 1) + '</td><td>' + e(p.dept) + '</td><td><b>' + e(p.name) + '</b></td><td class="c"><span class="tg" style="background:' + (p.isOut ? '#B91C1C' : '#047857') + '">' + (p.isIn && p.isOut ? '입·퇴사' : p.isOut ? '퇴사' : '입사') + '</span></td><td class="c">' + e(p.hired) + '</td><td class="c">' + e(p.state) + '</td><td class="c">' + e(p.left) + '</td>' + DOCS.map(x => '<td class="c">' + (p.docs && p.docs[x[0]] ? '○' : '') + '</td>').join('') + '<td class="' + (/^미비/.test(docCheck(p.docs)) ? 'cy' : 'c') + '">' + e(docCheck(p.docs)) + '</td><td>' + e(p.reason) + '</td><td>' + e(p.memo) + '</td></tr>').join('')
+      (P.hr.length ? P.hr.map((p, i) => '<tr><td class="c">' + (i + 1) + '</td><td>' + e(p.dept) + '</td><td><b>' + e(p.name) + '</b></td><td class="c"><span class="tg" style="background:' + (p.isOut ? '#B91C1C' : '#047857') + '">' + (p.isIn && p.isOut ? '입·퇴사' : p.isOut ? '퇴사' : '입사') + '</span></td><td class="c">' + e(p.hired) + '</td><td class="c">' + e(p.state) + '</td><td class="c">' + e(p.left) + '</td>' + DOCS.map(x => '<td class="c">' + (p.docs ? docMark(p.docs[x[0]]) : '') + '</td>').join('') + '<td class="' + (/^미비/.test(docCheck(p.docs)) ? 'cy' : 'c') + '">' + e(docCheck(p.docs)) + '</td><td>' + e(p.reason) + '</td><td>' + e(p.memo) + '</td></tr>').join('')
         : '<tr><td colspan="14" class="c sm">이 달 입사 · 퇴사자 없음</td></tr>') + '</tbody></table>' +
       '<h2' + (P.hr.length > 6 ? ' class="pb"' : '') + '>특이사항 (' + P.rows.length + '건)</h2><table><colgroup><col style="width:4%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col><col style="width:5%"><col style="width:5%"><col style="width:8%"><col style="width:9%"><col style="width:7%"><col style="width:12%"></colgroup>' +
       '<thead><tr><th>번호</th><th>부서</th><th>대상자</th><th>유형</th><th>내용</th><th>OT</th><th>특근</th><th>금액(원)</th><th>적용 월</th><th>조치</th><th>비고</th></tr></thead><tbody>' +
@@ -331,7 +335,7 @@ export function setupClosing(c) {
     else if (k === 'stop' && st.form) { const fid = st.form.id, ym = st.ym; if (await patchItem(fid, x => { x.end = ym; }, ymLabel(ym) + '까지만 나오게 했어요.')) st.form = null; c.draw(); }
     else if (k === 'hr') openHr(id);
     else if (k === 'hradd') { st.hrForm = { manual: true, idx: -1, name: '', dept: DEPTS[0], state: '재직', hired: st.ym + '-01', left: '', reason: '', memo: '', err: '' }; c.draw(); window.scrollTo(0, 0); }
-    else if (k === 'doc' && st.hrForm) { const f = st.hrForm, v = t.getAttribute('data-v'); f.docs = Object.assign({ c: 0, a: 0, i: 0, b: 0 }, f.docs || {}); f.docs[v] = f.docs[v] ? 0 : 1; f.docsTouched = true; c.draw(); }
+    else if (k === 'doc' && st.hrForm) { const f = st.hrForm, v = t.getAttribute('data-v'); f.docs = Object.assign({ c: 0, a: 0, i: 0, b: 0 }, f.docs || {}); f.docs[v] = (f.docs[v] + 1) % 3; f.docsTouched = true; c.draw(); }
     else if (k === 'hrsave') saveHr();
     else if (k === 'hrdel' && st.hrForm) { if (!confirm('이 분을 이 달 입퇴사 현황에서 뺄까요?')) return; const i = st.hrForm.idx; if (await saveNote(st.ym, nt => { nt.hrx = (nt.hrx || []).filter((_, j) => j !== i); }, '뺐어요.')) st.hrForm = null; c.draw(); }
     else if (k === 'lockm') { if (!confirm(ymLabel(st.ym) + ' 결산을 마감할까요?\n내용이 고정되고, 처리 상태만 바꿀 수 있어요. (나중에 풀 수 있어요)')) return; saveNote(st.ym, nt => { nt.locked = true; nt.lockedAt = Date.now(); }, ymLabel(st.ym) + ' 마감했어요.'); }

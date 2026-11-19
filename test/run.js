@@ -265,7 +265,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('⑤-3 📋 결산마감 특이사항');
   const YM = DAY.slice(0, 7), PYM = (() => { const d = new Date(Date.UTC(+YM.slice(0, 4), +YM.slice(5, 7) - 2, 1)); return d.toISOString().slice(0, 7); })();
   ok(/비밀번호 넣고 열기/.test(await p.innerText('main')), '특이사항은 화면 비밀번호 먼저');
-  await p.evaluate(() => { window.__seed['staff/s1'].docs = { c: 1, a: 1, i: 0, b: 1 }; });
+  await p.evaluate(() => { window.__seed['staff/s1'].docs = { c: 1, a: 2, i: 0, b: 1 }; });
   await p.click('[data-cs="unlock"]'); await pin(p, ['1234', '1234']); await p.waitForSelector('[data-cs="add"]', { timeout: 6000 });
   const addItem = async (o) => {
     await p.click('[data-cs="add"]'); await p.waitForSelector('[data-csf="name"]');
@@ -304,7 +304,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   const sp = WB['특이사항'] || [], body = sp.slice(4);
   ok(body.length === 3 && body.some(r => r[3] === '소개비' && /2\/3회차/.test(r[8])) && body.some(r => /이월/.test(r[8])), '특이사항 장: 3줄 · 회차 · 이월');
   ok((WB['요약'] || []).some(r => r[0] === '금액 합계 (원)' && r[1] === 300000), '요약: 금액 합계 300,000 (매월 10만 + 소개비 1/3·2/3 20만, 완료된 경조는 빠짐) ' + JSON.stringify((WB['요약'] || []).find(r => r[0] === '금액 합계 (원)')) + ')');
-  ok((WB['입퇴사 현황'] || []).some(r => r[2] === '이예시' && r[13] === '경력수당 적용' && r[7] === '○' && r[11] === '완비'), '입퇴사 장: 자동 + 서류 4칸 + 서류 확인 + 비고');
+  ok((WB['입퇴사 현황'] || []).some(r => r[2] === '이예시' && r[13] === '경력수당 적용' && r[7] === '○' && r[8] === '-' && r[11] === '완비'), '입퇴사 장: 자동 + 서류 4칸(지원서 해당 없음 -) + 서류 확인 + 비고');
   const [pop] = await Promise.all([p.context().waitForEvent('page'), p.click('[data-cs="pdf"]')]);
   await pop.waitForLoadState(); await pop.setViewportSize({ width: 1123, height: 794 }); await sleep(400);
   ok(/결산마감 특이사항/.test(await pop.innerText('body')) && /입 \/ 퇴사자 현황/.test(await pop.innerText('body')), 'PDF 화면: 제목 · 입퇴사 · 특이사항');
