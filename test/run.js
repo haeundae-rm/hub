@@ -265,6 +265,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('⑤-3 📋 결산마감 특이사항');
   const YM = DAY.slice(0, 7), PYM = (() => { const d = new Date(Date.UTC(+YM.slice(0, 4), +YM.slice(5, 7) - 2, 1)); return d.toISOString().slice(0, 7); })();
   ok(/비밀번호 넣고 열기/.test(await p.innerText('main')), '특이사항은 화면 비밀번호 먼저');
+  await p.evaluate(() => { window.__seed['staff/s1'].docs = { c: 1, a: 1, i: 0, b: 1 }; });
   await p.click('[data-cs="unlock"]'); await pin(p, ['1234', '1234']); await p.waitForSelector('[data-cs="add"]', { timeout: 6000 });
   const addItem = async (o) => {
     await p.click('[data-cs="add"]'); await p.waitForSelector('[data-csf="name"]');
@@ -289,7 +290,10 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   cst = await p.innerText('main');
   ok(/특이사항 3건/.test(cst) && await p.evaluate(([id, y]) => window.__seed['close_items/' + id].st[y] === '완료', [kyId, PYM]), '지난달 몫 완료 → 이월에서 빠짐 (st[지난달]=완료)');
   ok(/이예시/.test(cst), '입퇴사 현황: 직원 명단에서 이 달 입사자 자동');
-  await p.click('[data-cs="hr"][data-id="s1"]'); await p.fill('[data-csh="memo"]', '경력수당 적용'); await p.click('[data-cs="hrsave"]'); await sleep(400);
+  ok(/미비: 신분증 사본/.test(cst) && /서류 미비 1명/.test(cst), '서류 4종: 입퇴사 앱 값으로 미비 표시 + 미비 수');
+  ok(/서류 정보 없음/.test(cst), '서류 정보 없는 분은 "서류 정보 없음"');
+  await p.click('[data-cs="hr"][data-id="s1"]'); await p.fill('[data-csh="memo"]', '경력수당 적용'); await p.click('[data-cs="doc"][data-v="i"]'); await p.click('[data-cs="hrsave"]'); await sleep(400);
+  ok(/완비/.test(await p.innerText('main')) && await p.evaluate(y => window.__seed['close_month/' + y].hr.s1.docs.i === 1, YM), '허브에서 신분증 체크 → 완비 (그 달 메모에 저장)');
   ok(await p.evaluate(y => ((window.__seed['close_month/' + y] || {}).hr || {}).s1.memo === '경력수당 적용', YM), '입퇴사 비고 저장 (close_month)');
   await shot(p, '15_결산_특이사항.png');
   const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('[data-cs="xlsx"]')]);
@@ -300,7 +304,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   const sp = WB['특이사항'] || [], body = sp.slice(4);
   ok(body.length === 3 && body.some(r => r[3] === '소개비' && /2\/3회차/.test(r[8])) && body.some(r => /이월/.test(r[8])), '특이사항 장: 3줄 · 회차 · 이월');
   ok((WB['요약'] || []).some(r => r[0] === '금액 합계 (원)' && r[1] === 300000), '요약: 금액 합계 300,000 (매월 10만 + 소개비 1/3·2/3 20만, 완료된 경조는 빠짐) ' + JSON.stringify((WB['요약'] || []).find(r => r[0] === '금액 합계 (원)')) + ')');
-  ok((WB['입퇴사 현황'] || []).some(r => r[2] === '이예시' && r[8] === '경력수당 적용'), '입퇴사 장: 자동 + 비고');
+  ok((WB['입퇴사 현황'] || []).some(r => r[2] === '이예시' && r[13] === '경력수당 적용' && r[7] === '○' && r[11] === '완비'), '입퇴사 장: 자동 + 서류 4칸 + 서류 확인 + 비고');
   const [pop] = await Promise.all([p.context().waitForEvent('page'), p.click('[data-cs="pdf"]')]);
   await pop.waitForLoadState(); await pop.setViewportSize({ width: 1123, height: 794 }); await sleep(400);
   ok(/결산마감 특이사항/.test(await pop.innerText('body')) && /입 \/ 퇴사자 현황/.test(await pop.innerText('body')), 'PDF 화면: 제목 · 입퇴사 · 특이사항');
