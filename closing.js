@@ -67,8 +67,22 @@ export function hrRows(staff, M, note, today) {
   out.sort((x, y) => (x.dept || '').localeCompare(y.dept || '', 'ko') || (x.hired || x.left || '').localeCompare(y.hired || y.left || '') || (x.name || '').localeCompare(y.name || '', 'ko'));
   return out;
 }
-// ---------- 근속 도래 (3단계, 2026-11-19): 입사일로부터 1년 · 10년 되는 분 → 급여 인상 특이사항 (예전엔 손으로 적다 누락 · 미지급이 생김)
-export const TENURE_YEARS = [1, 10];
+// ---------- 근속 도래 (3단계, 2026-11-19): 입사일로부터 1 · 3 · 5 · 10년 되는 분 → 급여 인상 특이사항 (예전엔 손으로 적다 누락 · 미지급이 생김)
+//   입퇴사 시트 근속인상.gs 와 같은 규칙: 근속 도달일이 15일(기준일)까지면 그 달 인상, 16일부터면 다음 달 인상
+//   사람 = 직원 명단 staff + 연차 명단 leave_people(입사일 · 퇴사일, 룸메이드). 같은 이름이면 한 사람 (입사일은 더 이른 쪽)
+export const TENURE_YEARS = [1, 3, 5, 10], TENURE_CUT = 15;
+const nm = s => String(s == null ? '' : s).replace(/\s+/g, '');
+/** staff + leave_people → 근속 계산용 사람 목록 (staff 모양: id · name · job · hired · left · status) */
+export function tenPeople(staff, lp) {
+  const out = (staff || []).filter(p => p && p.name).map(p => ({ id: p.id, name: p.name, job: p.job || '', hired: p.hired || '', left: p.left || '', status: p.status || '' }));
+  (lp || []).forEach(q => {
+    if (!q || !q.name) return;
+    const s2 = out.find(p => nm(p.name) === nm(q.name)), hire = /^\d{4}-\d{2}-\d{2}$/.test(q.hire || '') ? q.hire : '', quit = /^\d{4}-\d{2}-\d{2}$/.test(q.quit || '') ? q.quit : '';
+    if (s2) { if (hire && (!s2.hired || hire < s2.hired)) s2.hired = hire; if (quit && !s2.left) s2.left = quit; }
+    else if (hire) out.push({ id: q.id, name: q.name, job: '룸메이드', hired: hire, left: quit, status: '' });
+  });
+  return out;
+}
 /** 입사일 + n년 (2월 29일 입사는 평년엔 2월 28일) */
 export function annivOf(hired, n) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(hired || '')) return '';
@@ -77,18 +91,20 @@ export function annivOf(hired, n) {
   return y + '-' + m + '-' + d;
 }
 export const tenId = (staffId, n) => ('ten-' + staffId + '-' + n).slice(0, 40);
-/** 그 달(M) 과 다음 달에 근속 n년이 되는 분 + 지난 3개월 중 특이사항에 안 넣은 분(놓침). done = 이미 넣었거나 '안 함' 한 특이사항 id 모음 */
-export function tenureDue(staff, M, done) {
+/** 인상 적용 월(eff)이 그 달(M) · 다음 달인 분 + 지난 3개월 중 특이사항에 안 넣은 분(놓침). done = 이미 넣었거나 '안 함' 한 특이사항 id 모음 */
+export function tenureDue(staff, M, done, cut) {
+  const CUT = cut || TENURE_CUT;
   const out = [], from = ymAdd(M, -3), next = ymAdd(M, 1), has = id => !!(done && (done.has ? done.has(id) : done[id]));
   (staff || []).forEach(p => {
     if (!p || !p.hired || p.status === '퇴사') return;
     TENURE_YEARS.forEach(n => {
-      const day = annivOf(p.hired, n), ym = day.slice(0, 7);
-      if (!day || ym < from || ym > next) return;
+      const day = annivOf(p.hired, n); if (!day) return;
+      const late = +day.slice(8, 10) > CUT, ym = late ? ymAdd(day.slice(0, 7), 1) : day.slice(0, 7);   // ym = 인상 적용 월
+      if (ym < from || ym > next) return;
       if (p.left && p.left < day) return;                                    // 그날 전에 그만둠
       const id = tenId(p.id, n), added = has(id), skip = !!(done && !done.has && done[id] === 'skip');
       if (ym < M && added) return;                                          // 지난달 몫은 넣었으면 안 보임 (특이사항 쪽에서 이월로 챙김)
-      out.push({ id, staffId: p.id, name: p.name || '', dept: p.job || '', hired: p.hired, n, day, ym, when: ym < M ? 'miss' : ym === M ? 'now' : 'next', added, skip });
+      out.push({ id, staffId: p.id, name: p.name || '', dept: p.job || '', hired: p.hired, n, day, ym, when: ym < M ? 'miss' : ym === M ? 'now' : 'next', added, skip, late });
     });
   });
   const ord = { miss: 0, now: 1, next: 2 };
@@ -114,7 +130,7 @@ const md = d => (d ? +d.slice(5, 7) + '/' + +d.slice(8, 10) : '');
 export function setupClosing(c) {
   const { S, esc, ymd, PIN } = c;
   const thisYm = () => ymd().slice(0, 7);
-  const st = { ym: thisYm(), tenDone: {}, items: null, staff: null, notes: {}, err: '', busy: false, form: null, hrForm: null, msg: '', filter: 'all', loadedAt: 0 };
+  const st = { ym: thisYm(), tenDone: {}, lp: null, items: null, staff: null, notes: {}, err: '', busy: false, form: null, hrForm: null, msg: '', filter: 'all', loadedAt: 0 };
   const say = m => { st.msg = m; c.draw(); clearTimeout(say.t); say.t = setTimeout(() => { st.msg = ''; c.draw(); }, 3000); };
   const errTxt = e => String(e && (e.code || e.message) || e);
 
@@ -122,10 +138,11 @@ export function setupClosing(c) {
     if (st.busy || (!force && st.items && Date.now() - st.loadedAt < 10 * 60000)) return;
     st.busy = true; st.err = ''; c.draw();
     try {
-      const [xs, staff] = await Promise.all([S.getQuery('close_items', []), st.staff ? Promise.resolve(null) : S.getQuery('staff', [])]);
+      const [xs, staff, lp] = await Promise.all([S.getQuery('close_items', []), st.staff ? Promise.resolve(null) : S.getQuery('staff', []), st.lp ? Promise.resolve(null) : S.getQuery('leave_people', []).catch(() => [])]);
       st.tenDone = {}; xs.forEach(x => { if (/^ten-/.test(x.id)) st.tenDone[x.id] = x.data && x.data.del ? 'skip' : 1; });   // 근속: 넣었거나 '안 함'(del) 한 것
       st.items = xs.map(x => Object.assign({}, x.data, { id: x.id })).filter(x => !x.del);
       if (staff) st.staff = staff.map(x => Object.assign({}, x.data, { id: x.id }));
+      if (lp) st.lp = lp.map(x => ({ id: x.id, name: x.data.name, hire: x.data.hire, quit: x.data.quit }));   // 연차 명단: 이름 · 입사일 · 퇴사일만
       st.loadedAt = Date.now();
       await loadNote(st.ym);
     } catch (e) { st.err = '결산 자료를 못 읽었어요: ' + errTxt(e); }
@@ -157,12 +174,12 @@ export function setupClosing(c) {
     if (!locked()) h += '<button class="big-btn" data-cs="add">＋ 특이사항 추가</button>';
     h += shown.length ? '<ul class="cs-list">' + shown.map(rowHtml).join('') + '</ul>' : '<p class="note">' + (rows.length ? '해당하는 건이 없어요.' : '이 달 특이사항이 아직 없어요. 생길 때마다 한 건씩 넣어 두면 월말에 그대로 문서가 돼요.') + '</p>';
     // 근속 도래
-    const ten = tenureDue(st.staff || [], M, st.tenDone);
+    const ten = tenureDue(tenPeople(st.staff, st.lp), M, st.tenDone);
     if (ten.length) {
       const lab = { miss: '놓침', now: ymLabel(M), next: '다음 달' };
-      h += '<div class="cs-head"><h3>근속 도래 ' + ten.length + '명' + (ten.some(t => !t.added) ? ' · 남은 ' + ten.filter(t => !t.added).length : ' · 다 챙김') + '</h3></div><p class="note" style="margin:0 0 8px">입사일로부터 ' + TENURE_YEARS.join('년 · ') + '년이 되는 분이에요. 「특이사항에 넣기」를 누르면 임금인상 건으로 들어가요.</p><ul class="cs-list">' +
+      h += '<div class="cs-head"><h3>근속 도래 ' + ten.length + '명' + (ten.some(t => !t.added) ? ' · 남은 ' + ten.filter(t => !t.added).length : ' · 다 챙김') + '</h3></div><p class="note" style="margin:0 0 8px">입사일로부터 ' + TENURE_YEARS.join(' · ') + '년이 되는 분이에요. 도달일이 ' + TENURE_CUT + '일까지면 그 달, 넘으면 다음 달 인상이에요. 「특이사항에 넣기」를 누르면 임금인상 건으로 들어가요.</p><ul class="cs-list">' +
         ten.map(t => '<li class="cs-ten ' + t.when + (t.added ? ' added' : '') + '"><div><span class="cs-tag" style="--tc:' + (t.when === 'miss' ? '#B91C1C' : t.when === 'now' ? '#1D4ED8' : '#6B7280') + '">' + esc(lab[t.when]) + '</span><b>' + esc(t.name) + '</b> <small>' + esc(t.dept) + '</small>' +
-          '<div class="cs-sub">근속 ' + t.n + '년 · ' + esc(md(t.day)) + ' (입사 ' + esc(t.hired) + ')</div></div>' +
+          '<div class="cs-sub">근속 ' + t.n + '년 · ' + esc(md(t.day)) + ' 도달 → <b>' + esc(ymLabel(t.ym)) + ' 인상</b> (입사 ' + esc(t.hired) + ')</div></div>' +
           (t.added ? '<span class="cs-tdone' + (t.skip ? ' skip' : '') + '">' + (t.skip ? '안 함' : '넣음 ✓') + '</span>' : locked() && t.ym <= M ? '' : '<div class="cs-tbtn"><button class="ref" data-cs="tenadd" data-id="' + esc(t.id) + '">특이사항에 넣기</button><button class="ref" data-cs="tenskip" data-id="' + esc(t.id) + '">안 함</button></div>') + '</li>').join('') + '</ul>';
     }
     // 입퇴사
@@ -361,7 +378,7 @@ export function setupClosing(c) {
     const k = t.getAttribute('data-cs'), id = t.getAttribute('data-id');
     if (k === 'unlock') { if (await PIN.gate('결산')) c.draw(); return; }
     if (!PIN.passed()) { c.draw(); return; }
-    if (k === 'reload') { st.notes = {}; st.staff = null; load(true); }
+    if (k === 'reload') { st.notes = {}; st.staff = null; st.lp = null; load(true); }
     else if (k === 'prev' || k === 'next') { st.ym = ymAdd(st.ym, k === 'prev' ? -1 : 1); st.form = st.hrForm = null; c.draw(); await loadNote(st.ym); c.draw(); }
     else if (k === 'filter') { st.filter = t.getAttribute('data-v'); c.draw(); }
     else if (k === 'add') openForm(null);
@@ -372,13 +389,13 @@ export function setupClosing(c) {
     else if (k === 'del' && st.form) { if (!confirm('이 특이사항을 지울까요? 지난달 기록에서도 빠져요.\n끝난 건은 지우지 말고 「완료」로 두는 게 좋아요.')) return; const fid = st.form.id; if (await patchItem(fid, x => { x.del = true; }, '지웠어요.')) st.form = null; c.draw(); }
     else if (k === 'stop' && st.form) { const fid = st.form.id, ym = st.ym; if (await patchItem(fid, x => { x.end = ym; }, ymLabel(ym) + '까지만 나오게 했어요.')) st.form = null; c.draw(); }
     else if (k === 'tenadd' || k === 'tenskip') {
-      const t = tenureDue(st.staff || [], st.ym, st.tenDone).find(x => x.id === id); if (!t || t.added) return;
+      const t = tenureDue(tenPeople(st.staff, st.lp), st.ym, st.tenDone).find(x => x.id === id); if (!t || t.added) return;
       const sm = t.ym < st.ym ? st.ym : t.ym;                                // 놓친 건은 이번 달에 넣음
       if (k === 'tenskip' && !confirm(t.name + ' 근속 ' + t.n + '년 인상을 「안 함」으로 둘까요?\n(대상이 아닌 분 · 이미 처리한 분) 다시 안 보여요.')) return;
       if ((st.notes[sm] || {}).locked) { say(ymLabel(sm) + '은 마감됐어요.'); return; }
       const d = { name: t.name, staffId: t.staffId, dept: DEPTS.indexOf(t.dept) >= 0 ? t.dept : '기타', type: '임금인상',
-        text: '근속 ' + t.n + '년 도래 (' + md(t.day) + ') 급여 인상 적용' + (t.ym < st.ym ? ' — ' + ymLabel(t.ym) + ' 누락분 포함 확인' : ''), ot: 0, days: 0, amount: 0,
-        kind: 'once', start: sm, end: '', n: 0, docs: [], memo: '', tag: 'tenure', tenure: { n: t.n, day: t.day }, st: {}, del: k === 'tenskip', at: Date.now(), by: c.who(), upd: S.SERVER_TIME, uid: c.uid() };
+        text: '근속 ' + t.n + '년 도래 (' + md(t.day) + ') ' + ymLabel(t.ym) + '부터 급여 인상 적용' + (t.ym < st.ym ? ' — ' + ymLabel(t.ym) + ' 누락분 지급 확인' : ''), ot: 0, days: 0, amount: 0,
+        kind: 'once', start: sm, end: '', n: 0, docs: [], memo: '', tag: 'tenure', tenure: { n: t.n, day: t.day, ym: t.ym }, st: {}, del: k === 'tenskip', at: Date.now(), by: c.who(), upd: S.SERVER_TIME, uid: c.uid() };
       try { await S.set('close_items/' + id, d); } catch (x) { say('저장하지 못했어요: ' + errTxt(x)); return; }
       st.tenDone[id] = d.del ? 'skip' : 1; if (!d.del) st.items = st.items.filter(x => x.id !== id).concat([Object.assign({}, d, { id, upd: Date.now() })]);
       say(k === 'tenskip' ? t.name + ' · 안 함으로 뒀어요.' : t.name + ' · 근속 ' + t.n + '년 인상을 ' + ymLabel(sm) + ' 특이사항에 넣었어요.');
