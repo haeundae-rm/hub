@@ -98,11 +98,13 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   //   ③ B키는 빈 층(두 키 다 없는 층) 덩어리가 있으면 통째로, 없으면 남은 방을 덩어리로 받음 (층 수 같거나 줄어들 때만 빈 층 지정)
   //   opts.bMoveMode = 'strict' 면 11/8 처음 조건(A키가 다 받고 남는 유닛 1 이하일 때만)
   const OVR = {}, OVR_WHY = {}, bMoves = [], MOVED = new Set(), FROM_B = {};
-  const BM_MAX = opts.bMoveMax != null ? opts.bMoveMax : 3, BM_STRICT = opts.bMoveMode === 'strict', BM_SHARE = opts.bShare != null ? opts.bShare : 0.5, BM_MIN_BLOCK = opts.bMoveMin != null ? opts.bMoveMin : 4;
-  // 11/19 하우스맨 의견(11/18 배정): '층 B키 메이드 우선 배정' · '특화 객실은 A·B키 우선' → B키 옮기기는 기본 끔 (opts.bMove === true 일 때만)
-  if (V2 && opts.bMove === true) {
+  const BM_MAX = opts.bMoveMax != null ? opts.bMoveMax : 3, BM_STRICT = opts.bMoveMode !== 'loose', BM_SHARE = opts.bShare != null ? opts.bShare : 0.5, BM_MIN_BLOCK = opts.bMoveMin != null ? opts.bMoveMin : 4;
+  // 11/19 하우스맨 의견(11/18 배정): '층 B키 메이드 우선 배정' · '특화 객실은 A·B키 우선'
+  //   → 중간안(기본): 특화 층(23·24F)은 B키 안 옮김, 일반 층은 A키가 B구역을 다 받고 남는 유닛 1 이하일 때만(strict). opts.bMove === false 면 끔, opts.bMoveMode = 'loose' 면 예전(11/13)
+  if (V2 && opts.bMove !== false) {
     const orphan = () => { const m = {}; free().forEach(x => { if (MOVED.has(x.room) || W[A_KEY[x.floor]] || W[B_KEY[x.floor]]) return; (m[x.floor] = m[x.floor] || []).push(x); }); return m; };
-    const bNames = [...new Set(Object.values(B_KEY))].filter(n => W[n] && W[n].load === 0 && !(opts.noBMove || []).includes(n));
+    const BM_KEEP = new Set((opts.bMoveKeep || [23, 24]).map(Number));   // 11/19: 특화 층(23·24F)은 B키 옮기기 안 함
+    const bNames = [...new Set(Object.values(B_KEY))].filter(n => W[n] && W[n].load === 0 && !(opts.noBMove || []).includes(n) && !Object.keys(B_KEY).some(f => B_KEY[f] === n && BM_KEEP.has(Number(f))));
     const cands = bNames.map(b => { const fs = Object.keys(B_KEY).map(Number).filter(f => B_KEY[f] === b);
       const xs = free().filter(x => fs.includes(x.floor) && (zone(x) === 'B' || !W[A_KEY[x.floor]]));
       return { b, xs }; }).filter(c => c.xs.length > 0 && c.xs.length <= BM_MAX).sort((p, q) => p.xs.length - q.xs.length || (p.b < q.b ? -1 : 1));
