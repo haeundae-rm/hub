@@ -20,13 +20,14 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import { setupNotice } from './notice.js?v=2026.11.19-7';
-import * as PIN from './pin.js?v=2026.11.19-7';
-import { setupClose } from './close.js?v=2026.11.19-7';
-import { setupClosing } from './closing.js?v=2026.11.19-7';
-import * as XW from './xlsxw.js?v=2026.11.19-7';
+import * as K from '../rm/app/keys.js';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.19-8';
+import * as PIN from './pin.js?v=2026.11.19-8';
+import { setupClose } from './close.js?v=2026.11.19-8';
+import { setupClosing } from './closing.js?v=2026.11.19-8';
+import * as XW from './xlsxw.js?v=2026.11.19-8';
 
-const VER = '2026.11.19-7';
+const VER = '2026.11.19-8';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -119,7 +120,18 @@ async function load(force) {
   // 연차 신청서 승인 대기 수 (count — 문서를 받지 않음, 1천 건까지 읽기 1건)
   const [hr, lvq, ng] = await Promise.all([hrP, isHk() ? null : safe(S.count('leave_apps', [['status', '==', '대기'], ['deleted', '==', false]])),
     Promise.all([addDays(d, -1), d].map(x => safe(S.get('night/' + x))))]);
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng };
+  // 🔑 플로어키 (2026-11-19): 켜져 있을 때만 오늘 배정 · 변경 · 키 줄 · 대조를 읽음 (꺼져 있으면 meta/keys 1건)
+  const kc = await safe(S.get('meta/keys'));
+  let ks = null;
+  if (kc && !kc.__err && K.enabled(kc, d)) {
+    const [pl, ch, kk, kx, tmz] = await Promise.all([safe(S.getQuery('days/' + d + '/plans', [])), safe(S.getQuery('days/' + d + '/changes', [])),
+      safe(S.getQuery('days/' + d + '/keys', [])), safe(S.getQuery('days/' + d + '/keychk', [])), safe(S.get('meta/teams'))]);
+    if (Array.isArray(kk)) {
+      const P = {}; (Array.isArray(pl) ? pl : []).forEach(x => { P[x.id] = (x.data && x.data.rooms) || []; });
+      ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], mf: K.maidFloors(P, Array.isArray(ch) ? ch : []), mate: (tmz && !tmz.__err && tmz.mate) || {} });
+    }
+  }
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -619,6 +631,7 @@ const TILES = [
   { href: './leave/', ic: '📋', t: '연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
   { href: './night/', ic: '🌙', t: '야간 보고서', s: '하우스키퍼 야간 업무 보고 · 확인 · 인쇄' },
+  { href: './keys/', ic: '🔑', t: '플로어 키', s: '키 서명 현황 · 오후 대조 · 미반납 · 대장 인쇄' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
   { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
   { go: 'close', ic: '📊', t: '결산', s: '결산 특이사항 · 입퇴사 현황 · 출역표 · 연차 대장' },
@@ -651,10 +664,19 @@ function todoItems(v) {
   const p = progress(v);
   if (p.issue) L.push({ lv: 'wait', title: '이상 보고 ' + p.issue + '실', sub: '메이드가 이상으로 표시한 객실 · 정비 레포트에서 보기', go: 'work/now' });
   if (typeof v.lvq === 'number' && v.lvq) L.push({ lv: 'bad', title: '휴가신청서 승인 대기 ' + v.lvq + '건', sub: '연차 관리에서 승인 · 반려', href: './leave/' });
+  keyTodo(v).forEach(x => L.push(x));
   nightWait(v).forEach(n => L.push({ lv: 'wait', title: '야간 보고서 ' + md(n.date) + ' 밤 확인 대기', sub: n.need, href: './night/#' + n.date }));
   const r = v.hr;
   if (r && !r.__err && r.past.length) L.push({ lv: 'wait', title: '퇴사일 지난 분 ' + r.past.length + '명', sub: '아직 재직으로 남아 있어요 · 입퇴사 서류에서 퇴사 처리', go: 'people' });
   return L.sort((a, b) => (a.lv === 'bad' ? 0 : 1) - (b.lv === 'bad' ? 0 : 1));
+}
+// 🔑 플로어키: 키 미서명(9시 30분 뒤) · 대조 때 키 없음(미반납 · 서명 없이 없음)
+function keyTodo(v) {
+  const k = v.ks; if (!k) return [];
+  const L = [], late = k.late.concat(k.nosign);
+  if (late.length) L.push({ lv: 'bad', title: '플로어 키 미반납 ' + late.length + '개', sub: late.map(x => x.floor + '층 ' + x.key + '키' + (x.takers.length ? ' ' + x.takers.map(d => d.maid).join('·') : ' 서명 없음')).join(', '), href: './keys/' });
+  if (k.unanswered.length && hm(Date.now()) >= '09:30') L.push({ lv: 'wait', title: '키 서명 안 한 메이드 ' + k.unanswered.length + '명', sub: k.unanswered.map(u => u.name + ' ' + u.floors.join('·') + '층').join(', '), href: './keys/' });
+  return L;
 }
 // 🌙 야간 보고서: 제출됐고 내(소장 · 부소장) 확인이 아직인 것 — 어젯밤 · 오늘 밤 두 문서만 읽음
 function nightWait(v) {
@@ -674,6 +696,12 @@ function badgeOf(t, v) {
   }
   if (t.go === 'field') return Array.isArray(v.errs) && v.errs.length ? B('wait', '오류 ' + v.errs.length) : '';
   if (t.href === './night/') { const n = nightWait(v).length; return n ? B('wait', '확인 ' + n) : ''; }
+  if (t.href === './keys/') {
+    const k = v.ks; if (!k) return v.kc && v.kc.from && v.kc.on !== false && v.kc.from > v.d ? B('wait', md(v.kc.from) + ' 시작') : '';
+    const bad = k.late.length + k.nosign.length; if (bad) return B('bad', '미반납 ' + bad);
+    if (k.unanswered.length) return B('wait', '미서명 ' + k.unanswered.length);
+    return B('ok', '대조 ' + k.checked + '/' + k.cells);
+  }
   if (t.href === './leave/') return typeof v.lvq === 'number' && v.lvq ? B('bad', '승인 ' + v.lvq) : '';
   if (t.go === 'people') {
     const r = v.hr; if (!r || r.__err) return '';
