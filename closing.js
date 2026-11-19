@@ -117,7 +117,7 @@ export function setupClosing(c) {
     // 입퇴사
     h += '<div class="cs-head"><h3>입퇴사 현황 ' + hr.length + '명</h3></div><p class="note" style="margin:0 0 8px">직원 명단에서 이 달 입사일 · 퇴사일인 분을 자동으로 넣어요. 퇴사사유 · 비고만 눌러서 적어 주세요.</p>';
     h += hr.length ? '<ul class="cs-list">' + hr.map(p => '<li class="cs-hr"><button data-cs="hr" data-id="' + esc(p.id) + '"' + (locked() ? ' disabled' : '') + '><span class="cs-tag" style="--tc:' + (p.isOut ? '#B91C1C' : '#047857') + '">' + (p.isIn && p.isOut ? '입·퇴사' : p.isOut ? '퇴사' : '입사') + '</span><b>' + esc(p.name) + '</b> <small>' + esc(p.dept) + (p.manual ? ' · 직접 추가' : '') + '</small>' +
-      '<div class="cs-sub">' + (p.hired ? '입사 ' + esc(md(p.hired)) : '') + (p.left ? ' · 마지막 근로 ' + esc(md(p.left)) : '') + ' · ' + esc(p.state) + (p.reason ? ' · 사유: ' + esc(p.reason) : '') + (p.memo ? '<br>' + esc(p.memo) : '') + '</div></button></li>').join('') + '</ul>' : '<p class="note">이 달 입사 · 퇴사한 분이 직원 명단에 없어요.</p>';
+      '<div class="cs-sub">' + [p.hired ? '입사 ' + esc(md(p.hired)) : '', p.left ? '마지막 근로 ' + esc(md(p.left)) : '', esc(p.state), p.reason ? '사유: ' + esc(p.reason) : ''].filter(Boolean).join(' · ') + (p.memo ? '<br>' + esc(p.memo) : '') + '</div></button></li>').join('') + '</ul>' : '<p class="note">이 달 입사 · 퇴사한 분이 직원 명단에 없어요.</p>';
     if (!locked()) h += '<button class="big-btn sec" data-cs="hradd">＋ 명단에 없는 분 직접 추가</button>';
     // 마감
     h += '<div class="cs-lock">' + (locked() ? '<p class="note" style="margin:0 0 8px">🔒 ' + esc(ymLabel(M)) + ' 마감됨 · 내용은 고정, 처리 상태(본사 전달 · 완료)만 바꿀 수 있어요. 새로 생긴 건은 다음 달로 넣어 주세요.</p><button class="ref" data-cs="unlockm">마감 풀기</button>'
