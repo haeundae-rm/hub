@@ -114,14 +114,22 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
   //   ① A키가 남은 유닛만큼 B구역 방을 받음 — 다 못 받으면 나머지는 같은 층·옆 층 분들이 채움(6·7단계)
   //   ③ B키는 빈 층(두 키 다 없는 층) 덩어리가 있으면 통째로, 없으면 남은 방을 덩어리로 받음 (층 수 같거나 줄어들 때만 빈 층 지정)
   //   opts.bMoveMode = 'strict' 면 11/8 처음 조건(A키가 다 받고 남는 유닛 1 이하일 때만)
-  const OVR = {}, OVR_WHY = {}, bMoves = [], MOVED = new Set(), FROM_B = {};
+  const OVR = {}, OVR_WHY = {}, bMoves = [], MOVED = new Set(), FROM_B = {}, FORKS = [];
   const BM_MAX = opts.bMoveMax != null ? opts.bMoveMax : 3, BM_STRICT = opts.bMoveMode !== 'loose', BM_SHARE = opts.bShare != null ? opts.bShare : 0.5, BM_MIN_BLOCK = opts.bMoveMin != null ? opts.bMoveMin : 4;
   // 11/19 하우스맨 의견(11/18 배정): '층 B키 메이드 우선 배정' · '특화 객실은 A·B키 우선'
   //   → 중간안(기본): 특화 층(23·24F)은 B키 안 옮김, 일반 층은 A키가 B구역을 다 받고 남는 유닛 1 이하일 때만(strict). opts.bMove === false 면 끔, opts.bMoveMode = 'loose' 면 예전(11/13)
   if (V2 && opts.bMove !== false) {
     const orphan = () => { const m = {}; free().forEach(x => { if (MOVED.has(x.room) || W[A_KEY[x.floor]] || W[B_KEY[x.floor]]) return; (m[x.floor] = m[x.floor] || []).push(x); }); return m; };
     const BM_KEEP = new Set((opts.bMoveKeep || [23, 24]).map(Number));   // 11/19: 특화 층(23·24F)은 B키 옮기기 안 함
-    const bNames = [...new Set(Object.values(B_KEY))].filter(n => W[n] && W[n].load === 0 && !(opts.noBMove || []).includes(n) && !Object.keys(B_KEY).some(f => B_KEY[f] === n && BM_KEEP.has(Number(f))));
+    // 11/19 갈림길 선택 (소장): opts.bChoice = { B키 이름: 'keep' 담당층 우선 | 'move' 층 이동 효율 우선 } — 없으면 기본(중간안)
+    const CH = opts.bChoice || {};
+    const keepDef = n => Object.keys(B_KEY).some(f => B_KEY[f] === n && BM_KEEP.has(Number(f)));
+    const allB = [...new Set(Object.values(B_KEY))].filter(n => W[n] && W[n].load === 0 && !(opts.noBMove || []).includes(n));
+    allB.forEach(b => { const fs = Object.keys(B_KEY).map(Number).filter(f => B_KEY[f] === b);
+      const xs = free().filter(x => fs.includes(x.floor) && (zone(x) === 'B' || !W[A_KEY[x.floor]]));
+      const fl = [...new Set(xs.map(x => x.floor))].sort((p, q) => q - p);
+      if (xs.length > 0 && xs.length <= BM_MAX && fl.every(f => W[A_KEY[f]] && A_KEY[f] !== b)) FORKS.push({ b, floors: fl, n: xs.length, a: fl.map(f => A_KEY[f]), spec: fl.some(isSpecF), choice: CH[b] || '' }); });
+    const bNames = allB.filter(n => CH[n] === 'move' || (CH[n] !== 'keep' && !keepDef(n)));
     const cands = bNames.map(b => { const fs = Object.keys(B_KEY).map(Number).filter(f => B_KEY[f] === b);
       const xs = free().filter(x => fs.includes(x.floor) && (zone(x) === 'B' || !W[A_KEY[x.floor]]));
       return { b, xs }; }).filter(c => c.xs.length > 0 && c.xs.length <= BM_MAX).sort((p, q) => p.xs.length - q.xs.length || (p.b < q.b ? -1 : 1));
@@ -129,7 +137,7 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
       const byF = {}; xs.forEach(x => (byF[x.floor] = byF[x.floor] || []).push(x));
       const ok1 = Object.keys(byF).every(f => { const a = A_KEY[f]; if (!W[a] || a === b) return false; const fsA = floors(a);
         if (fsA.size !== 1 || !fsA.has(Number(f))) return false;
-        if (!BM_STRICT) { const fit = byF[f].filter(x => x.w <= rem(a) + 1e-9).length; return Math.min(fit, Math.floor(rem(a) + 1e-9)) >= Math.max(1, Math.ceil(byF[f].length * BM_SHARE)); }
+        if (!BM_STRICT || CH[b] === 'move') { const fit = byF[f].filter(x => x.w <= rem(a) + 1e-9).length; return Math.min(fit, Math.floor(rem(a) + 1e-9)) >= Math.max(1, Math.ceil(byF[f].length * BM_SHARE)); }
         const need = byF[f].reduce((s, x) => s + x.w, 0), r = rem(a);
         return need <= r + 1e-9 && r - need <= 1 + 1e-9 && byF[f].every(x => !(x.late && lateN(a) + byF[f].filter(y => y.late).length > LATE_MAX)); });
       if (!ok1) continue;
@@ -138,7 +146,7 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
         if (size < BM_MIN_BLOCK) continue; if (!best || size > best.size || (size === best.size && f < best.f)) best = { f, xs: xsF, size }; }
       const before = new Set(xs.map(x => x.floor)).size + (xs.reduce((s, x) => s + x.w, 0) < W[b].cap ? 1 : 0);
       if (best && (best.size >= W[b].cap - 1e-9 ? 1 : 2) > before) best = null;
-      if (!best && BM_STRICT) continue;
+      if (!best && BM_STRICT && CH[b] !== 'move') continue;
       const toA = [], shared = [];
       Object.keys(byF).forEach(f => { const a = A_KEY[f]; toA.push(a);
         byF[f].sort((p, q) => p.room - q.room).forEach(x => { OVR[x.room] = a; FROM_B[x.room] = b; OVR_WHY[x.room] = 'B키 옮기기 (담당 ' + b + ')';
@@ -342,6 +350,7 @@ export function runAssign(rooms, ho, cfg0, prev2901, hist, opts) {
     vip2: names.filter(n => workers[n].vip >= 2), vipNew: names.filter(n => workers[n].vip && VIP_NO.has(n)), vipNo: names.filter(n => VIP_NO.has(n)), vipTotal: T.filter(x => x.vip).length, grpTotal: T.filter(x => x.grp).length,
     royPri: names.filter(n => royalN(n) && W[n].rooms.some(r => !ROYAL.includes(r) && TX[r] && TX[r].late)).map(n => n + ' ' + W[n].rooms.filter(r => !ROYAL.includes(r) && TX[r] && TX[r].late).join('·')),
     wallBed: WB_ON ? names.map(n => [n, W[n].rooms.filter(r => WB.has(r))]).filter(([, rs]) => rs.length).map(([n, rs]) => n + ' ' + rs.length) : [],
+    forks: FORKS.map(k => Object.assign(k, { moved: bMoves.some(m => m.b === k.b) })),
     teams: Object.keys(LEAD).map(a => { const u = new Set([...floors(a), ...floors(MATE[a])]); return { a, b: MATE[a], floors: [...u].sort((p, q) => q - p) }; }),
     themeTotal: T.filter(x => x.theme).length,
     grpHeavy: names.filter(n => workers[n].grp >= 3 && workers[n].gen < Math.ceil((workers[n].grp + workers[n].gen) * GRP_RATIO - 1e-9)),

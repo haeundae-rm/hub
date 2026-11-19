@@ -134,7 +134,7 @@ function pick() {
       const E = await import(new URL('../rm/app/engine.js?v=' + VER, import.meta.url).href);
       A.buf = await f.arrayBuffer();
       const r = await E.buildFromXlsx(A.buf, A.date);
-      A.data = r.data; A.sheet = r.sheet; A.carry = new Set(); A.cq = null;
+      A.data = r.data; A.sheet = r.sheet; A.carry = new Set(); A.cq = null; A.bChoice = {};
       const named = A.data.rooms.filter(x => x.name && isTarget(x));
       A.done = named.length >= 20 ? A.data.rooms : null;   // 이름이 들어 있으면 하우스키퍼 완성본 → 대조용
       // 출근 카드 유닛 = 관리자 인계 유닛 (11/14 사용자 결정: 하우스키퍼가 초안 카드에 인계 유닛을 적어 둠 → 따로 입력 안 함)
@@ -149,7 +149,7 @@ function pick() {
 }
 
 // ---------- 돌리기 (백그라운드)
-function run() {
+function run(again) {
   if (!A.data || A.worker) return;
   const H0 = ho(); if (!Object.keys(H0).length) { A.err = '출근자를 골라 주세요.'; draw(); return; }
   // 단체: 상단 '단체 현황' 표의 호실 (입실 시간 → 시각 숫자). 표가 없는 예전 파일은 객실 위 단체 행에 칠한 색
@@ -159,7 +159,7 @@ function run() {
   const TH = new Set((A.data.themes || []).map(t => String(t.room)));
   // 미정비(이월) 확인 (11/15 하우스맨): 대상 유닛이 인계 유닛보다 많이 넘치면 먼저 물어봄
   const gap = gapInfo();
-  if (gap && gap.over > 0 && !confirm('정비 대상 ' + gap.units + '유닛이 인계 ' + gap.ho + '유닛보다 ' + gap.over + '유닛 많아요 (한 분당 약 +' + gap.per + ').\n\n미정비(이월) 표시를 먼저 하셨나요?\n· 이월할 객실이 있으면 [취소] → 정비보고서 메모에 \'미정비\' 적고 다시 넣기\n· 넘치는 만큼 모두 배정하려면 [확인]')) return;
+  if (!again && gap && gap.over > 0 && !confirm('정비 대상 ' + gap.units + '유닛이 인계 ' + gap.ho + '유닛보다 ' + gap.over + '유닛 많아요 (한 분당 약 +' + gap.per + ').\n\n미정비(이월) 표시를 먼저 하셨나요?\n· 이월할 객실이 있으면 [취소] → 정비보고서 메모에 \'미정비\' 적고 다시 넣기\n· 넘치는 만큼 모두 배정하려면 [확인]')) return;
   const rooms = A.data.rooms.map(x => { const g = G[String(x.room)] || (noTbl && ['', 'FFFFFFFF', 'THEME0'].indexOf(String(x.grp_fill || '').toUpperCase()) < 0 ? { n: '단체', h: 17 } : null);
     return { room: x.room, floor: x.floor, st: x.st, m1: A.bprio && A.bprio[String(x.room)] ? ((x.m1 || '') + ' 14시까지') : x.m1, m2: ((A.carry && A.carry.has(String(x.room))) || blk(x.room)) ? ((x.m2 || '') + ' 미정비') : x.m2, grp: g ? g.n : '', gh: g ? g.h : 0, theme: TH.has(String(x.room)) }; });
   // 신입 = 직원 명단 입사일이 배정 날짜 3개월 안 (11/14 사용자: 3개월 미만은 가급적 VIP 안 줌). 입사일 없는 분은 모름 → 정량 8 미만만 신입으로
@@ -184,7 +184,7 @@ function run() {
     draw();
   };
   w.onerror = e => { if (!A) return; A.worker = null; A.running = false; A.err = '배정 계산을 못 했어요: ' + (e.message || e); draw(); };
-  const input = { rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo, teams: A.teams || [], trainees: trOpts() } };
+  const input = { rooms, ho: H0, cfg: cfg(), prev2901: prev, hist, opts: { seeds: [11, 23, 37, 51], iter: 150000, vipNo: A.vipNo, teams: A.teams || [], trainees: trOpts(), bChoice: Object.assign({}, A.bChoice || {}) } };
   A.input = input;   // 📝 배정 의견 · asg_days 에 같이 남김 (나중에 같은 계산을 다시 돌려 보려고)
   w.postMessage(input);
 }
@@ -204,7 +204,7 @@ export function snapshot() {
   if (!A || !A.res) return null;
   const s = A.res.stats || {};
   return { date: A.date, file: A.file || '', kind: A.done ? '완성본 대조' : '초안', engine: A.res0 || byName(A.res), final: byName(A.res), edits: (A.edits || []).slice(), left: (A.res.left || []).slice(),
-    stats: { avgFloors: Math.round((s.avgFloors || 0) * 100) / 100, three: (s.three || []).slice(), target: s.target || 0, units: s.units || 0 }, cmp: cmpLite(), input: A.input || null, ver: VER };
+    stats: { avgFloors: Math.round((s.avgFloors || 0) * 100) / 100, three: (s.three || []).slice(), target: s.target || 0, units: s.units || 0, forks: (s.forks || []).map(k => ({ b: k.b, floors: k.floors, n: k.n, moved: !!k.moved, choice: k.choice || '' })) }, cmp: cmpLite(), input: A.input || null, ver: VER };
 }
 // asg_days/{날짜}: 매일 품질 기록 (확정해서 올릴 때 · 완성본 대조할 때). 관리자만 씀, 매일 점검 계정이 읽음 (규칙 v19)
 function saveDay(extra) {
@@ -561,6 +561,7 @@ function resultHtml() {
         '<button class="big-btn sec" style="margin-top:8px" data-as="xlsx"' + (A.xbusy ? ' disabled' : '') + '>' + (A.xbusy ? '엑셀 만드는 중…' : '📄 정비보고서 엑셀만 받기 (오더테이커용)') + '</button>' +
         (A.xmsg ? '<p class="note">' + esc(A.xmsg) + '</p>' : '') +
         '<p class="note">메이드별 줄을 눌러 객실을 다른 분에게 옮길 수 있어요. 확정하면 메이드 휴대폰·더티 배분에 들어가고, 넣은 정비보고서 원본에 이름·출근 카드를 채운 엑셀이 내려받아져요 (서식·그림 그대로).</p>') + '</div>';
+  h += forkHtml();
   if (C) {
     h += '<div class="card"><h2>하우스키퍼와 대조 <small>' + esc(H.md(A.date)) + '</small></h2>' +
       '<div class="kv"><div><b>' + C.pct + '%</b><span>같은 사람 (' + C.same + '/' + C.total + ')</span></div><div><b>' + C.hkAvg.toFixed(2) + ' / ' + s.avgFloors.toFixed(2) + '</b><span>평균 층 HK / 엔진</span></div><div><b>' + C.hkThree.length + ' / ' + s.three.length + '</b><span>3개 층 HK / 엔진</span></div></div>' +
@@ -577,6 +578,16 @@ function resultHtml() {
   }).join('') + '</div></div>';
   if (A.mv && A.mv.from === '(미배정)') h = h.replace('<div class="card"><h2>메이드별', '<div class="card">' + moveHtml() + '</div><div class="card"><h2>메이드별');
   return h;
+}
+// 🔀 갈림길 (11/19 소장): B키 구역에 방이 1~3실만 남은 층 — 담당층 우선(B키가 자기 층) / 층 이동 효율 우선(A키가 다 받고 B키는 다른 층). 누르면 다시 계산
+function forkHtml() {
+  const esc = H.esc, F = (A.res.stats.forks || []); if (!F.length) return '';
+  const fl = n => (A.res.workers[n] ? A.res.workers[n].floors.map(f => f + 'F').join('·') || '-' : '-');
+  return '<div class="card"><h2>🔀 갈림길 ' + F.length + '곳 <small>사람이 골라 주세요</small></h2><p class="note" style="margin:0 0 8px">B키 구역에 방이 조금만 남은 층이에요. 고르면 그 기준으로 다시 계산해요 (30초~1분). 안 고르면 기본값(특화는 담당층, 일반 층은 A키가 다 받을 수 있을 때만 옮김).</p>' +
+    F.map(k => { const cur = k.moved ? 'move' : 'keep';
+      return '<div class="asg-fork" style="border-top:1px solid var(--line);padding:10px 0"><b>' + esc(k.floors.map(f => f + 'F').join('·')) + (k.spec ? ' 특화' : '') + '</b> · B구역 ' + k.n + '실 · B키 ' + esc(k.b) + ' / A키 ' + esc([...new Set(k.a)].join('·')) +
+        '<br><small>지금 안: ' + (cur === 'keep' ? '담당층 우선' : '층 이동 효율 우선') + (k.choice ? ' (고름)' : ' (기본값)') + (k.choice === 'move' && !k.moved ? ' — 이 날은 A키에게 자리가 없어 못 옮겼어요' : '') + ' — ' + esc(k.b) + ' ' + esc(fl(k.b)) + ' / ' + esc([...new Set(k.a)].map(n => n + ' ' + fl(n)).join(' / ')) + '</small>' +
+        '<div class="seg2" style="margin-top:6px"><button data-as="fork" data-v="' + esc(k.b) + '|keep" aria-pressed="' + (cur === 'keep') + '">담당층 우선</button><button data-as="fork" data-v="' + esc(k.b) + '|move" aria-pressed="' + (cur === 'move') + '">층 이동 효율 우선</button></div></div>'; }).join('') + '</div>';
 }
 function moveHtml() {
   const esc = H.esc, R = A.res, m = A.mv;
@@ -631,7 +642,7 @@ document.addEventListener('click', e => {
   if (a === 'cqpick') { carryRead(); const r = carryPick(A.cq); A.carry = r.set; A.cshort = r.short; A.res = null; A.cmp = null; draw(); return; }
   if (a === 'cqx') { A.carry.delete(v); const t = typeOf(v); if (A.cq[t]) A.cq[t]--; A.res = null; A.cmp = null; draw(); return; }
   if (a === 'cqdone') { carryRead(); A.view = ''; draw(); return; }
-  if (a === 'date') { if (A.date === v) return; A.date = v; A.tr = []; bmapUpd(); A.data = null; A.done = null; A.res = null; A.cmp = null; A.file = ''; draw(); return; }
+  if (a === 'date') { if (A.date === v) return; A.date = v; A.tr = []; A.bChoice = {}; bmapUpd(); A.data = null; A.done = null; A.res = null; A.cmp = null; A.file = ''; draw(); return; }
   if (a === 'tog') { const r = A.rows.find(x => x.name === v); if (r) { r.on = !r.on; A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'u-' || a === 'u+') { const r = A.rows.find(x => x.name === v); if (r) { r.unit = Math.max(1, Math.min(15, Number(r.unit) + (a === 'u+' ? 1 : -1))); A.res = null; A.cmp = null; } draw(); return; }
   if (a === 'all') { A.showAll = !A.showAll; draw(); return; }
@@ -643,6 +654,10 @@ document.addEventListener('click', e => {
   if (a === 'mvx') { A.mv = null; draw(); return; }
   if (a === 'mvok') { const to = (document.getElementById('asto') || {}).value; if (A.mv) moveRoom(A.mv.room, A.mv.from, to); A.mv = null; draw(); return; }
   if (a === 'note') { openNote(); return; }
+  if (a === 'fork') { const [b, ch] = String(v).split('|'); const k = ((A.res && A.res.stats.forks) || []).find(x => x.b === b); if (!k) return;
+    if ((k.moved ? 'move' : 'keep') === ch) return;
+    if (A.edits && A.edits.length && !confirm('손으로 고친 ' + A.edits.length + '건은 다시 계산하면 사라져요. 계속할까요?')) return;
+    A.bChoice = Object.assign({}, A.bChoice || {}, { [b]: ch }); A.forkLog = (A.forkLog || []).concat([{ b, ch, floors: k.floors }]); run(true); return; }
   if (a === 'send') { confirmUpload(); return; }
   if (a === 'xlsx') { downXlsx(); return; }
 });
