@@ -5,11 +5,11 @@
 // · 로그인: 소장·부소장(관리자) 또는 점검자 공용 계정 → 점검자 이름은 버튼으로 (관리자 / 하우스맨)
 // ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
-import { makeCards, makeText } from './card.js?v=2026.11.18-1';
-import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.18-1';
-import { openCam, camOk } from './cam.js?v=2026.11.18-1';
+import { makeCards, makeText } from './card.js?v=2026.11.20-2';
+import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.20-2';
+import { openCam, camOk } from './cam.js?v=2026.11.20-2';
 
-const VER = '2026.11.18-1';
+const VER = '2026.11.20-2';
 const ACCOUNTS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com', admin: true },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com', admin: true },
@@ -219,12 +219,37 @@ function pick(multi, how) {
   inp.addEventListener('change', async () => { const fs = Array.from(inp.files || []); inp.remove(); if (fs.length) await addPhotos(fs); });
   document.body.appendChild(inp); inp.click();
 }
+// 사진 읽기 (11/20): 갤럭시 '고효율 사진(HEIF)' 이 켜진 휴대폰은 사진이 .heic → 크롬이 못 읽음('사진을 못 읽었어요')
+//   → 읽기 실패 + HEIC 이면 그때만 변환기(heic-to, 약 3MB)를 받아 그림으로 바꿈. 한 번 받으면 브라우저가 기억
+const HEIC_LIB = 'https://cdn.jsdelivr.net/npm/heic-to@1.6.7/dist/heic-to.js';
+let heicP = null;
+async function looksHeic(file) {
+  if (/\.(heic|heif)$/i.test(file.name || '') || /hei[cf]/i.test(file.type || '')) return true;
+  try { const b = new Uint8Array(await file.slice(4, 12).arrayBuffer()), t = String.fromCharCode.apply(null, b); return /^ftyp(heic|heix|hevc|heim|heis|hevm|hevs|mif1|msf1)/.test(t); } catch (e) { return false; }
+}
+function imgOf(file) {
+  return new Promise((res, rej) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => { URL.revokeObjectURL(u); res(im); }; im.onerror = () => { URL.revokeObjectURL(u); rej(new Error('x')); }; im.src = u; });
+}
+async function decode(file) {
+  if (!file || !file.size) throw new Error('사진 파일이 비어 있어요 (휴대폰에 아직 안 내려받은 사진이면 갤러리에서 한 번 열어 본 뒤 다시 골라 주세요)');
+  try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) {}
+  try { return await imgOf(file); } catch (e) {}
+  if (await looksHeic(file)) {
+    try {
+      if (!heicP) heicP = (window.__heicLib ? Promise.resolve(window.__heicLib) : import(HEIC_LIB)).catch(e => { heicP = null; throw e; });
+      const L = await heicP;
+      return await L.heicTo({ blob: file, type: 'bitmap' });
+    } catch (e) { console.warn('HEIC', e); throw new Error('HEIC(고효율 사진)을 바꾸지 못했어요 — 카메라 설정에서 \'고효율 사진\'을 꺼 주세요'); }
+  }
+  throw new Error('사진을 못 읽었어요 (' + (file.type || (file.name || '').split('.').pop() || '형식 모름') + ', ' + Math.round(file.size / 1024) + 'KB)');
+}
 async function shrink(file) {
-  let bmp;
-  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) { bmp = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('사진을 못 읽었어요')); im.src = URL.createObjectURL(file); }); }
+  const bmp = await decode(file);
   const s = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height)), w = Math.round(bmp.width * s), h = Math.round(bmp.height * s);
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  if (bmp.close) try { bmp.close(); } catch (e) {}
   const blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', JPEG_Q));
+  if (!blob) throw new Error('사진을 줄이지 못했어요 (휴대폰 메모리 부족일 수 있어요 — 다른 앱을 닫고 다시)');
   return { blob, w, h };
 }
 async function addPhotos(files, quiet) {
@@ -307,8 +332,21 @@ async function findMaid(x, room) {
 async function save(close) {
   const x = V.cur, a = acct;
   if (!roomOk(x.room)) { alert('객실 번호 4자리를 확인해 주세요.'); $('#room') && $('#room').focus(); return; }
-  const nF = faults(x), empty = x.photos.filter((p, i) => isF(p) && !String(p.t).trim()).length;
-  if (empty && !confirm('문구가 빈 사진이 ' + empty + '장 있어요. 그대로 저장할까요?\n(필요 없는 사진은 ✕ 로 빼 주세요)')) return;
+  // 문구 빈 사진 (11/20): 흔들림·바닥·손 사진이 AI 에서 '흔들림/문제 안 보임' → 문구 없이 저장돼 공유에 번호만 남던 것
+  //   → 몇 번인지 보여 주고, [확인] = 빈 사진 빼고 저장 / [취소] = 돌아가서 적기
+  const emp = x.photos.filter(p => isF(p) && !String(p.t).trim());
+  if (emp.length) {
+    const nos = emp.map(p => no(x, x.photos.indexOf(p))).join('·');
+    if (!confirm(nos + '번 사진에 지적 문구가 없어요.\n\n[확인] 문구 없는 사진 ' + emp.length + '장 빼고 저장\n[취소] 돌아가서 문구 적기')) {
+      const i = x.photos.indexOf(emp[0]), el = document.querySelector('.ptxt[data-p="' + i + '"]'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); }
+      return;
+    }
+    emp.forEach(p => { idb.del('blobs', p.pid).catch(() => {}); if (x.paths) delete x.paths[p.pid]; });
+    x.photos = x.photos.filter(p => emp.indexOf(p) < 0);
+    if (!x.photos.length && !faults(x)) { await saveDraft(); draw(); alert('남은 사진이 없어요. 사진을 다시 찍거나 \'이 점검 버리기\'를 눌러 주세요.'); return; }
+    if (!faults(x)) close = '';
+  }
+  const nF = faults(x);
   if (!x.maid && !confirm('정비자를 모르는 채로 저장할까요? (메이드별 기록에서 빠져요)')) return;
   if (close === '재정비' && !x.maid) { alert('재정비 요청은 정비자가 있어야 해요.'); return; }
   const docId = x.docId || (x.date + '_' + x.room + '_' + newId());
