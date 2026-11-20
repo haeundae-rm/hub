@@ -124,7 +124,8 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   // 같은 층 같은 키 겹침 경고 (이두리 = 12층, 김하나가 이미 A키)
   p = await ctxOf(browser, seed({ keys: { ['days/' + DAY + '/keys/x1']: { floor: 12, maid: '김하나', key: 'A', reason: '', by: '본인', who: '', at: now - 3600e3, clientAt: now - 3600e3, uid: 'dvA' } } }), null, 'dvB');
   await p.goto(BASE + 'rm/app/'); await p.waitForSelector('.keyband');
-  ok(/이미 가져감 · A키 김하나/.test(await p.textContent('.keyband')), '짝이 누른 키가 띠에 보임 (A키 김하나 님)');
+  ok(/김하나 님이 가져감/.test(await p.textContent('.keyband [data-key="12:A"].ktaken')), '이미 가져간 키는 버튼 안에 「김하나 님이 가져감」');
+  ok(!(await p.locator('.keyband [data-key="12:B"].ktaken').count()), '안 가져간 B키 버튼은 그대로');
   await p.click('[data-key="12:A"]'); await p.waitForSelector('.warnbox');
   ok(/김하나/.test(await p.textContent('.warnbox')), '같은 키를 또 누르면 "이미 가져갔다고 했어요" 경고');
   await p.screenshot({ path: path.join(OUT, 'k6_겹침경고.png') });
