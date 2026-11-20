@@ -35,9 +35,17 @@ kind:
 
 JSON 하나만 답하세요: {"kind":"fault","room":"","text":"각티슈 세팅 미흡","zone":"안방","part":"가구","type":"세팅 불량","conf":0.8}`;
 
-let modelP = null, cfg = null, lastErr = '';
+let modelP = null, cfg = null, lastErr = '', learn = [];
 export const aiErr = () => lastErr;
 export function setCfg(c) { cfg = c || {}; modelP = null; }
+// 매주 배운 것 (11/20): 점검자가 AI 문구를 같은 식으로 2번 이상 고친 것 → 판독 지시문 끝에 붙임 (meta/insp_learn, insp.js 가 모음)
+export function setLearn(list) { learn = Array.isArray(list) ? list.slice(0, 40) : []; }
+export function promptText() {
+  if (!learn.length) return PROMPT;
+  return PROMPT + '\n\n이 리조트 점검자들이 AI 문구를 자주 고친 예 (왼쪽 = AI가 처음 쓴 문구, 오른쪽 = 점검자가 고친 맞는 문구). ' +
+    '왼쪽처럼 보이는 사진이면 오른쪽 뜻이 아닌지 먼저 살피세요. 특히 물건이 없거나 모자라 보이면 얼룩보다 세팅·보충 쪽입니다:\n' +
+    learn.map(x => '- "' + x.a + '" → "' + x.t + '"').join('\n');
+}
 
 async function getModel(name) {
   const [A, AI, AC] = await Promise.all([import(FB + 'firebase-app.js'), import(FB + 'firebase-ai.js'), import(FB + 'firebase-app-check.js')]);
@@ -58,7 +66,7 @@ async function call(b64) {
     try {
       if (!modelP || modelP.name !== n) modelP = { name: n, m: getModel(n) };
       const m = await modelP.m;
-      const r = await m.generateContent([PROMPT, { inlineData: { data: b64, mimeType: 'image/jpeg' } }]);
+      const r = await m.generateContent([promptText(), { inlineData: { data: b64, mimeType: 'image/jpeg' } }]);
       return r.response.text();
     } catch (e) { err = e; modelP = null; if (!/not found|404|unsupported|is not supported|requires the Firebase AI API/i.test(String(e && e.message))) break; }
   }
@@ -85,7 +93,7 @@ function clean(o) {
 export async function readPhoto(blob) {
   try {
     const b64 = await small(blob);
-    const txt = window.__fakeAI ? JSON.stringify(await window.__fakeAI(b64)) : await call(b64);
+    const txt = window.__fakeAI ? JSON.stringify(await window.__fakeAI(b64, promptText())) : await call(b64);
     const j = JSON.parse(String(txt).replace(/^```(json)?|```$/g, '').trim());
     lastErr = '';
     return clean(Array.isArray(j) ? j[0] : j);

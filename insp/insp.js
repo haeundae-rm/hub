@@ -6,7 +6,7 @@
 // ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
 import { makeCards, makeText } from './card.js?v=2026.11.20-2';
-import { readPhoto, hashOf, hamming, setCfg, aiErr } from './ai.js?v=2026.11.20-2';
+import { readPhoto, hashOf, hamming, setCfg, aiErr, setLearn } from './ai.js?v=2026.11.20-2';
 import { openCam, camOk } from './cam.js?v=2026.11.20-2';
 
 const VER = '2026.11.20-2';
@@ -82,6 +82,53 @@ async function loadDrafts() {
 const allUp = x => x.photos.every(p => x.up && x.up[p.pid]);
 async function dropDraft(x) { try { for (const p of x.photos) await idb.del('blobs', p.pid); await idb.del('drafts', x.id); } catch (e) {} }
 
+// ---------- AI 매주 배우기 (2026-11-20 사용자 요청: '디스펜서 내용물 부족'을 '얼룩'으로 읽는 등)
+// · 매주(월요일 기준) 관리자가 처음 열 때 지난 4주 점검에서 'AI 문구 → 사람이 고친 문구'를 모아 meta/insp_learn 에 저장
+// · 같은 식으로 2번 이상 고쳤고, 그 AI 문구를 그대로 둔 횟수보다 고친 횟수가 많을 때만 배움 (한 번 잘못 적은 건 안 배움)
+// · 관리자는 ⚙ 아래 '🧠 AI가 배운 것' 에서 ✕ 로 뺄 수 있음 (off 목록은 다음 주에도 유지). 점검자 계정은 읽기만 (1건)
+const LEARN_DAYS = 28, LEARN_MIN = 2, LEARN_MAX = 40;
+const nrm = t => String(t || '').replace(/\s+/g, ' ').replace(/[.。]$/, '').trim();
+const lkey = x => x.a + '→' + x.t;
+function weekOf(d) { const t = Date.parse(d + 'T12:00:00+09:00'), wd = new Date(t).getUTCDay(); return addDays(d, -((wd + 6) % 7)); }   // 그 주 월요일
+function applyLearn() { const L = V.learn || {}, off = L.off || []; setLearn((L.items || []).filter(x => off.indexOf(lkey(x)) < 0)); }
+async function buildLearn() {
+  const from = addDays(ymd(), -LEARN_DAYS);
+  const docs = await S.getQuery('insp', [['date', '>=', from]]);
+  const fix = {}, kept = {};
+  docs.forEach(d => ((d.data && d.data.photos) || []).forEach(p => {
+    if (!p || p.plate || !p.ai || p.ai.k !== 'fault') return;
+    const a = nrm(p.ai.t), t = nrm(p.t); if (!a) return;
+    if (!p.edit || !t || t === a) { kept[a] = (kept[a] || 0) + 1; return; }
+    const k = a + '→' + t; fix[k] = fix[k] || { a, t, n: 0 }; fix[k].n++;
+  }));
+  const fixedBy = {}; Object.values(fix).forEach(x => { fixedBy[x.a] = (fixedBy[x.a] || 0) + x.n; });
+  const items = Object.values(fix).filter(x => x.n >= LEARN_MIN && fixedBy[x.a] > (kept[x.a] || 0)).sort((a, b) => b.n - a.n).slice(0, LEARN_MAX);
+  return { items, docs: docs.length, from };
+}
+async function loadLearn(force) {
+  try { V.learn = (await S.get('meta/insp_learn')) || {}; } catch (e) { V.learn = {}; }
+  const wk = weekOf(ymd());
+  if (acct && acct.admin && (force || V.learn.week !== wk)) {
+    try {
+      const r = await buildLearn();
+      const L = { week: wk, from: r.from, docs: r.docs, items: r.items, off: V.learn.off || [], at: S.SERVER_TIME, by: acct.label };
+      await S.set('meta/insp_learn', L); V.learn = Object.assign({}, L, { at: Date.now() });
+    } catch (e) { console.warn('AI 배우기', e); V.learnErr = '배운 것을 모으지 못했어요: ' + (e && (e.code || e.message) || e); }
+  }
+  applyLearn();
+}
+function learnHtml() {
+  const L = V.learn || {}, off = L.off || [], it = L.items || [];
+  let h = '<details class="aiset"><summary>🧠 AI가 배운 것 <small>' + it.filter(x => off.indexOf(lkey(x)) < 0).length + '개' + (L.week ? ' · ' + Number(L.week.slice(5, 7)) + '/' + Number(L.week.slice(8)) + ' 주' : '') + '</small></summary>' +
+    '<p class="note">매주 월요일 관리자가 처음 열 때 지난 4주 점검에서 <b>AI 문구를 같은 식으로 2번 이상 고친 것</b>을 모아 판독 때 같이 알려 줘요. 이상한 건 ✕ 로 빼세요.<br>점검자분들이 틀린 AI 문구를 <b>지우고 맞게 고쳐 적어야</b> 배워요.</p>';
+  if (V.learnErr) h += '<p class="err">' + esc(V.learnErr) + '</p>';
+  if (!it.length) h += '<p class="note">아직 배운 게 없어요' + (L.docs != null ? ' (지난 4주 점검 ' + L.docs + '건)' : '') + '.</p>';
+  h += it.map(x => { const k = lkey(x), o = off.indexOf(k) >= 0;
+    return '<div class="lrn' + (o ? ' off' : '') + '"><span><s>' + esc(x.a) + '</s> → <b>' + esc(x.t) + '</b> <small>' + x.n + '번</small></span>' +
+      '<button class="ref" data-a="lrn" data-v="' + esc(k) + '">' + (o ? '되살리기' : '✕ 빼기') + '</button></div>'; }).join('');
+  return h + '<button class="ref" data-a="lrnnow">지금 다시 모으기</button></details>';
+}
+
 // ---------- 그리기
 function draw() {
   const m = $('#main'); if (!m) return;
@@ -139,6 +186,7 @@ function homeHtml() {
     '<div class="f"><label>App Check 키</label><input id="aikey" placeholder="비우면 기본 키 (11/15 만든 것)" value="' + esc(V.aicfg.siteKey || '') + '"></div>' +
     '<div class="f"><label>키 종류</label><select id="aiac"><option value="ent"' + (V.aicfg.acType !== 'v3' ? ' selected' : '') + '>reCAPTCHA Enterprise</option><option value="v3"' + (V.aicfg.acType === 'v3' ? ' selected' : '') + '>reCAPTCHA v3</option></select></div>' +
     '<button class="big-btn sec" data-a="aisave">저장</button>' + (aiErr() ? '<p class="note warn">마지막 오류: ' + esc(aiErr()) + '</p>' : '') + '</details>';
+  if (acct.admin) h += learnHtml();
   return h;
 }
 function galHint() {
@@ -469,6 +517,13 @@ document.addEventListener('click', async e => {
     try { await S.set('insp/' + s.id, doc); s.state = '확인'; go('home'); } catch (err) { alert('저장하지 못했어요: ' + (err && (err.code || err.message) || err)); }
     return;
   }
+  if (a === 'lrn') {
+    const L = V.learn || {}, off = (L.off || []).slice(), i = off.indexOf(v);
+    if (i >= 0) off.splice(i, 1); else off.push(v);
+    try { await S.merge('meta/insp_learn', { off }); L.off = off; V.learn = L; applyLearn(); draw(); } catch (err) { alert('저장하지 못했어요: ' + (err && (err.code || err.message) || err)); }
+    return;
+  }
+  if (a === 'lrnnow') { t.disabled = true; t.textContent = '모으는 중…'; V.learnErr = ''; await loadLearn(true); draw(); return; }
   if (a === 'aisave') {
     const c = { model: ($('#aimodel') || {}).value.trim(), siteKey: ($('#aikey') || {}).value.trim(), acType: ($('#aiac') || {}).value, at: S.SERVER_TIME };
     try { await S.set('meta/insp_ai', c); V.aicfg = c; setCfg(c); alert('저장했어요. 새로 고침하면 새 설정으로 판독해요.'); } catch (err) { alert('저장하지 못했어요: ' + (err && (err.code || err.message) || err)); }
@@ -534,6 +589,7 @@ S.onUser(async u => {
   if (!acct) return;
   try { const c = await S.get('meta/insp_ai'); V.aicfg = c || {}; } catch (e) { V.aicfg = {}; }
   setCfg(V.aicfg);
+  loadLearn().then(() => { if (V.view === 'home') draw(); });
   await loadDrafts();
   // 작성 중이 하나뿐이고 방금(10분 안) 하던 것이면 바로 그 화면으로 (화면 잠김 뒤 이어서)
   const open = V.drafts.filter(x => x.st !== 'saved');
