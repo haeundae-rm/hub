@@ -183,12 +183,15 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   const K = (id, f, m, k, min, x) => [['days/' + DAY + '/keys/' + id], Object.assign({ floor: f, maid: m, key: k, reason: '', by: '본인', who: '', at: now - min * 60000, clientAt: now - min * 60000, uid: 'u' }, x || {})];
   const KS = Object.fromEntries([K('a1', 12, '김하나', 'A', 300), K('a2', 13, '김하나', '없음', 299, { reason: '짝이 열어 줌' }), K('a3', 12, '이두리', 'A', 290), K('a4', 12, '이두리', 'B', 280), K('a5', 14, '박세나', 'AB', 270)]);
   KS['days/' + DAY + '/keyret/r1'] = { floor: 12, maid: '이두리', on: true, at: now - 30 * 60000, clientAt: now - 30 * 60000, uid: 'u' };
+  KS['days/' + DAY + '/recs/최넷_2501'] = { maid: '최넷', room: '2501', status: '완료', at: now - 20 * 60000 };   // 25층은 시작함 → 누락
+  KS['days/' + DAY + '/plans/박세나'] = { rooms: [room(1401), room(1601)] };   // 16층은 시작 전 → 대기 (알림 아님)
   KS['days/' + DAY + '/keychk/c1'] = { floor: 14, key: 'A', st: 'out', by: '하우스키퍼', at: now - 60000, clientAt: now - 60000 };
   p = await ctxOf(browser, seed({ keys: KS }), { viewport: { width: 430, height: 932 } });
   await p.goto(BASE + 'hub/keys/'); await p.waitForSelector('#pw'); await p.click('[data-who="0"]'); await p.fill('#pw', 'pw'); await p.click('[data-login]');
   await p.waitForSelector('.led');
   const sumT = await p.textContent('.sum4');
-  ok(/1\s*키 미서명/.test(sumT), '미서명 1명 (최넷 25층)');
+  ok(/1\s*키 서명 누락/.test(sumT), '누락 1명 (최넷 25층 · 객실 시작함) ' + sumT);
+  ok(/아직 시작 전 층[\s\S]*박세나 16층/.test(await p.textContent('body')), '시작 전 층(박세나 16층)은 「대기」로 따로, 누락 수에 안 셈');
   ok(/1\s*미반납/.test(sumT), '대조 때 14층 A키 없음 → 미반납 1');
   ok(/1\s*바꾼 기록/.test(sumT), '바꾼 기록 1 (이두리 12층 A→B)');
   ok(await p.locator('.lc.bad').count() === 1, '미반납 칸 빨강');
@@ -205,7 +208,7 @@ const keysOf = p => p.evaluate(d => Object.keys(window.__seed).filter(k => k.sta
   await p.selectOption('#fx-maid', '최넷'); await p.click('[data-fk="A"]'); await p.click('[data-fixs]'); await sleep(400);
   const fx = (await keysOf(p)).filter(k => k.floor === 25)[0];
   ok(fx && fx.by === '관리자' && fx.who === '하우스키퍼' && fx.maid === '최넷', '고치기: 「관리자 · 하우스키퍼」 이름으로 줄 추가');
-  ok(/0\s*키 미서명/.test(await p.textContent('.sum4')), '고친 뒤 미서명 0');
+  ok(/0\s*키 서명 누락/.test(await p.textContent('.sum4')), '고친 뒤 미서명 0');
   await p.click('[data-allin]'); await sleep(500);
   ok(/56\/56/.test(await p.textContent('.sum4')), '대조 안 한 칸 모두 있음 → 56/56');
   await p.emulateMedia({ media: 'print' }); await p.screenshot({ path: path.join(OUT, 'h2_인쇄.png'), fullPage: true }); await p.emulateMedia({ media: 'screen' });

@@ -4,9 +4,9 @@
 //         ④ 바꾼 기록 ⑤ 종이 대장과 같은 A4 인쇄 ⑥ (소장 · 부소장) 시작 날짜 · 끄기 스위치 · 반납 안내 문구
 // 쓰는 사람: 하우스키퍼 공용 계정 · 소장 · 부소장 (규칙 v17: keys · keychk 는 쌓기만, 고치기 · 지우기 없음)
 import * as S from '../../rm/app/store.js';
-import * as K from '../../rm/app/keys.js';
+import * as K from '../../rm/app/keys.js?v=2026.11.20-3';
 
-const VER = '2026.11.19-3';
+const VER = '2026.11.20-1';
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
   { k: 'boss', label: '소장', email: 'unieshaeundae+admin@gmail.com', uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2' },
@@ -38,15 +38,15 @@ async function load(d, quiet) {
   if (!quiet) { busy = true; draw(); }
   const D = 'days/' + date, safe = p => p.then(x => x, () => null);
   try {
-    const [cfg, teams, day, plans, chg, keys, chk, ret] = await Promise.all([
+    const [cfg, teams, day, plans, chg, keys, chk, ret, recs] = await Promise.all([
       safe(S.get('meta/keys')), safe(S.get('meta/teams')), safe(S.get(D)),
       safe(S.getQuery(D + '/plans', [])), safe(S.getQuery(D + '/changes', [])),
-      S.getQuery(D + '/keys', []), safe(S.getQuery(D + '/keychk', [])), safe(S.getQuery(D + '/keyret', []))
+      S.getQuery(D + '/keys', []), safe(S.getQuery(D + '/keychk', [])), safe(S.getQuery(D + '/keyret', [])), safe(S.getQuery(D + '/recs', []))
     ]);
     const pl = {}; (plans || []).forEach(x => { pl[x.id] = (x.data && x.data.rooms) || []; });
     const mf = K.maidFloors(pl, chg || []);
     const mate = (teams && teams.mate) || {};
-    const sum = K.summary({ keys, chk: chk || [], ret: ret || [], mf, mate });
+    const sum = K.summary({ keys, chk: chk || [], ret: ret || [], mf, mr: K.maidRooms ? K.maidRooms(pl, chg || []) : null, recs: Array.isArray(recs) ? recs : null, mate });
     st = { cfg: cfg || {}, mf, mate, keys, chk: chk || [], sum, maids: ((day && day.maids) || Object.keys(pl)).slice(), at: Date.now() };
     msg = '';
   } catch (e) { msg = '읽지 못했어요: ' + errOf(e); if (!st) st = null; }
@@ -137,10 +137,11 @@ function mainHtml() {
     (role.k === 'boss' && st.cfg.from && st.cfg.on !== false ? '<button class="off" data-quickoff="1">바로 끄기</button>' : '') + '</div>';
   // 요약
   const un = s.unanswered, late = s.late.concat(s.nosign);
-  h += '<div class="card"><h2>한눈에</h2><div class="sum4"><div class="' + (un.length ? 'w' : '') + '"><b>' + un.length + '</b><span>키 미서명</span></div>' +
+  h += '<div class="card"><h2>한눈에</h2><div class="sum4"><div class="' + (un.length ? 'bad' : '') + '"><b>' + un.length + '</b><span>키 서명 누락</span></div>' +
     '<div class="' + (late.length ? 'bad' : '') + '"><b>' + late.length + '</b><span>미반납 · 서명 없이 없음</span></div>' +
     '<div><b>' + s.checked + '/' + s.cells + '</b><span>오후 대조</span></div><div><b>' + s.changed.length + '</b><span>바꾼 기록</span></div></div>' +
-    (un.length ? '<div class="alert w"><b>키를 아직 안 알린 분</b>' + un.map(u => esc(u.name) + ' (' + u.floors.map(f => f + '층').join('·') + ')').join(', ') + '<small>그 층 객실 완료를 못 누르고 있어요. 키를 가져갔는지 확인해 주세요.</small></div>' : '') +
+    (un.length ? '<div class="alert bad"><b>키 서명 누락 (그 층 객실을 시작했는데 키 답이 없음)</b>' + un.map(u => esc(u.name) + ' (' + u.floors.map(f => f + '층').join('·') + ')').join(', ') + '<small>대신 처리했거나 시간 정해짐 등으로 키 질문 없이 지나간 경우예요. 키를 가져갔는지 확인하고 [고치기]로 남겨 주세요.</small></div>' : '') +
+    (s.waiting && s.waiting.length ? '<div class="alert" style="background:var(--bg);color:var(--muted)"><b style="color:var(--muted)">아직 시작 전 층 (대기)</b>' + s.waiting.map(u => esc(u.name) + ' ' + u.floors.map(f => f + '층').join('·')).join(', ') + '<small>그 층 첫 객실을 누를 때 앱이 키를 물어봐요. 알림 아님.</small></div>' : '') +
     (late.length ? '<div class="alert bad"><b>대조 때 키가 없음</b>' + late.map(x => x.floor + '층 ' + x.key + '키' + (x.takers.length ? ' (' + x.takers.map(d => esc(d.maid)).join('·') + ')' : ' (서명한 분 없음)')).join(', ') + '</div>' : '') +
     '</div>';
   // 대장

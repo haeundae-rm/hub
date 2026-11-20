@@ -20,14 +20,14 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.19-15';
-import * as PIN from './pin.js?v=2026.11.19-15';
-import { setupClose } from './close.js?v=2026.11.19-15';
-import { setupClosing } from './closing.js?v=2026.11.19-15';
-import * as XW from './xlsxw.js?v=2026.11.19-15';
+import * as K from '../rm/app/keys.js?v=2026.11.20-3';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.20-1';
+import * as PIN from './pin.js?v=2026.11.20-1';
+import { setupClose } from './close.js?v=2026.11.20-1';
+import { setupClosing } from './closing.js?v=2026.11.20-1';
+import * as XW from './xlsxw.js?v=2026.11.20-1';
 
-const VER = '2026.11.19-15';
+const VER = '2026.11.20-1';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -130,7 +130,8 @@ async function load(force) {
       safe(S.getQuery('days/' + d + '/keys', [])), safe(S.getQuery('days/' + d + '/keychk', [])), safe(S.get('meta/teams')), safe(S.getQuery('days/' + d + '/keyret', []))]);
     if (Array.isArray(kk)) {
       const P = {}; (Array.isArray(pl) ? pl : []).forEach(x => { P[x.id] = (x.data && x.data.rooms) || []; });
-      ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, Array.isArray(ch) ? ch : []), mate: (tmz && !tmz.__err && tmz.mate) || {} });
+      const C = Array.isArray(ch) ? ch : [];
+      ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, C), mr: K.maidRooms ? K.maidRooms(P, C) : null, recs: Array.isArray(recs) ? recs : null, mate: (tmz && !tmz.__err && tmz.mate) || {} });
     }
   }
   view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks };
@@ -678,12 +679,13 @@ function todoItems(v) {
   if (r && !r.__err && r.past.length) L.push({ lv: 'wait', title: '퇴사일 지난 분 ' + r.past.length + '명', sub: '아직 재직으로 남아 있어요 · 입퇴사 서류에서 퇴사 처리', go: 'people' });
   return L.sort((a, b) => (a.lv === 'bad' ? 0 : 1) - (b.lv === 'bad' ? 0 : 1));
 }
-// 🔑 플로어키: 키 미서명(9시 30분 뒤) · 대조 때 키 없음(미반납 · 서명 없이 없음)
+// 🔑 플로어키: 키 서명 누락(시작한 층만) · 대조 때 키 없음(미반납 · 서명 없이 없음)
 function keyTodo(v) {
   const k = v.ks; if (!k) return [];
   const L = [], late = k.late.concat(k.nosign);
   if (late.length) L.push({ lv: 'bad', title: '플로어 키 미반납 ' + late.length + '개', sub: late.map(x => x.floor + '층 ' + x.key + '키' + (x.takers.length ? ' ' + x.takers.map(d => d.maid).join('·') : ' 서명 없음')).join(', '), href: './keys/' });
-  if (k.unanswered.length && hm(Date.now()) >= '09:30') L.push({ lv: 'wait', title: '키 서명 안 한 메이드 ' + k.unanswered.length + '명', sub: k.unanswered.map(u => u.name + ' ' + u.floors.join('·') + '층').join(', '), href: './keys/' });
+  // 11/20: 그 층 객실을 시작했는데 키 답이 없는 경우만 (시작 전 층은 앱이 첫 객실 때 물어봄 → 알림 아님)
+  if (k.unanswered.length) L.push({ lv: 'bad', title: '키 서명 누락 ' + k.unanswered.length + '명', sub: k.unanswered.map(u => u.name + ' ' + u.floors.join('·') + '층 (객실 시작함)').join(', '), href: './keys/' });
   return L;
 }
 // 🌙 야간 보고서: 제출됐고 내(소장 · 부소장) 확인이 아직인 것 — 어젯밤 · 오늘 밤 두 문서만 읽음
@@ -707,7 +709,7 @@ function badgeOf(t, v) {
   if (t.href === './keys/') {
     const k = v.ks; if (!k) return v.kc && v.kc.from && v.kc.on !== false && v.kc.from > v.d ? B('wait', md(v.kc.from) + ' 시작') : '';
     const bad = k.late.length + k.nosign.length; if (bad) return B('bad', '미반납 ' + bad);
-    if (k.unanswered.length) return B('wait', '미서명 ' + k.unanswered.length);
+    if (k.unanswered.length) return B('bad', '누락 ' + k.unanswered.length);
     return B('ok', '대조 ' + k.checked + '/' + k.cells);
   }
   if (t.href === './leave/') return typeof v.lvq === 'number' && v.lvq ? B('bad', '승인 ' + v.lvq) : '';
