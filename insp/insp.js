@@ -5,11 +5,11 @@
 // · 로그인: 소장·부소장(관리자) 또는 점검자 공용 계정 → 점검자 이름은 버튼으로 (관리자 / 하우스맨)
 // ② (11/15): 사진을 넣으면 AI(Gemini, ai.js)가 문구·분류를 먼저 채움 · 룸넘버 판을 읽어 객실·정비자 자동 · 흔들림·중복 표시 (사람 문구는 덮지 않음)
 import * as S from '../../rm/app/store.js';
-import { makeCards, makeText } from './card.js?v=2026.11.21-1';
-import { readPhoto, hashOf, hamming, setCfg, aiErr, setLearn } from './ai.js?v=2026.11.21-1';
-import { openCam, camOk } from './cam.js?v=2026.11.21-1';
+import { makeCards, makeText } from './card.js?v=2026.11.21-3';
+import { readPhoto, hashOf, hamming, setCfg, aiErr, setLearn } from './ai.js?v=2026.11.21-3';
+import { openCam, camOk } from './cam.js?v=2026.11.21-3';
 
-const VER = '2026.11.21-1';
+const VER = '2026.11.21-3';
 const ACCOUNTS = [
   { uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2', label: '소장', email: 'unieshaeundae+admin@gmail.com', admin: true },
   { uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2', label: '부소장', email: 'unieshaeundae+sub@gmail.com', admin: true },
@@ -133,7 +133,7 @@ function learnHtml() {
 function draw() {
   const m = $('#main'); if (!m) return;
   if (user === null) { m.innerHTML = '<div class="card"><p class="note" style="margin:0">여는 중…</p></div>'; return; }
-  if (!acct) { m.innerHTML = loginHtml(); return; }
+  if (!acct) { m.innerHTML = loginHtml(); backBtn(); return; }
   const y = window.scrollY, ae = document.activeElement;
   const fk = ae && ae.tagName === 'INPUT' && m.contains(ae) ? (ae.id ? '#' + ae.id : ae.hasAttribute('data-p') ? '.ptxt[data-p="' + ae.getAttribute('data-p') + '"]' : ae.hasAttribute('data-x') ? '[data-x="' + ae.getAttribute('data-x') + '"]' : '') : '';
   const fs = fk ? [ae.selectionStart, ae.selectionEnd] : null;
@@ -145,6 +145,13 @@ function draw() {
   if (V.view === 'done') showCards();
   if (V.view === 'see') loadSeeImgs();
   $('#who').textContent = acct.label + (byNow() ? ' · 점검 ' + byNow().name : '');
+  backBtn();
+}
+// ‹ 뒤로 (2026-11-21): 점검 화면 → 처음 목록 / 처음 목록 → 허브 (점검자 공용 계정은 허브를 안 쓰니 처음 목록에선 숨김)
+function backBtn() {
+  const b = $('#back'); if (!b) return;
+  const inner = acct && V.view !== 'home', toHub = !inner && (!acct || acct.admin);
+  b.hidden = !inner && !toHub; $('#backt').textContent = inner ? '목록' : '허브';
 }
 function go(v) { V.view = v; V.keep = false; draw(); }
 
@@ -595,6 +602,11 @@ S.onUser(async u => {
   const open = V.drafts.filter(x => x.st !== 'saved');
   if (open.length === 1 && Date.now() - (open[0].at || 0) < 10 * 60000 && V.view === 'home') return openDraft(open[0].id).then(() => { loadList(); upload(); });
   draw(); loadList(); upload(); loadPlans(ymd());
+});
+$('#back') && $('#back').addEventListener('click', async () => {
+  if (acct && V.view !== 'home') { if (V.view === 'draft') await saveDraft(); V.cur = null; await loadDrafts(); go('home'); return; }
+  if (V.view === 'draft') await saveDraft();
+  location.href = '../#quality';
 });
 $('#out') && $('#out').addEventListener('click', () => { if (confirm('로그아웃할까요?')) S.signOut(); });
 checkVer();
