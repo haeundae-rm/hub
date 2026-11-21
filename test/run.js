@@ -27,6 +27,7 @@ function seed(kind) {
   s['devices/dv1'] = { name: '메이드1', at: now - 864e5 };
   s['notices/n1'] = { title: '시험 공지', body: '예시', from: DAY, to: DAY };
   s['asg_notes/an1'] = { d: DAY, text: '1203·1205는 같은 분이 가야 해요', by: '하우스맨예시', kind: 'rule', re: '', st: 'ask', reply: '두 방을 늘 같은 분에게 줄까요, 그날 담당 층 분에게 줄까요?', rAt: now - 600000, ver: '', at: now - 3600e3, snap: null };
+  if (kind === 'busy') s['sup/' + DAY + '/auto/a-x1'] = { maid: '메이드4', st: 'need', unit: 10, n: 4, w: '', msg: '10유닛인데 더티 근무 중인 정비보조가 없어요 (기준 더티 4실)', at: now - 60000 };   // 11/21 레포트 방 변경 자동 배정
   if (kind === 'busy') s['errors/e1'] = { day: DAY, name: '메이드2', where: '저장', msg: '예시 오류', at: now - 600000 };
   if (kind === 'busy') {
     s['leave_apps/L1'] = { status: '대기', deleted: false, name: '홍길순' };
@@ -76,12 +77,14 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(todo.some(t => /퇴사일 지난 분 1명/.test(t)), '할 일: 퇴사일 지난 분 1명');
   ok(todo.some(t => /이상 보고 1실/.test(t)), '할 일: 이상 보고 1실');
   ok(todo.some(t => /중계 멈춤/.test(t)), '할 일: 시트 중계 멈춤');
+  ok(todo.some(t => /더티 지원 필요 1명/.test(t) && /메이드4/.test(t)), '할 일: 방이 늘어 더티 지원 필요 1명 (레포트 방 변경)');
   ok(!(await p.evaluate(() => [...document.querySelectorAll('.hm-todo li')].some(li => /정상/.test(li.innerText)))), '정상 항목은 첫 화면에 안 나옴');
   ok(/승인 2/.test(await p.locator('.hm-tile[href="./leave/"]').innerText()), '연차 버튼에 승인 2 표시');
   const r0 = await p.evaluate(() => window.__reads);
-  ok(!(await p.evaluate(() => /더티/.test(document.querySelector('main').innerText.replace(/더티 배분 · 활동판|더티 배분이|더티 배분 만들기/g, '')))), '첫 화면에서 더티 칸 안 그림');
+  ok(!(await p.evaluate(() => /더티/.test(document.querySelector('main').innerText.replace(/더티 배분 · 활동판|더티 배분이|더티 배분 만들기|더티 지원 필요[^\n]*/g, '')))), '첫 화면에서 더티 칸 안 그림');
   const h = await p.evaluate(() => document.documentElement.scrollHeight);
-  ok(h < 1500, '첫 화면 길이 ' + h + 'px (예전보다 짧음)');
+  // 11/21: 시험 자료에 '더티 지원 필요' 한 줄을 더해 1500 → 1600
+  ok(h < 1600, '첫 화면 길이 ' + h + 'px (예전보다 짧음)');
   await shot(p, '1_첫화면_할일.png');
   console.log('② 오늘 정비 → 탭');
   await p.click('[data-go="work"]'); await sleep(300);
