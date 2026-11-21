@@ -20,14 +20,15 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-3';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-3';
-import * as PIN from './pin.js?v=2026.11.21-3';
-import { setupClose } from './close.js?v=2026.11.21-3';
-import { setupClosing } from './closing.js?v=2026.11.21-3';
-import * as XW from './xlsxw.js?v=2026.11.21-3';
+import * as K from '../rm/app/keys.js?v=2026.11.21-4';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.21-4';
+import * as PIN from './pin.js?v=2026.11.21-4';
+import { setupClose } from './close.js?v=2026.11.21-4';
+import { setupClosing } from './closing.js?v=2026.11.21-4';
+import { supProgress } from './supcalc.js?v=2026.11.21-4';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.21-4';
 
-const VER = '2026.11.21-3';
+const VER = '2026.11.21-4';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -139,14 +140,15 @@ async function load(force) {
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
-let ex = { rows: null, acts: null, at: 0, busy: false, d: '' };
+let ex = { rows: null, rm: null, sa: null, acts: null, at: 0, busy: false, d: '' };
 async function loadEx(force) {
   if (!admin || ex.busy) return;
   const d = ymd();
   if (!force && ex.d === d && ex.at && Date.now() - ex.at < 120000) return;
   ex.busy = true; draw();
   // 더티·정비보조: 오늘 기록 줄(체크·근태) / 진행 중 활동: 개수만 세기(count — 체크 문서를 받지 않음)
-  const [rows, acts] = await Promise.all([safe(S.getQuery('sup/' + d + '/rows', [])), safe(S.getQuery('acts', [['status', '==', '진행']]))]);
+  const [rows, acts, rm, sa] = await Promise.all([safe(S.getQuery('sup/' + d + '/rows', [])), safe(S.getQuery('acts', [['status', '==', '진행']])),
+    safe(S.getQuery('sup/' + d + '/rm', [])), supAuto()]);   // 레포트 앱 객실 변경 · 정비 지원 autosup.js (더티 % 를 정비 지원과 같게)
   let actList = acts;
   if (Array.isArray(acts) && acts.length) {
     const ex = await actExcl();
@@ -158,7 +160,7 @@ async function loadEx(force) {
       return { id: a.id, name: x.name || a.id, color: x.color || '', due: x.due || '', doneName: x.doneName || '', proc: typeof proc === 'number' ? proc : null, today: typeof td === 'number' ? td : null, target };
     }));
   }
-  ex = { rows, acts: actList, at: Date.now(), busy: false, d }; draw();
+  ex = { rows, rm, sa, acts: actList, at: Date.now(), busy: false, d }; draw();
 }
 function reload(force) { load(force); if (route.sec === 'work' && route.tab === 'dirty') loadEx(force); }
 function bad(x) { return !x || x.__err; }
@@ -230,25 +232,33 @@ function actExcl() {
   if (!exP) exP = new Promise(res => { const sc = document.createElement('script'); sc.src = new URL('../dirty/act.js', import.meta.url).href; sc.onload = () => res(window.actExcl || null); sc.onerror = () => { exP = null; res(null); }; document.head.appendChild(sc); });
   return exP;
 }
+let saP = null;
+function supAuto() {
+  if (window.SupAuto) return Promise.resolve(window.SupAuto);
+  if (!saP) saP = new Promise(res => { const sc = document.createElement('script'); sc.src = new URL('../dirty/autosup.js?v=' + VER, import.meta.url).href; sc.onload = () => res(window.SupAuto || null); sc.onerror = () => { saP = null; res(null); }; document.head.appendChild(sc); });
+  return saP;
+}
 const COLORS = { '하늘색': '#3BA7E0', '민트': '#1FB59A', '연두': '#7CB518', '주황': '#F08C00', '보라': '#8E5CD9', '분홍': '#E0559A' };
 function dirtyHtml(v) {
   const sp = v.sup && !v.sup.__err ? v.sup : null, plan = sp && Array.isArray(sp.plan) ? sp.plan : [];
   let h = '<div class="card"><h2>더티 · 정비보조</h2>';
   if (v.rows && v.rows.__err) return h + '<p class="err">정비 지원 기록을 못 읽었어요: ' + esc(v.rows.__err) + '</p></div>';
   const rows = (Array.isArray(v.rows) ? v.rows : []).map(x => x.data || {}).sort((a, b) => Number(a.at || 0) - Number(b.at || 0));
-  const att = {}, chk = {};
+  const att = {};
   rows.forEach(x => {
     const r = Array.isArray(x.row) ? x.row : [];
     if (x.tab === '근태' && r[2] && ['출근', '퇴근', '퇴근취소'].indexOf(r[3]) >= 0) att[r[2]] = r[3];
-    if (x.tab === '체크' && r[2]) chk[String(r[2]).replace(/^'/, '')] = r[5];
   });
   const inNow = Object.keys(att).filter(n => att[n] !== '퇴근'), outN = Object.keys(att).filter(n => att[n] === '퇴근');
-  const total = plan.reduce((s, x) => s + (Number(x && x.n) || 0), 0), done = Object.keys(chk).filter(k => chk[k] === '완료').length;
-  const ws = Array.from(new Set(plan.map(x => x && x.w).filter(Boolean)));
+  // 2026-11-21: 정비 지원 앱 상단 '전체'와 같은 셈 — 아침 배분 + 그날 수량 수정 · 가져옴 · 자동 배정 · 레포트 방 변경, 메이드마다 지원 수량까지만
+  const pg = supProgress(sp, v.rows, Array.isArray(v.rm) ? v.rm : [], v.sa, v.d || ymd());
+  const total = pg.target, done = pg.done;
+  const ws = pg.workers.filter(w => w.target > 0 || w.done > 0).map(w => w.name);
   const pct = total ? Math.min(100, Math.round(done * 100 / total)) : 0;
   if (total) h += '<div class="prog"><div class="big">' + pct + '%<small>더티 ' + done + ' / ' + total + '실</small></div><div class="bar"><i style="width:' + pct + '%;background:linear-gradient(90deg,#9A4708,#D27A2C)"></i></div></div>';
   else h += '<p class="note" style="margin:0 0 10px">' + (plan.length ? '오늘은 더티 지원 객실이 없어요.' : '오늘 더티 배분이 아직이에요.') + (done ? ' 지금까지 더티 완료 ' + done + '실.' : '') + '</p>';
   h += '<div class="kv"><div><b>' + inNow.length + '</b><span>출근 중</span></div><div><b>' + ws.length + '</b><span>더티 담당</span></div><div><b>' + outN.length + '</b><span>퇴근</span></div></div>';
+  if (pg.workers.length && total) h += '<p class="note">' + pg.workers.filter(w => w.target > 0).map(w => esc(w.name) + ' ' + w.done + '/' + w.target).join(' · ') + '</p>';
   if (inNow.length) h += '<p class="note">출근: ' + esc(inNow.join(', ')) + '</p>';
   return h + '<button class="big-btn" style="margin-top:12px" data-sup="1">🛏 정비보조별 진행 보기 · 수정 <small style="display:block;font-weight:600;font-size:12.5px;opacity:.8;margin-top:2px">남은 더티 · 대신 체크 · 수량 · 추가 · 근무 종료</small></button>' +
     '<button class="big-btn sec" style="margin-top:10px" data-hdist="1">📋 더티 배분 ' + (plan.length ? '다시 만들기' : '만들기') + '</button></div>';
@@ -587,7 +597,7 @@ function progHtml() {
 function exHtml() {
   const v = view.st;
   if (!ex.at || ex.d !== ymd()) return '<div class="card"><h2>더티 · 정비보조</h2><p class="note" style="margin:0">읽는 중…</p></div>';
-  return dirtyHtml(Object.assign({}, v || {}, { rows: ex.rows })) + actsHtml({ acts: ex.acts });
+  return dirtyHtml(Object.assign({}, v || {}, { rows: ex.rows, rm: ex.rm, sa: ex.sa })) + actsHtml({ acts: ex.acts });
 }
 // ---------- 🧾 입퇴사 진행 (2026-11-18, 입퇴사 서류 부분 연결)
 // 입퇴사 앱(HrStaff.gs)이 1시간마다 staff/{id} 로 보내는 기본 정보만 씀. 서류·주민번호·사진은 입퇴사 앱에만 있음

@@ -19,7 +19,10 @@ function seed(kind) {
   s['days/' + DAY] = { maids: Array.from({ length: 12 }, (_, i) => '메이드' + i) };
   s['uploads/rep_' + DAY] = { rooms: Array.from({ length: 60 }, (_, i) => ({ room: String(1001 + i), name: '메이드' + (i % 12) })) };
   for (let i = 0; i < 38; i++) s['days/' + DAY + '/recs/r' + i] = { room: String(1001 + i), status: i === 5 && kind === 'busy' ? '이상' : '완료', at: now - i * 60000, maid: '메이드' + (i % 12) };
-  s['sup/' + DAY] = { plan: [{ w: '정비보조A', n: 10 }, { w: '정비보조B', n: 8 }] };
+  s['sup/' + DAY] = { plan: [{ d: DAY, w: '정비보조A', m: '메이드1', n: 10, r: '1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011' }, { d: DAY, w: '정비보조B', m: '메이드2', n: 8, r: '1101, 1102, 1103, 1104, 1105, 1106, 1107, 1108, 1109' }] };
+  // 2026-11-21: 더티 % = 정비 지원과 같은 셈 — 메이드2 수량을 4로 고침 · 메이드2 방 5개 체크(4까지만 셈) · 메이드1 1개 → 5 / 14
+  s['sup/' + DAY + '/rows/c0'] = { tab: '변경', row: [null, DAY, '수정', '메이드2', '정비보조B', '', 4, '', ''], at: now - 4 * 3600e3 };
+  ['1101', '1102', '1103', '1104', '1105', '1001'].forEach((r, i) => { s['sup/' + DAY + '/rows/k' + i] = { tab: '체크', row: [null, DAY, "'" + r, r < '1100' ? '메이드1' : '메이드2', '정비보조B', '완료', ''], at: now - 3 * 3600e3 + i }; });
   s['sup/' + DAY + '/rows/x1'] = { tab: '근태', row: ['', '', '정비보조A', '출근'], at: now - 5 * 3600e3 };
   s['acts/A1'] = { name: '이불장 얼룩 제거', color: '보라', status: '진행', exclText: '' };
   for (let k = 0; k < 12; k++) s['days/' + DAY + '/plans/메이드' + k] = { rooms: Array.from({ length: 5 }, (_, j) => ({ room: String(1001 + k + j * 12), tags: [], note: '', due: k === 0 && j === 1 ? '14:00' : '', after: '', memo: '' })) };
@@ -233,6 +236,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('④ 즐겨찾기로 #work/dirty 바로 열기 → ‹ 는 첫 화면');
   p = await open(b, phone, 'calm', '#work/dirty'); await sleep(500);
   ok(/출근 중/.test(await p.innerText('main')), '바로 열어도 더티 읽음');
+  ok(/더티 5 \/ 14실/.test(await p.innerText('main')) && /정비보조B 4\/4/.test(await p.innerText('main')), '더티 % 는 정비 지원과 같은 셈 (수정 수량 · 지원 수량까지만)');
   ok(await p.locator('[data-sup]').count() === 1, '🛏 정비보조별 진행 보기 · 수정 버튼 (2026-11-21)');
   await p.click('[data-sup]'); await sleep(300);
   ok(/\/dirty\/\?hub=sup$/.test(await p.getAttribute('#actf', 'src') || '') && /정비보조별 진행/.test(await p.innerText('#actp .act-bar')), '누르면 정비 지원 관리자 탭 창 (?hub=sup)');
