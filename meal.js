@@ -106,7 +106,7 @@ export function setupMeal(c) {
   const { S, esc, ymd, addDays, md } = c;
   let doc = undefined, at = 0, busy = false, err = '';
   let up = null;   // { pic, reading, err, days:{date:{b,l,d 글자}}, notes, saving }
-  let wkFrom = '';  // 주간 표에서 보는 주의 월요일
+  let wkFrom = '', saved = '';  // 주간 표에서 보는 주의 월요일
   const mon = d => addDays(d, -((new Date(d + 'T12:00:00+09:00').getUTCDay() + 6) % 7));
   async function load(force) {
     if (busy || (!force && at && Date.now() - at < 600000)) return;
@@ -153,7 +153,9 @@ export function setupMeal(c) {
     if (doc === undefined) { load(false); return '<div class="card"><p class="note" style="margin:0">읽는 중…</p></div>'; }
     if (up) return upHtml();
     if (!wkFrom) wkFrom = mon(ymd());
-    let h = '<div class="card"><h2>📷 식단표 올리기</h2><p class="note" style="margin:0 0 12px">식당 게시판 식단표를 휴대폰으로 찍어 올리면 AI가 표로 읽어요. 저장 전에 한 번 확인하고 고칠 수 있어요. 일주일에 한 번이면 돼요.</p>' +
+    const ahead = [1, 2].map(n => addDays(mon(ymd()), 7 * n)).filter(hasWeek).map(f => weekWord(f));
+    let h = (saved ? '<p class="ml-info ok">' + esc(saved) + '</p>' : '') + '<div class="card"><h2>📷 식단표 올리기</h2><p class="note" style="margin:0 0 12px">식당 게시판 식단표를 휴대폰으로 찍어 올리면 AI가 표로 읽어요. 저장 전에 한 번 확인하고 고칠 수 있어요. 다음 주 · 다다음 주 식단표를 미리 올려도 날짜에 맞춰 자동으로 보여요.' +
+      (ahead.length ? ' <b>' + ahead.join(' · ') + ' 식단은 이미 올라가 있어요.</b>' : '') + '</p>' +
       '<button class="big-btn" data-ml="up">📷 식단표 사진 올리기</button></div>';
     h += '<div class="card"><h2>🗓 주간 식단표 <span class="ml-nav"><button class="ref" data-ml="prev" aria-label="지난주">‹</button><button class="ref" data-ml="next" aria-label="다음 주">›</button></span></h2>' +
       '<p class="ml-range">' + md(wkFrom) + ' (월) ~ ' + md(addDays(wkFrom, 6)) + ' (일)' + (wkFrom === mon(ymd()) ? ' · 이번 주' : '') + '</p>';
@@ -171,6 +173,7 @@ export function setupMeal(c) {
     if (up.pic) h += '<details class="ml-pic"' + (up.days ? '' : ' open') + '><summary>올린 사진 보기</summary><img src="' + up.pic + '" alt="식단표 사진"></details>';
     if (up.reading) return h + '<p class="ml-busy">AI가 식단표를 읽는 중이에요… (20~40초)</p></div>';
     if (up.err) h += '<p class="ml-err">' + esc(up.err) + '</p>';
+    if (up.info && up.days) h += '<p class="ml-info ' + up.info.lv + '">' + esc(up.info.msg) + '</p>';
     if (!up.days) return h + '<button class="big-btn" data-ml="up">다른 사진 고르기</button>' + (up.pic ? '<button class="big-btn sec" style="margin-top:8px" data-ml="blank">손으로 적기</button>' : '') + '</div>';
     const ds = Object.keys(up.days).sort();
     h += '<p class="note" style="margin:0 0 10px">' + (up.fromAI ? 'AI가 읽은 내용이에요. <b>사진과 비교해서 틀린 글자를 고친 뒤</b> 저장해 주세요. ' : '') + '한 줄에 메뉴 하나, 원산지는 괄호 안에 적어요. 예: <code>쇠고기미역국 (쇠고기:국산,한우)</code></p><div class="ml-edit">';
@@ -194,6 +197,7 @@ export function setupMeal(c) {
   async function read(file) {
     up = { pic: '', reading: true, err: '', days: null, notes: '' }; c.go('meal'); c.draw();
     try {
+      if (doc === undefined) await load(true);
       up.pic = await toJpeg(file, 2048); c.draw();
       const b64 = up.pic.slice(up.pic.indexOf(',') + 1), text = prompt(ymd());
       let cfg = {}; try { cfg = (await S.get('meta/insp_ai')) || {}; } catch (e) {}
@@ -202,11 +206,25 @@ export function setupMeal(c) {
       if (!Object.keys(j.days).length) throw new Error('표에서 날짜를 못 찾았어요. 식단표 전체가 나오게, 정면에서 다시 찍어 주세요.');
       up.days = {}; Object.keys(j.days).forEach(d => { up.days[d] = toText(j.days[d]); });
       up.notes = j.notes.join('\n'); up.fromAI = true;
+      up.info = aheadInfo(Object.keys(j.days));
     } catch (e) {
       console.warn('식단 AI', e);
       up.err = (e && e.message && /[가-힣]/.test(e.message) ? e.message : 'AI가 읽지 못했어요 (' + String(e && (e.code || e.message) || e).slice(0, 120) + '). 다시 찍어 올리거나 \'손으로 적기\'를 눌러 주세요.');
     }
     up.reading = false; c.draw();
+  }
+  // 11/21 사용자: 다음 주 · 다다음 주 식단표를 미리 올려도 됨 (날짜별로 저장 → 그 날이 되면 자동으로 보임)
+  //   이미 같은 내용이 올라가 있으면 '이미 반영돼 있어요'
+  const same = (a, b) => ['b', 'l', 'd'].every(k => JSON.stringify(lines((a || {})[k])) === JSON.stringify(lines((b || {})[k])));
+  const range = ds => md(ds[0]) + '(' + dowOf(ds[0]) + ') ~ ' + md(ds[ds.length - 1]) + '(' + dowOf(ds[ds.length - 1]) + ')';
+  function weekWord(d) { const n = Math.round((Date.parse(mon(d)) - Date.parse(mon(ymd()))) / (7 * 864e5)); return n === 0 ? '이번 주' : n === 1 ? '다음 주' : n === 2 ? '다다음 주' : n > 0 ? n + '주 뒤' : '지난 식단'; }
+  function aheadInfo(ds) {
+    ds = ds.slice().sort(); if (!ds.length) return null;
+    const had = ds.filter(d => dayOf(d)), allSame = had.length === ds.length && ds.every(d => same(dayOf(d), up.days[d]));
+    if (allSame) return { lv: 'ok', msg: '✅ ' + range(ds) + ' 식단은 이미 반영되어 있어요. 다시 저장하지 않아도 돼요.' };
+    const w = weekWord(ds[0]);
+    if (had.length) return { lv: 'wait', msg: '이미 올라간 날짜가 ' + had.length + '일 있어요 (' + w + '). 저장하면 새 내용으로 바뀌어요.' };
+    return { lv: 'ok', msg: '📅 ' + w + ' 식단표예요 (' + range(ds) + '). 저장해 두면 그 날이 되면 자동으로 보여요.' };
   }
   function blankWeek(from) { up.days = {}; weekCells(from).forEach(d => { up.days[d] = toText(dayOf(d) || {}); }); up.notes = ((doc && doc.notes) || []).join('\n'); up.err = ''; }
   async function save() {
@@ -223,6 +241,8 @@ export function setupMeal(c) {
       const out = { days: all, notes: lines(up.notes).slice(0, 8), wk: { from: keys[0], to: keys[keys.length - 1], by: c.who() || '' }, at: S.SERVER_TIME, uid: c.uid() || '' };
       await S.set('meta/meals', out);
       doc = Object.assign({}, out, { at: Date.now() }); at = Date.now();
+      const w = weekWord(keys[0]);
+      saved = w === '이번 주' ? '✅ 이번 주 식단을 저장했어요. 메이드 휴대폰에도 바로 보여요.' : w === '지난 식단' ? '✅ 저장했어요.' : '✅ ' + w + ' 식단을 미리 저장했어요 (' + range(keys) + '). 그 날이 되면 자동으로 보여요.';
       wkFrom = mon(keys[0]); up = null; c.draw(); window.scrollTo(0, 0);
     } catch (e) { up.saving = false; up.err = '저장하지 못했어요: ' + (e && (e.code || e.message) || e); c.draw(); }
   }
@@ -242,13 +262,14 @@ export function setupMeal(c) {
     const a = t.getAttribute('data-ml');
     if (a === 'open') { openDlg(); return; }
     if (a === 'close') { closeDlg(); return; }
+    if (a !== 'save') saved = '';
     if (a === 'up' || a === 'week') closeDlg();
     if (a === 'up') pick();
     else if (a === 'week') c.go('meal');
     else if (a === 'cancel') { if (up && up.days && !confirm('고친 내용을 버리고 닫을까요?')) return; up = null; c.draw(); }
     else if (a === 'blank') { blankWeek(mon(ymd())); c.draw(); }
     else if (a === 'edit') { up = { pic: '', reading: false, err: '', days: null, notes: '' }; blankWeek(wkFrom); c.draw(); window.scrollTo(0, 0); }
-    else if (a === 'prev' || a === 'next') { wkFrom = addDays(wkFrom, a === 'prev' ? -7 : 7); c.draw(); }
+    if (a === 'prev' || a === 'next') { wkFrom = addDays(wkFrom, a === 'prev' ? -7 : 7); c.draw(); }
     else if (a === 'print') print();
     else if (a === 'save') save();
     else if (a === 'delday') { delete up.days[t.getAttribute('data-d')]; c.draw(); }
