@@ -87,8 +87,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(/승인 2/.test(await p.locator('.hm-tile[href="./leave/"]').innerText()), '연차 버튼에 승인 2 표시');
   const r0 = await p.evaluate(() => window.__reads);
   ok(!(await p.evaluate(() => /더티/.test(document.querySelector('main').innerText.replace(/더티 배분 · 활동판|더티 배분이|더티 배분 만들기|더티 지원 필요[^\n]*/g, '')))), '첫 화면에서 더티 칸 안 그림');
-  // 11/21: 🍚 오늘 식단 카드는 빼고 잼 (새로 넣은 카드)
-  const h = await p.evaluate(() => document.documentElement.scrollHeight - ((document.querySelector('.ml-card') || {}).offsetHeight || 0));
+  const h = await p.evaluate(() => document.documentElement.scrollHeight);
   // 11/21: 시험 자료에 '더티 지원 필요' 한 줄을 더해 1500 → 1600
   ok(h < 1600, '첫 화면 길이 ' + h + 'px (예전보다 짧음)');
   await shot(p, '1_첫화면_할일.png');
