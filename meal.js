@@ -118,18 +118,28 @@ export function setupMeal(c) {
   const nowMeal = () => { const h = Number(new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 13)); return h < 10 ? 'b' : h < 14 ? 'l' : 'd'; };
   const itemHtml = s => { const x = split(s); return '<li><b>' + esc(x.n) + '</b>' + (x.o ? '<small>' + esc(x.o) + '</small>' : '') + '</li>'; };
 
-  // 첫 화면 카드
-  function homeHtml() {
-    if (doc === undefined) { load(false); return ''; }
-    load(false);
+  // 11/21 사용자: 첫 화면 카드는 자리를 많이 차지 → 위쪽 남색 띠의 작은 '🍚 오늘 식단' 버튼, 누르면 창
+  function btnHtml() { if (doc === undefined) load(false); return '<button class="ml-top" data-ml="open">🍚 오늘 식단</button>'; }
+  function dlgBody() {
     const d = ymd(), t = dayOf(d), lab = md(d) + ' (' + dowOf(d) + ')';
-    if (!t) return '<div class="card ml-card ml-none"><h2>🍚 오늘 식단 <small>' + lab + '</small></h2><p class="note" style="margin:0 0 10px">이번 주 식단표가 아직 안 올라왔어요. 식당 식단표를 사진 찍어 올리면 메이드 휴대폰에도 오늘 점심이 떠요.</p>' +
-      '<button class="big-btn sec" data-ml="up">📷 식단표 사진 올리기</button></div>';
+    let h = '<div class="ml-dh"><h2>🍚 오늘 식단 <small>' + lab + '</small></h2><button class="ref" data-ml="close" aria-label="닫기">✕</button></div>';
+    if (doc === undefined) return h + '<p class="note">읽는 중…</p>';
+    if (!t) return h + '<p class="note" style="margin:0 0 12px">이번 주 식단표가 아직 안 올라왔어요. 식당 식단표를 사진 찍어 올리면 메이드 휴대폰에도 점심 메뉴가 떠요.</p>' +
+      '<button class="big-btn" data-ml="up">📷 식단표 사진 올리기</button><button class="ml-more" data-ml="week">주간 식단표 ›</button>';
     const cur = nowMeal();
-    return '<div class="card ml-card"><h2>🍚 오늘 식단 <small>' + lab + '</small></h2><div class="ml-cols">' +
+    return h + '<div class="ml-cols">' +
       MEALS.map(([k, n]) => '<div class="ml-col' + (k === cur ? ' on' : '') + '"><h3>' + n + (k === cur ? '<i>지금</i>' : '') + '</h3><ul>' + ((t[k] || []).length ? t[k].map(itemHtml).join('') : '<li class="ml-x">없음</li>') + '</ul></div>').join('') +
-      '</div><button class="ml-more" data-ml="week">주간 식단표 · 인쇄 ›</button></div>';
+      '</div><div class="ml-dacts"><button class="ml-more" data-ml="up">📷 새 식단표 올리기</button><button class="ml-more" data-ml="week">주간 식단표 · 인쇄 ›</button></div>';
   }
+  let dlgOn = false;
+  function drawDlg() {
+    let el = document.getElementById('mldlg');
+    if (!dlgOn) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'mldlg'; document.body.appendChild(el); }
+    el.innerHTML = '<div class="ml-scrim" data-ml="close"></div><div class="ml-box" role="dialog" aria-label="오늘 식단">' + dlgBody() + '</div>';
+  }
+  function openDlg() { dlgOn = true; drawDlg(); load(false).then(drawDlg); }
+  function closeDlg() { dlgOn = false; drawDlg(); }
 
   // 주간 식단표 화면 (#meal)
   function weekCells(from) { return Array.from({ length: 7 }, (_, i) => addDays(from, i)); }
@@ -230,6 +240,9 @@ export function setupMeal(c) {
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-ml]'); if (!t) return;
     const a = t.getAttribute('data-ml');
+    if (a === 'open') { openDlg(); return; }
+    if (a === 'close') { closeDlg(); return; }
+    if (a === 'up' || a === 'week') closeDlg();
     if (a === 'up') pick();
     else if (a === 'week') c.go('meal');
     else if (a === 'cancel') { if (up && up.days && !confirm('고친 내용을 버리고 닫을까요?')) return; up = null; c.draw(); }
@@ -254,5 +267,5 @@ export function setupMeal(c) {
     if (up.days[d1] && !confirm(md(d1) + ' 칸이 이미 있어요. 덮어쓸까요?')) { e.target.value = d0; return; }
     up.days[d1] = up.days[d0]; delete up.days[d0]; c.draw();
   });
-  return { homeHtml, secHtml, load, reset() { doc = undefined; at = 0; up = null; }, busy: () => !!(up && (up.reading || up.saving)) };
+  return { btnHtml, secHtml, load, reset() { doc = undefined; at = 0; up = null; }, busy: () => !!(up && (up.reading || up.saving)) };
 }
