@@ -20,16 +20,16 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-9';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-9';
-import * as PIN from './pin.js?v=2026.11.21-9';
-import { setupClose } from './close.js?v=2026.11.21-9';
-import { setupClosing } from './closing.js?v=2026.11.21-9';
-import { supProgress } from './supcalc.js?v=2026.11.21-9';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.21-9';
-import { setupMeal } from './meal.js?v=2026.11.21-9';   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
+import * as K from '../rm/app/keys.js?v=2026.11.21-10';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.21-10';
+import * as PIN from './pin.js?v=2026.11.21-10';
+import { setupClose } from './close.js?v=2026.11.21-10';
+import { setupClosing } from './closing.js?v=2026.11.21-10';
+import { supProgress } from './supcalc.js?v=2026.11.21-10';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.21-10';
+import { setupMeal } from './meal.js?v=2026.11.21-10';   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.21-9';
+const VER = '2026.11.21-10';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -108,11 +108,12 @@ async function load(force) {
   view.busy = true; draw();
   const d = ymd(), tm = ymd(Date.now() + 864e5);
   const hrP = isHk() ? Promise.resolve(null) : hrLoad(d);
-  const [up, rl, srl, cmp, sup, day, recs, errs, auto] = await Promise.all([
+  const [up, rl, srl, cmp, sup, day, recs, errs, auto, rs] = await Promise.all([
     safe(S.get('uploads/latest')), safe(S.get('meta/relay')), safe(S.get('sup_meta/relay')), safe(S.get('meta/compare')),
     safe(S.get('sup/' + d)), safe(S.get('days/' + d)),
     safe(S.getQuery('days/' + d + '/recs', [])), safe(S.getQuery('errors', [['day', '==', d]])),
-    safe(S.getQuery('sup/' + d + '/auto', []))   // 2026-11-21: 레포트 방 변경 → 더티 자동 배정 알림 (정비 지원 휴대폰이 씀, 규칙 v22)
+    safe(S.getQuery('sup/' + d + '/auto', [])),   // 2026-11-21: 레포트 방 변경 → 더티 자동 배정 알림 (정비 지원 휴대폰이 씀, 규칙 v22)
+    safe(S.get('meta/rsync'))   // 2026-11-21: 📄 정비보고서 연결 상태 (오더테이커 PC 연결 창이 5분마다 남김)
   ]);
   // 오늘 배정 실 수: 그날 정비보고서 저장본(rep_) → 없으면 올림 문서(오늘 것) → 없으면 메이드별 배정(plans)
   let base = await safe(S.get('uploads/rep_' + d));
@@ -138,7 +139,7 @@ async function load(force) {
       ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, C), mr: K.maidRooms ? K.maidRooms(P, C) : null, recs: Array.isArray(recs) ? recs : null, mate: (tmz && !tmz.__err && tmz.mate) || {} });
     }
   }
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto };
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -193,6 +194,7 @@ function statusItems(v) {
     if (by('under').length) add('wait', '방이 줄었는데 더티 지원 중 ' + by('under').length + '명', line(by('under')) + ' — 정비 지원에서 확인');
     if (by('auto').length) add('ok', '방 변경 자동 배정 ' + by('auto').length + '건', by('auto').map(x => x.maid + ' ' + x.msg).join(' / ').slice(0, 300));
   }
+  rsItems(v, now, H).forEach(x => L.push(x));
   // 중계 두 개
   [['정비 레포트 시트 중계', v.rl], ['정비 지원 시트 중계', v.srl]].forEach(([nm, r]) => {
     if (bad(r) || !r.at) { add('bad', nm + ' 기록 없음', r && r.__err ? r.__err : '중계가 한 번도 안 돌았어요'); return; }
@@ -718,6 +720,25 @@ function goHome() {
   history.replaceState(null, '', location.pathname + location.search);
   route = parseRoute(); draw(); window.scrollTo(0, 0);
 }
+// 📄 정비보고서 연결 (2026-11-21): 오늘 켜져 있을 때만. 조용히 멈추는 게 제일 위험 → 근무 시간(7~18시)에 15분 넘게 소식 없으면 끊김 경고
+const RS_URL = '../rm/?link=1';
+function rsItems(v, now, H) {
+  const r = v.rs; if (!r || r.__err || !r.on || r.day !== v.d) return [];
+  const it = (lv, title, sub) => ({ lv, title, sub, href: RS_URL, rs: 1 });
+  const gap = Math.round((now - Number(r.at || 0)) / 60000);
+  if (gap > 15 && H >= 7 && H < 18) return [it('bad', '정비보고서 연결이 ' + gap + '분째 끊겼어요', '오더테이커 PC에서 연결 창이 닫혔거나 PC가 꺼졌어요 · 그동안은 손으로 해 주세요')];
+  if (r.state === 'perm') return [it('bad', '정비보고서 폴더를 다시 허락해 주세요', '오더테이커 PC 연결 창에서 "다시 허락하기"')];
+  if (r.state === 'stop') return [it('bad', '정비보고서 연결 멈춤', String(r.msg || '').slice(0, 150))];
+  if (r.pend) return [it('wait', '정비보고서 변경 ' + r.pend + '건 확인 대기', '연결 창에서 "이대로 반영"을 눌러야 메이드·더티에 들어가요')];
+  return [it('ok', '정비보고서 연결됨', hm(r.at) + ' 확인' + (r.fileAt ? ' · 엑셀 저장 ' + hm(r.fileAt) : '') + (r.mode === 'auto' ? ' · 자동 반영' : ' · 확인 후 반영') + (r.diff ? ' · 엑셀과 다름 ' + r.diff : ''))];
+}
+function rsCardHtml() {
+  const v = view.st || {}, r = v.rs && !v.rs.__err ? v.rs : null, x = v.d ? rsItems(v, Date.now(), Number(seoul().toISOString().slice(11, 13)))[0] : null;
+  return '<div class="card"><h2>📄 정비보고서 연결 <small>엑셀 → 앱 자동 반영</small></h2>' +
+    (x ? '<p class="' + (x.lv === 'bad' ? 'err' : x.lv === 'wait' ? 'waitbox' : 'okbox') + '">' + (x.lv === 'ok' ? '✅ ' : x.lv === 'bad' ? '❗ ' : '⏳ ') + esc(x.title) + '<br><small>' + esc(x.sub) + '</small></p>'
+      : '<p class="note" style="margin:0 0 10px">' + (r && r.on ? '오늘은 아직 연결 소식이 없어요.' : '아직 연결 안 됨.') + ' 오더테이커 PC(크롬)에서 연결 창을 열고 정비보고서 폴더를 한 번 골라 두면, 엑셀에서 바꾼 방(추가·빠짐·재실·시간)이 메이드 화면과 정비보조 더티에 들어가요.</p>') +
+    '<a class="big-btn sec" style="display:block;text-align:center;text-decoration:none;margin-top:10px" href="' + RS_URL + '" target="_blank" rel="noopener">연결 창 열기 (새 탭 · 켜 두기)</a></div>';
+}
 // 첫 화면 '지금 확인할 것': 오늘 한눈에에서 문제·주의만 + 이상 보고 · 연차 승인 대기 · 퇴사일 지남
 function todoItems(v) {
   const L = statusItems(v).filter(x => x.lv !== 'ok').map(x => Object.assign({ go: /휴대폰 오류/.test(x.title) ? 'field' : 'work/now' }, x));
@@ -784,7 +805,7 @@ function homeHtml() {
       h += '<div class="card hm-todo' + (nb ? '' : ' w') + '"><h2>' + (nb ? '❗' : '⏳') + ' 지금 확인할 것 ' + T.length + ' <button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ ' + hm(view.at)) + '</button></h2><ul>' +
         T.map(x => {
           const inner = '<span class="hm-i">' + (x.lv === 'bad' ? '❗' : '⏳') + '</span><span class="hm-t"><b>' + esc(x.title) + '</b>' + (x.sub ? '<small>' + esc(x.sub) + '</small>' : '') + '</span><span class="hm-c">›</span>';
-          return '<li class="' + x.lv + '">' + (x.href ? '<a href="' + x.href + '">' + inner + '</a>' : '<button data-go="' + x.go + '">' + inner + '</button>') + '</li>';
+          return '<li class="' + x.lv + '">' + (x.href ? '<a href="' + x.href + '"' + (x.rs ? ' target="_blank" rel="noopener"' : '') + '>' + inner + '</a>' : '<button data-go="' + x.go + '">' + inner + '</button>') + '</li>';
         }).join('') + '</ul></div>';
     } else h += '<div class="card hm-ok"><b>✅ 모두 정상</b><span>' + hm(view.at) + ' 기준</span><button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></div>';
   }
@@ -801,7 +822,7 @@ function secHtml() {
     (sec === 'work' || sec === 'people' ? '<button class="ref" data-ref="1">' + (view.busy || ex.busy ? '읽는 중…' : '↻ 새로 고침') + '</button>' : '') + '</div>';
   if (S0.tabs) h += '<div class="hm-tabs" role="tablist">' + S0.tabs.map(t => '<button role="tab" data-tab="' + t[0] + '" aria-pressed="' + (route.tab === t[0]) + '">' + esc(t[1]) + (t[0] === 'up' && up && !up.sent ? ' •' : '') + '</button>').join('') + '</div>';
   if (sec === 'work') {
-    if (route.tab === 'up') h += upHtml();
+    if (route.tab === 'up') h += upHtml() + rsCardHtml();
     else if (route.tab === 'dirty') h += exHtml();
     else if (route.tab === 'asg') h += assignCardHtml();
     else h += statusHtml() + progHtml() + rmCardHtml();
