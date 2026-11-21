@@ -461,7 +461,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await fx(ctxN); await p.reload(); await p.waitForSelector('.hm-tile'); await sleep(700);
   const bt = await p.innerText('main');
   ok(new RegExp('야간 보고서 .* 밤 확인 대기[\\s\\S]*발주 필요: 비누').test(bt), '허브 할 일: 야간 보고서 확인 대기 · 발주 필요: 비누');
-  ok(/확인 1/.test(await p.locator('.hk-card').innerText()), '하우스키퍼 카드 야간 보고서 버튼에 확인 1');
+  ok(/확인 1/.test(await p.locator('.hm-tile[data-go="hk"]').innerText()), '하우스키퍼 칸에 확인 1');
   await p.goto(BASE + 'hub/night/#' + ND);
   await p.waitForSelector('[data-ok="소장"]', { timeout: 6000 });
   ok(await p.locator('[data-ok]').count() === 1, '소장은 소장 칸에만 확인 버튼');

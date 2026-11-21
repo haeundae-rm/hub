@@ -20,17 +20,17 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-11';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-11';
-import * as PIN from './pin.js?v=2026.11.21-11';
-import { setupClose } from './close.js?v=2026.11.21-11';
-import { setupClosing } from './closing.js?v=2026.11.21-11';
-import { supProgress } from './supcalc.js?v=2026.11.21-11';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.21-11';
-import { setupMeal } from './meal.js?v=2026.11.21-11';
+import * as K from '../rm/app/keys.js?v=2026.11.21-12';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.21-12';
+import * as PIN from './pin.js?v=2026.11.21-12';
+import { setupClose } from './close.js?v=2026.11.21-12';
+import { setupClosing } from './closing.js?v=2026.11.21-12';
+import { supProgress } from './supcalc.js?v=2026.11.21-12';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.21-12';
+import { setupMeal } from './meal.js?v=2026.11.21-12';
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.21-11';
+const VER = '2026.11.21-12';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -667,6 +667,13 @@ function hrHtml(v) {
   if (r.past.length) h += '<h3 class="hrh" style="color:var(--wait)">퇴사일 지남 <small>아직 재직으로 남아 있어요</small></h3><ul class="hrl">' + r.past.map(p => row(p, '퇴사 ' + md(p.left) + ' (' + dd(p.left) + ')')).join('') + '</ul><p class="note" style="margin-top:6px">입퇴사 서류 앱에서 퇴사 처리를 마치면 다음 갱신 때 빠져요.</p>';
   return h + open + '</div>';
 }
+// 🛎️ 하우스키퍼 (11/21): 첫 화면 칸 → 안쪽에서 야간 업무 보고서 · 연차 현황 고르기 (다른 칸과 같은 방식)
+function hkSecHtml() {
+  const n = view.st ? nightWait(view.st).length : 0;
+  return '<div class="card"><h2>무엇을 열까요?</h2><div class="go-grid">' +
+    '<a class="go" href="./night/"><span class="ic">🌙</span><b>야간 업무 보고서' + (n ? ' <i class="hm-bd wait" style="position:static;margin-left:4px">확인 ' + n + '</i>' : '') + '</b><span>야간 근무 보고 · 확인 · 인쇄</span></a>' +
+    '<button class="go" data-hkleave="1"><span class="ic">📅</span><b>연차 현황</b><span>이름 고르고 본인 비밀번호 4자리 → 내 연차</span></button></div></div>';
+}
 function linksHtml() {
   return '<div class="card"><h2>현장 앱 <small>같은 로그인으로 열려요</small></h2><div class="go-grid">' +
     LINKS.filter(l => FIELD.indexOf(l.href) >= 0 && !(isHk() && l.href === '../unies-contract/')).map(l => '<a class="go" href="' + l.href + '"' + (l.tab ? ' target="_blank" rel="noopener"' : '') + '><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
@@ -686,6 +693,7 @@ const SECS = {
   field: { ic: '📱', t: '현장 관리' },
   close: { ic: '📊', t: '결산' },
   meal: { ic: '🍚', t: '주간 식단' },
+  hk: { ic: '🛎️', t: '하우스키퍼' },
   apps: { ic: '🔗', t: '현장 앱 열기' }
 };
 const TILES = [
@@ -693,7 +701,7 @@ const TILES = [
   { go: 'quality', ic: '🔍', t: '품질 관리', s: '인스펙션 · 고객만족도 VOC' },
   { href: './leave/', ic: '📋', t: '연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
-  { hk: 1, ic: '🛎️', t: '하우스키퍼', s: '야간 업무 보고서 · 연차 현황' },
+  { go: 'hk', ic: '🛎️', t: '하우스키퍼', s: '야간 업무 보고서 · 연차 현황' },
   { href: './keys/', ic: '🔑', t: '플로어 키', s: '키 서명 현황 · 오후 대조 · 미반납 · 대장 인쇄' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
   { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
@@ -778,7 +786,7 @@ function badgeOf(t, v) {
     return p.total ? B('ok', p.pct + '%') : '';
   }
   if (t.go === 'field') return Array.isArray(v.errs) && v.errs.length ? B('wait', '오류 ' + v.errs.length) : '';
-  if (t.href === './night/' || t.hk) { const n = nightWait(v).length; return n ? B('wait', '확인 ' + n) : ''; }
+  if (t.href === './night/' || t.go === 'hk') { const n = nightWait(v).length; return n ? B('wait', '확인 ' + n) : ''; }
   if (t.href === './keys/') {
     const k = v.ks; if (!k) return v.kc && v.kc.from && v.kc.on !== false && v.kc.from > v.d ? B('wait', md(v.kc.from) + ' 시작') : '';
     const bad = k.late.length + k.nosign.length; if (bad) return B('bad', '미반납 ' + bad);
@@ -811,8 +819,6 @@ function homeHtml() {
     } else h += '<div class="card hm-ok"><b>✅ 모두 정상</b><span>' + hm(view.at) + ' 기준</span><button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></div>';
   }
   h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.go === 'close' || t.href === './leave/'))).map(t => {
-    if (t.hk) return '<div class="hm-tile hk-card"><span class="hm-tx"><span class="hm-ic">' + t.ic + '</span><b>' + esc(t.t) + '</b></span>' +
-      '<a class="hk-btn" href="./night/">🌙 야간 업무 보고서' + badgeOf(t, v) + '</a><button class="hk-btn" data-hkleave="1">📅 연차 현황</button></div>';
     const inner = badgeOf(t, v) + '<span class="hm-ic">' + t.ic + '</span><span class="hm-tx"><b>' + esc(t.t) + '</b><small>' + esc(t.s) + '</small></span>';
     return t.href ? '<a class="hm-tile' + (t.wide ? ' wide' : '') + '" href="' + t.href + '">' + inner + '</a>'
       : '<button class="hm-tile' + (t.wide ? ' wide' : '') + '" data-go="' + t.go + '">' + inner + '</button>';
@@ -837,6 +843,7 @@ function secHtml() {
   else if (sec === 'close') { if (!CL) CL = setupClose({ S, esc, ymd, draw: () => draw() }); if (!CLG) CLG = setupClosing({ S, esc, ymd, PIN, xlsx: XW, draw: () => draw(), who: () => (admin ? admin.label : ''), uid: () => (user ? user.uid : '') }); h += CLG.html() + CL.html(); }
   else if (sec === 'apps') h += linksHtml();
   else if (sec === 'meal') h += meal().secHtml();
+  else if (sec === 'hk') h += hkSecHtml();
   return h;
 }
 function draw() {
