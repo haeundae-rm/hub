@@ -20,14 +20,14 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-2';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-2';
-import * as PIN from './pin.js?v=2026.11.21-2';
-import { setupClose } from './close.js?v=2026.11.21-2';
-import { setupClosing } from './closing.js?v=2026.11.21-2';
-import * as XW from './xlsxw.js?v=2026.11.21-2';
+import * as K from '../rm/app/keys.js?v=2026.11.21-3';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.21-3';
+import * as PIN from './pin.js?v=2026.11.21-3';
+import { setupClose } from './close.js?v=2026.11.21-3';
+import { setupClosing } from './closing.js?v=2026.11.21-3';
+import * as XW from './xlsxw.js?v=2026.11.21-3';
 
-const VER = '2026.11.21-2';
+const VER = '2026.11.21-3';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -250,7 +250,8 @@ function dirtyHtml(v) {
   else h += '<p class="note" style="margin:0 0 10px">' + (plan.length ? '오늘은 더티 지원 객실이 없어요.' : '오늘 더티 배분이 아직이에요.') + (done ? ' 지금까지 더티 완료 ' + done + '실.' : '') + '</p>';
   h += '<div class="kv"><div><b>' + inNow.length + '</b><span>출근 중</span></div><div><b>' + ws.length + '</b><span>더티 담당</span></div><div><b>' + outN.length + '</b><span>퇴근</span></div></div>';
   if (inNow.length) h += '<p class="note">출근: ' + esc(inNow.join(', ')) + '</p>';
-  return h + '<button class="big-btn' + (plan.length ? ' sec' : '') + '" style="margin-top:12px" data-hdist="1">📋 더티 배분 ' + (plan.length ? '다시 만들기' : '만들기') + '</button></div>';
+  return h + '<button class="big-btn" style="margin-top:12px" data-sup="1">🛏 정비보조별 진행 보기 · 수정 <small style="display:block;font-weight:600;font-size:12.5px;opacity:.8;margin-top:2px">남은 더티 · 대신 체크 · 수량 · 추가 · 근무 종료</small></button>' +
+    '<button class="big-btn sec" style="margin-top:10px" data-hdist="1">📋 더티 배분 ' + (plan.length ? '다시 만들기' : '만들기') + '</button></div>';
 }
 function actsHtml(v) {
   let h = '<div class="card"><h2>진행 중 활동 <small>객실 활동판</small></h2>';
@@ -436,12 +437,14 @@ async function openDist() {
   }
   draw();
 }
-// ---------- 🗺 객실 활동판 (2단계 ④)
-function openAct() {
+// ---------- 🗺 객실 활동판 (2단계 ④) · 🛏 정비보조별 진행 보기·수정 (2026-11-21: 같은 창에 정비 지원 관리자 탭 ?hub=sup)
+const ACT_T = { act: '🗺 객실 활동판', sup: '🛏 정비보조별 진행' };
+function openAct(kind) {
+  kind = ACT_T[kind] ? kind : 'act';
   if (!admin || document.getElementById('actp')) return;
   const p = document.createElement('div'); p.className = 'vp'; p.id = 'actp'; p.style.overflow = 'hidden';
-  p.innerHTML = '<div class="act-bar"><b>🗺 객실 활동판</b><span id="actmsg">여는 중…</span><button class="vp-x" data-actclose="1" aria-label="닫기">✕</button></div>' +
-    '<iframe id="actf" title="객실 활동판" src="' + new URL('../dirty/?hub=act', import.meta.url).href + '"></iframe>';
+  p.innerHTML = '<div class="act-bar"><b>' + ACT_T[kind] + '</b><span id="actmsg">여는 중…</span><button class="vp-x" data-actclose="1" aria-label="닫기">✕</button></div>' +
+    '<iframe id="actf" title="' + ACT_T[kind] + '" src="' + new URL('../dirty/?hub=' + kind, import.meta.url).href + '"></iframe>';
   document.body.appendChild(p); document.body.classList.add('sb-lock');
   const f = p.querySelector('iframe'); f.addEventListener('load', () => { const m = document.getElementById('actmsg'); if (m) m.textContent = ''; });
 }
@@ -462,6 +465,7 @@ function closeAct() { const p = document.getElementById('actp'); if (!p) return;
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || !e.data || !e.data.hub) return;
   if (e.data.hub === 'close') closeAct();
+  if (e.data.hub === 'supok') { const m = document.getElementById('actmsg'); if (m) m.textContent = '정비보조 이름 탭을 누르면 대신 체크해요'; }
   if (e.data.hub === 'noadmin') {
     // 정비 지원은 로그인을 따로 보관(Firebase 앱 'sup') → 비밀번호를 바꾸면 거기 로그인만 풀려 있음 (2026-11-19). 이 창 안에서 바로 다시 로그인
     const m = document.getElementById('actmsg');
@@ -819,7 +823,7 @@ function openStaff() {
 
 // ---------- 누르기
 document.addEventListener('click', e => {
-  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-actclose],[data-actlogin],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"]');
+  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-sup],[data-actclose],[data-actlogin],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"]');
   if (!t || (t.closest && t.closest('#dz'))) return;
   if (t.matches('a[href="./leave/"]') && !PIN.passed()) { e.preventDefault(); PIN.gate('연차 · 근무').then(ok => { if (ok) location.href = './leave/'; }); return; }
   if (t.matches('a[href="./leave/"]')) return;
@@ -832,7 +836,8 @@ document.addEventListener('click', e => {
   if (t.hasAttribute('data-tab')) { goSec(route.sec, t.getAttribute('data-tab')); return; }
   if (t.hasAttribute('data-home')) { goHome(); return; }
   if (t.hasAttribute('data-voc')) { openVoc(); return; }
-  if (t.hasAttribute('data-act')) { openAct(); return; }
+  if (t.hasAttribute('data-act')) { openAct('act'); return; }
+  if (t.hasAttribute('data-sup')) { openAct('sup'); return; }
   if (t.hasAttribute('data-actlogin')) { actLogin(); return; }
   if (t.hasAttribute('data-asg')) { if (t.getAttribute('data-asg') === 'notes') { openAsgNotes(); return; } openAssignUI(t.getAttribute('data-asg') === 'blocks' ? 'blocks' : ''); return; }
   if (t.hasAttribute('data-actclose')) { closeAct(); return; }

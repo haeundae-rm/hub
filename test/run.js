@@ -233,6 +233,13 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('④ 즐겨찾기로 #work/dirty 바로 열기 → ‹ 는 첫 화면');
   p = await open(b, phone, 'calm', '#work/dirty'); await sleep(500);
   ok(/출근 중/.test(await p.innerText('main')), '바로 열어도 더티 읽음');
+  ok(await p.locator('[data-sup]').count() === 1, '🛏 정비보조별 진행 보기 · 수정 버튼 (2026-11-21)');
+  await p.click('[data-sup]'); await sleep(300);
+  ok(/\/dirty\/\?hub=sup$/.test(await p.getAttribute('#actf', 'src') || '') && /정비보조별 진행/.test(await p.innerText('#actp .act-bar')), '누르면 정비 지원 관리자 탭 창 (?hub=sup)');
+  await p.evaluate(() => window.postMessage({ hub: 'supok' }, location.origin)); await sleep(200);
+  ok(/대신 체크/.test(await p.innerText('#actmsg')), '열리면 "이름 탭 → 대신 체크" 안내');
+  await p.click('[data-actclose]'); await sleep(300);
+  ok(await p.locator('#actp').count() === 0, '✕ 로 닫힘');
   await p.click('[data-home]'); await sleep(300);
   ok(await p.locator('.hm-tile').count() === 10, '첫 화면으로');
   ok(/모두 정상/.test(await p.innerText('main')), '할 일 없으면 "모두 정상" 한 줄');
