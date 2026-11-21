@@ -23,6 +23,8 @@ function seed(kind) {
   // 2026-11-21: 더티 % = 정비 지원과 같은 셈 — 메이드2 수량을 4로 고침 · 메이드2 방 5개 체크(4까지만 셈) · 메이드1 1개 → 5 / 14
   s['sup/' + DAY + '/rows/c0'] = { tab: '변경', row: [null, DAY, '수정', '메이드2', '정비보조B', '', 4, '', ''], at: now - 4 * 3600e3 };
   ['1101', '1102', '1103', '1104', '1105', '1001'].forEach((r, i) => { s['sup/' + DAY + '/rows/k' + i] = { tab: '체크', row: [null, DAY, "'" + r, r < '1100' ? '메이드1' : '메이드2', '정비보조B', '완료', ''], at: now - 3 * 3600e3 + i }; });
+  // 2026-11-21 🔔 메이드 더티 요청: 메이드1 = 3시간 10분 전 요청(1001 체크로 약 10분 만에 옴) + 20분 전 다시(아직 기다림)
+  s['sup/' + DAY + '/req/메이드1'] = { maid: '메이드1', names: ['메이드1'], ws: ['정비보조A'], rooms: ['1006'], at: now - 20 * 60000, n: 2, hist: [now - 3 * 3600e3 - 10 * 60000], why: 'left', left: 3, R: 5, dc: 1 };
   s['sup/' + DAY + '/rows/x1'] = { tab: '근태', row: ['', '', '정비보조A', '출근'], at: now - 5 * 3600e3 };
   s['acts/A1'] = { name: '이불장 얼룩 제거', color: '보라', status: '진행', exclText: '' };
   for (let k = 0; k < 12; k++) s['days/' + DAY + '/plans/메이드' + k] = { rooms: Array.from({ length: 5 }, (_, j) => ({ room: String(1001 + k + j * 12), tags: [], note: '', due: k === 0 && j === 1 ? '14:00' : '', after: '', memo: '' })) };
@@ -99,6 +101,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.click('[data-tab="dirty"]'); await p.waitForFunction(() => /출근 중/.test(document.querySelector('main').innerText), null, { timeout: 4000 }).catch(() => {});
   const r1 = await p.evaluate(() => window.__reads);
   ok(/출근 중/.test(await p.innerText('main')) && /이불장 얼룩 제거/.test(await p.innerText('main')), '더티 · 활동 탭: 들어갈 때 읽음 (읽기 ' + r0 + ' → ' + r1 + ')');
+  { const t = await p.innerText('main'); ok(/오늘 더티 요청/.test(t) && /메이드1/.test(t) && /2번/.test(t) && /기다리는 중 2\d분/.test(t) && /평균 기다림/.test(t) && /10분/.test(t), '🔔 오늘 더티 요청: 메이드1 2번 · 기다리는 중 · 평균 10분'); }
   await shot(p, '3_오늘정비_더티활동.png');
   console.log('③ 휴대폰 뒤로 → 첫 화면');
   await p.goBack(); await sleep(300);
