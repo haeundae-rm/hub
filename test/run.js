@@ -26,6 +26,10 @@ function seed(kind) {
   // 2026-11-21 🔔 메이드 더티 요청: 메이드1 = 3시간 10분 전 요청(1001 체크로 약 10분 만에 옴) + 20분 전 다시(아직 기다림)
   s['sup/' + DAY + '/req/메이드1'] = { maid: '메이드1', names: ['메이드1'], ws: ['정비보조A'], rooms: ['1006'], at: now - 20 * 60000, n: 2, hist: [now - 3 * 3600e3 - 10 * 60000], why: 'left', left: 3, R: 5, dc: 1 };
   s['sup/' + DAY + '/rows/x1'] = { tab: '근태', row: ['', '', '정비보조A', '출근'], at: now - 5 * 3600e3 };
+  // 2026-11-21 📄 정비보고서 연결 상태
+  if (kind === 'rsstop') s['meta/rsync'] = { on: true, day: DAY, at: now - 60000, state: 'stop', msg: '양식 검사에서 다른 점: 카드와 다른 메이드', file: '정비보고서.xlsx', fileAt: now - 120000, pend: 0, diff: 0, mode: 'confirm' };
+  if (kind === 'rsok') s['meta/rsync'] = { on: true, day: DAY, at: now - 60000, state: 'ok', msg: '', file: '정비보고서.xlsx', fileAt: now - 300000, pend: 0, diff: 1, mode: 'confirm' };
+  if (kind === 'rsgap') s['meta/rsync'] = { on: true, day: DAY, at: now - 40 * 60000, state: 'ok', msg: '', file: '정비보고서.xlsx', fileAt: now - 3600e3, pend: 2, diff: 0, mode: 'confirm' };
   s['acts/A1'] = { name: '이불장 얼룩 제거', color: '보라', status: '진행', exclText: '' };
   for (let k = 0; k < 12; k++) s['days/' + DAY + '/plans/메이드' + k] = { rooms: Array.from({ length: 5 }, (_, j) => ({ room: String(1001 + k + j * 12), tags: [], note: '', due: k === 0 && j === 1 ? '14:00' : '', after: '', memo: '' })) };
   s['days/' + DAY + '/changes/c1'] = { kind: '추가', maid: '메이드3', room: '2001', by: '본인', at: now - 7200e3, parties: ['메이드3'] };
@@ -495,6 +499,23 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.click('[data-delrep]'); await p.click('[data-delrep]'); await sleep(600);
   ok(await p.evaluate(ND => !window.__seed['night/' + ND], ND) && /새로 쓰기/.test(await p.innerText('.datebar')), '두 번 누르면 지워지고 새로 쓰기');
   ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
+  console.log('⑭ 정비보고서 연결 상태 (허브)');
+  {
+    let q = await open(b, phone, 'rsstop'); let tx = await q.innerText('main');
+    ok(/정비보고서 연결 멈춤/.test(tx) && /카드와 다른 메이드/.test(tx), '멈춤 → 지금 확인할 것에 빨간 줄');
+    ok(await q.locator('a[href="../rm/?link=1"][target="_blank"]').count() >= 1, '누르면 연결 창(새 탭)');
+    await q.context().close();
+    q = await open(b, phone, 'rsok', '#work/up'); await sleep(500); tx = await q.innerText('main');
+    ok(/정비보고서 연결됨/.test(tx) && /확인 후 반영/.test(tx) && /연결 창 열기/.test(tx), '정비보고서 탭: 연결됨 카드 + 연결 창 열기');
+    await q.locator('.card', { hasText: '정비보고서 연결' }).screenshot({ path: path.join(OUT, '20_정비보고서연결_허브.png') });
+    await q.context().close();
+    q = await open(b, phone, 'rsgap'); tx = await q.innerText('main');
+    const H = Number(new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 13));
+    ok(H >= 7 && H < 18 ? /\d+분째 끊겼어요/.test(tx) : !/끊겼어요/.test(tx) && /변경 2건 확인 대기/.test(tx), '40분 소식 없음 → 근무 시간엔 끊김 경고 (지금 ' + H + '시) ' + (/정비보고서[^\n]*/.exec(tx) || [''])[0]);
+    if (H >= 7 && H < 18) await q.locator('.hm-todo').screenshot({ path: path.join(OUT, '21_허브_끊김경고.png') });
+    ok(q.errs.length === 0, '화면 오류 없음 ' + q.errs.join(' | '));
+    await q.context().close();
+  }
   console.log('\n통과 ' + pass + ' / 실패 ' + fail);
   await b.close(); process.exit(fail ? 1 : 0);
 })();
