@@ -190,14 +190,25 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.click('[data-nt="img"]')]); await fc.setFiles(png);
   await p.waitForSelector('.nt-img img', { timeout: 4000 }).catch(() => {});
   ok(await p.locator('.nt-img img').count() === 1, '사진 넣기 (줄여서 data URL)');
+  // 11/21: 여러 장 — 큰 잡음 사진 4장을 한 번에 골라도 합이 1MB 문서 한도 안으로 줄여짐
+  const big = [1, 2, 3, 4].map(i => path.join(OUT, '_big' + i + '.png'));
+  if (!fs.existsSync(big[3])) require('child_process').execFileSync('python3', ['-c', 'import sys,random\nfrom PIL import Image\nfor f in sys.argv[1:]:\n  im=Image.effect_noise((3000,2200),90).convert("RGB"); im.save(f)', ...big]);
+  const [fc2] = await Promise.all([p.waitForEvent('filechooser'), p.click('[data-nt="img"]')]); await fc2.setFiles(big);
+  await p.waitForFunction(() => document.querySelectorAll('.nt-pic img').length === 5 && !/줄이는 중/.test(document.getElementById('ntcard').innerText), null, { timeout: 30000 }).catch(() => {});
+  ok(await p.locator('.nt-pic img').count() === 5, '여러 장 한 번에 넣기 (5장)');
+  await p.click('.nt-pic:nth-child(3) [data-nt="mvimg"]'); await sleep(100);
+  await p.click('.nt-pic:nth-child(5) [data-nt="noimg"]'); await sleep(100);
+  ok(await p.locator('.nt-pic img').count() === 4, '한 장 빼기');
   await shot(p, '10_공지_쓰기.png');
   await p.click('[data-nt="save"]'); await p.waitForFunction(() => /공지를 올렸어요/.test(document.getElementById('ntcard').innerText), null, { timeout: 4000 }).catch(() => {});
   const nd = await p.evaluate(() => { const k = Object.keys(window.__seed).filter(x => /^notices\/hub-/.test(x))[0]; return k ? Object.assign({ k }, window.__seed[k]) : null; });
   ok(nd && nd.src === 'hub' && nd.targets.join() === '메이드1' && nd.target === '메이드1' && nd.popup === true && /^data:image\/jpeg/.test(nd.img) && nd.from <= nd.to, '저장: id hub-… · 대상 메이드1 · 꼭 확인 · 사진');
-  ok(/예시 공지[\s\S]*1명/.test(await p.innerText('#ntcard')), '목록에 새 공지 (1명)');
+  ok(nd && nd.imgs.length === 4 && nd.img === nd.imgs[0] && nd.imgNames[1] === '_big2.png' && nd.imgNames[0] === '_t.png' && nd.imgs.reduce((t, u) => t + u.length, 0) <= 880 * 1024 && JSON.stringify(nd).length < 1000000, '사진 4장 저장 (첫 장 = img, ◀ 로 순서 바뀜, 합 1MB 안)');
+  ok(/예시 공지[\s\S]*1명[\s\S]*사진 4장/.test(await p.innerText('#ntcard')), '목록에 새 공지 (1명 · 사진 4장)');
   await shot(p, '11_공지_목록.png');
   await p.click('[data-nt="edit"]'); await sleep(150);
   ok(await p.inputValue('[data-ntf="title"]') === '예시 공지 — 비품 위치' && await p.locator('[data-nt="pick"][aria-pressed="true"]').count() === 1, '고치기: 내용·대상 불러옴');
+  ok(await p.locator('.nt-pic img').count() === 4, '고치기: 사진 4장 불러옴');
   await p.click('[data-nt="del"]'); await p.waitForFunction(() => /내렸어요/.test(document.getElementById('ntcard').innerText), null, { timeout: 4000 }).catch(() => {});
   ok(!(await p.evaluate(() => Object.keys(window.__seed).some(x => /^notices\/hub-/.test(x)))), '내리기 = 지움');
   await p.click('[data-home]'); await sleep(200);
