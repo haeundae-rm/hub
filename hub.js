@@ -20,15 +20,16 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-6';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-6';
-import * as PIN from './pin.js?v=2026.11.21-6';
-import { setupClose } from './close.js?v=2026.11.21-6';
-import { setupClosing } from './closing.js?v=2026.11.21-6';
-import { supProgress } from './supcalc.js?v=2026.11.21-6';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.21-6';
+import * as K from '../rm/app/keys.js?v=2026.11.21-7';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.21-7';
+import * as PIN from './pin.js?v=2026.11.21-7';
+import { setupClose } from './close.js?v=2026.11.21-7';
+import { setupClosing } from './closing.js?v=2026.11.21-7';
+import { supProgress } from './supcalc.js?v=2026.11.21-7';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.21-7';
+import { setupMeal } from './meal.js?v=2026.11.21-7';   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.21-6';
+const VER = '2026.11.21-7';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -162,7 +163,7 @@ async function loadEx(force) {
   }
   ex = { rows, rm, sa, req, acts: actList, at: Date.now(), busy: false, d }; draw();
 }
-function reload(force) { load(force); if (route.sec === 'work' && route.tab === 'dirty') loadEx(force); }
+function reload(force) { load(force); if (ML && !ML.busy()) ML.load(force); if (route.sec === 'work' && route.tab === 'dirty') loadEx(force); }
 function bad(x) { return !x || x.__err; }
 function statusItems(v) {
   const L = [], now = Date.now(), H = Number(seoul().toISOString().slice(11, 13));
@@ -680,6 +681,7 @@ const SECS = {
   people: { ic: '👥', t: '인사' },
   field: { ic: '📱', t: '현장 관리' },
   close: { ic: '📊', t: '결산' },
+  meal: { ic: '🍚', t: '주간 식단' },
   apps: { ic: '🔗', t: '현장 앱 열기' }
 };
 const TILES = [
@@ -769,9 +771,11 @@ function badgeOf(t, v) {
   }
   return '';
 }
+let ML = null;
+function meal() { if (!ML) ML = setupMeal({ S, esc, ymd, addDays, md, draw: () => draw(), go: s => goSec(s, ''), who: () => (admin ? admin.label : ''), uid: () => (user ? user.uid : '') }); return ML; }
 function homeHtml() {
   const v = view.st;
-  let h = '';
+  let h = meal().homeHtml();
   if (!v) h += '<div class="card hm-ok"><span>오늘 상황을 읽는 중…</span></div>';
   else {
     const T = todoItems(v), nb = T.filter(x => x.lv === 'bad').length;
@@ -807,6 +811,7 @@ function secHtml() {
   else if (sec === 'field') h += fieldHtml();
   else if (sec === 'close') { if (!CL) CL = setupClose({ S, esc, ymd, draw: () => draw() }); if (!CLG) CLG = setupClosing({ S, esc, ymd, PIN, xlsx: XW, draw: () => draw(), who: () => (admin ? admin.label : ''), uid: () => (user ? user.uid : '') }); h += CLG.html() + CL.html(); }
   else if (sec === 'apps') h += linksHtml();
+  else if (sec === 'meal') h += meal().secHtml();
   return h;
 }
 function draw() {
@@ -917,6 +922,7 @@ S.onUser(u => {
   view = { st: null, busy: false, err: '', at: 0 };
   ex = { rows: null, acts: null, at: 0, busy: false, d: '' };
   if (NT) NT.reset();
+  if (ML) ML.reset();
   draw();
   if (admin) reload(true);
 });

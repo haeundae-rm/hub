@@ -257,13 +257,74 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 60px}
 .cs-docs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;align-items:center}.cs-docs i{font-style:normal;font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--muted)}.cs-docs i.on{border-color:#047857;color:#047857;font-weight:700}.cs-docs b{font-size:12px;margin-left:4px}.cs-docs b.ok{color:#047857}.cs-docs b.bad{color:#B91C1C}.cs-docs b.unk{color:var(--muted);font-weight:500}
 .cs-dform{display:grid;gap:6px}.cs-dform>span{font-size:13px;font-weight:700;color:var(--muted)}.cs-dform>div{display:grid;grid-template-columns:1fr 1fr;gap:6px}.cs-dform button{min-height:42px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);font:700 14px inherit;font-family:inherit;color:var(--muted)}.cs-dform button[aria-pressed=true]{border-color:#047857;background:#ECFDF5;color:#047857}
 .cs-del{color:#B91C1C}.cs-lock{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)}
+/* 🍚 주간 식단 (2026-11-21) */
+.ml-card{border-top:4px solid var(--gold)}
+.ml-card h2 small{font-family:var(--f-num)}
+.ml-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:520px){.ml-cols{grid-template-columns:1fr}.ml-col:not(.on) ul{display:flex;flex-wrap:wrap;gap:2px 10px}.ml-col:not(.on) li small{display:none}}
+.ml-col{background:var(--tile);border-radius:12px;padding:10px 12px}
+.ml-col.on{background:#FFF8E8;box-shadow:inset 0 0 0 1.5px var(--gold)}
+.ml-col h3{margin:0 0 6px;font-size:14px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.ml-col.on h3{color:#8A5A00}
+.ml-col h3 i{font-style:normal;font-size:11px;background:var(--gold);color:#fff;border-radius:99px;padding:1px 7px}
+.ml-col ul,.ml-tb ul{list-style:none;margin:0;padding:0}
+.ml-col li{font-size:14.5px;line-height:1.4;padding:1px 0}
+.ml-col li b{font-weight:600}
+.ml-col.on li b{font-weight:800;font-size:15.5px}
+.ml-col li small,.ml-tb li small{display:block;font-size:11px;color:#8A93A3;line-height:1.3}
+.ml-x{color:var(--muted)}
+.ml-more{display:block;width:100%;margin-top:10px;background:none;border:0;border-top:1px solid var(--line);padding:10px 0 0;text-align:right;font:700 14px inherit;color:var(--brand);cursor:pointer}
+.ml-nav{display:flex;gap:6px}
+.ml-range{margin:-4px 0 10px;font-weight:700;color:var(--muted)}
+.ml-scroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
+.ml-tb{border-collapse:collapse;width:100%;min-width:660px;box-sizing:border-box;font-size:13px;table-layout:fixed}
+.ml-tb th,.ml-tb td{border:1px solid var(--line);padding:6px 6px;vertical-align:top;text-align:center}
+.ml-tb thead th{background:var(--navy);color:#fff;font-size:14px}
+.ml-tb thead th small{display:block;font-weight:500;font-size:11.5px;opacity:.8;font-family:var(--f-num)}
+.ml-tb thead th.sat{background:#24497F}.ml-tb thead th.sun{background:#8E2F3B}
+.ml-tb tbody th{background:var(--tile);width:46px;vertical-align:middle}
+.ml-tb tr>:first-child{width:46px}
+.ml-tb td.td{background:#FFF8E8}.ml-tb thead th.td{background:var(--gold)}
+.ml-tb li{padding:1px 0;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere}
+.ml-notes{margin:10px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)}
+.ml-pic summary{cursor:pointer;font-weight:700;color:var(--brand);margin-bottom:8px}
+.ml-pic img{width:100%;border-radius:10px;margin-bottom:10px}
+.ml-busy{padding:18px;text-align:center;font-weight:700;background:var(--tile);border-radius:12px}
+.ml-err{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 12px;font-weight:600;margin:0 0 10px}
+.ml-edit{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.ml-ed{border:1.5px solid var(--line);border-radius:12px;padding:10px}
+.ml-edh{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ml-edh input{font:700 15px inherit;border:1.5px solid var(--line);border-radius:8px;padding:5px 6px}
+.ml-edh b{flex:1}
+.ml-del{border:0;background:none;color:var(--warn);font-size:16px;cursor:pointer}
+.ml-ed label,.ml-nl{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-top:6px}
+.ml-ed textarea,.ml-nl textarea{display:block;width:100%;margin-top:3px;font:500 14px/1.45 inherit;border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;resize:vertical}
+.ml-nl{margin-top:12px}
+#mlprint{display:none}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body.ml-printing>*:not(#mlprint){display:none!important}
+  body.ml-printing{background:#fff}
+  body.ml-printing #mlprint{display:block;font-family:"Noto Sans KR",sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .mlp-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #C79A3B;padding-bottom:6px;margin-bottom:8px}
+  .mlp-head small{font-size:10pt;color:#555}
+  .mlp-head h1{margin:2px 0 0;font-size:22pt;color:#10233F;letter-spacing:-.5px}
+  .mlp-head b{font-size:13pt;color:#10233F}
+  #mlprint .ml-tb{min-width:0;font-size:10.5pt}
+  #mlprint .ml-tb th,#mlprint .ml-tb td{border:1px solid #9AA3B2;padding:5px 4px}
+  #mlprint .ml-tb tbody th{font-size:11pt;background:#EEF2F8}
+  #mlprint .ml-tb li b{font-weight:600}
+  #mlprint .ml-tb li small{font-size:7.5pt;color:#666}
+  #mlprint .ml-tb li{padding:1px 0}
+  #mlprint .ml-notes{font-size:8.5pt;color:#444;margin-top:6px}
+}
 </style>
 </head>
 <body>
 <header class="top"><div class="top-in"><div class="top-row"><div class="cal" aria-hidden="true"><i id="calm"></i><b id="cald"></b></div><div class="tt"><h1>객실 통합 관리 시스템</h1><div class="sub" id="today">한화리조트 해운대</div></div><div class="ring" id="ring" hidden></div></div><div class="line" id="hline"></div></div></header>
 <main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
 <noscript><div class="card">이 화면은 자바스크립트가 켜져 있어야 해요.</div></noscript>
-<script type="module" src="hub.js?v=2026.11.21-6"></script>
+<script type="module" src="hub.js?v=2026.11.21-7"></script>
 <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); }); }</script>
 </body>
 </html>
