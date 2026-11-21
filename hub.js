@@ -20,14 +20,14 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-1';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-1';
-import * as PIN from './pin.js?v=2026.11.21-1';
-import { setupClose } from './close.js?v=2026.11.21-1';
-import { setupClosing } from './closing.js?v=2026.11.21-1';
-import * as XW from './xlsxw.js?v=2026.11.21-1';
+import * as K from '../rm/app/keys.js?v=2026.11.21-2';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.21-2';
+import * as PIN from './pin.js?v=2026.11.21-2';
+import { setupClose } from './close.js?v=2026.11.21-2';
+import { setupClosing } from './closing.js?v=2026.11.21-2';
+import * as XW from './xlsxw.js?v=2026.11.21-2';
 
-const VER = '2026.11.21-1';
+const VER = '2026.11.21-2';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -105,10 +105,11 @@ async function load(force) {
   view.busy = true; draw();
   const d = ymd(), tm = ymd(Date.now() + 864e5);
   const hrP = isHk() ? Promise.resolve(null) : hrLoad(d);
-  const [up, rl, srl, cmp, sup, day, recs, errs] = await Promise.all([
+  const [up, rl, srl, cmp, sup, day, recs, errs, auto] = await Promise.all([
     safe(S.get('uploads/latest')), safe(S.get('meta/relay')), safe(S.get('sup_meta/relay')), safe(S.get('meta/compare')),
     safe(S.get('sup/' + d)), safe(S.get('days/' + d)),
-    safe(S.getQuery('days/' + d + '/recs', [])), safe(S.getQuery('errors', [['day', '==', d]]))
+    safe(S.getQuery('days/' + d + '/recs', [])), safe(S.getQuery('errors', [['day', '==', d]])),
+    safe(S.getQuery('sup/' + d + '/auto', []))   // 2026-11-21: 레포트 방 변경 → 더티 자동 배정 알림 (정비 지원 휴대폰이 씀, 규칙 v22)
   ]);
   // 오늘 배정 실 수: 그날 정비보고서 저장본(rep_) → 없으면 올림 문서(오늘 것) → 없으면 메이드별 배정(plans)
   let base = await safe(S.get('uploads/rep_' + d));
@@ -134,7 +135,7 @@ async function load(force) {
       ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, C), mr: K.maidRooms ? K.maidRooms(P, C) : null, recs: Array.isArray(recs) ? recs : null, mate: (tmz && !tmz.__err && tmz.mate) || {} });
     }
   }
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks };
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -180,6 +181,14 @@ function statusItems(v) {
     const ws = Array.from(new Set(sp.plan.map(x => x && x.w).filter(Boolean)));
     add('ok', '더티 배분 확정', '정비보조 ' + ws.length + '명' + (sp.src === 'app' ? ' · 앱에서 확정' : ''));
   } else add(H >= 9 ? 'bad' : 'wait', '오늘 더티 배분이 아직이에요', '정비 지원 → 📋 더티 배분 만들기');
+  // 레포트 방 변경 → 더티 자동 배정 (2026-11-21)
+  if (Array.isArray(v.auto) && v.auto.length) {
+    const A = v.auto.map(x => x.data || {}), by = k => A.filter(x => x.st === k);
+    const line = L2 => L2.map(x => x.maid + ' ' + x.unit + '유닛·' + x.n + '실' + (x.w ? '(' + x.w + ')' : '')).join(', ').slice(0, 200);
+    if (by('need').length) add('bad', '더티 지원 필요 ' + by('need').length + '명', line(by('need')) + ' — 근무 중인 정비보조 없음. 출근하면 자동 배정');
+    if (by('under').length) add('wait', '방이 줄었는데 더티 지원 중 ' + by('under').length + '명', line(by('under')) + ' — 정비 지원에서 확인');
+    if (by('auto').length) add('ok', '방 변경 자동 배정 ' + by('auto').length + '건', by('auto').map(x => x.maid + ' ' + x.msg).join(' / ').slice(0, 300));
+  }
   // 중계 두 개
   [['정비 레포트 시트 중계', v.rl], ['정비 지원 시트 중계', v.srl]].forEach(([nm, r]) => {
     if (bad(r) || !r.at) { add('bad', nm + ' 기록 없음', r && r.__err ? r.__err : '중계가 한 번도 안 돌았어요'); return; }
