@@ -1,14 +1,15 @@
 // hub/leave/app.js — 연차 관리 시작 · 휴대폰 승인 탭 · 옮기기 탭 (2026-11-18)
 // 나머지 화면(현황 · 신청서 · 월 사용 입력 · 명단 · 대장 출력)은 index.html 안 옛 LeavePage 코드 그대로
-import * as A from './api.js?v=2026.11.18-3';
+import * as A from './api.js?v=2026.11.21-1';
 
-const VER = '2026.11.18-7';
+const VER = '2026.11.21-1';
 const EMAILS = ['unieshaeundae+admin@gmail.com', 'unieshaeundae+sub@gmail.com'];
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const P = () => window.LVP;
 let imp = null;    // 옮기기 진행 상태
 let pick = {};     // 휴대폰 승인 — 고른 휴대폰
+let hki = null;    // 하우스키핑 대장 가져오기 (11/21)
 
 window.LV = {
   call: (fn, args) => A.call(fn, args),
@@ -64,12 +65,16 @@ document.addEventListener('click', e => {
   if (t.id === 'imp-file-btn') { $('#imp-file').click(); return; }
   if (t.id === 'imp-go') { runImport(); return; }
   if (t.id === 'imp-check') { runCheck(); return; }
+  if (t.id === 'hki-file-btn') { $('#hki-file').click(); return; }
+  if (t.id === 'hki-go') { runHk(); return; }
+  if (t.dataset && t.dataset.hkdrop !== undefined && hki && hki.read) { const p = hki.read.people[Number(t.dataset.hkdrop)]; p.dropPre = t.checked; p.calc = hki.X.calc(p, hki.asOf); P().render(); return; }
+  if (t.dataset && t.dataset.hkpick !== undefined && hki && hki.read) { const p = hki.read.people[Number(t.dataset.hkpick)]; p.pick = t.checked; P().render(); return; }
 });
 
 // ---------- 옮기기 (구글 시트 → Firebase, 처음 한 번) — 개인정보가 이 PC 브라우저에서 바로 Firebase 로 감 (다른 곳 안 거침)
 function impHtml() {
   const D = P().D(), has = D && !D.empty;
-  let h = '<div class="card imp-step"><h2>구글 시트 연차 대장 옮기기 (처음 한 번)</h2>' +
+  let h = hkHtml() + '<div class="card imp-step"><h2>구글 시트 연차 대장 옮기기 (처음 한 번)</h2>' +
     '<p class="muted" style="margin:0">① 구글 시트(정비 레포트 옛 시트)를 열고 <b>파일 → 다운로드 → Microsoft Excel(.xlsx)</b> 을 눌러 파일을 받아요.<br>② 아래 <b>엑셀 파일 고르기</b>로 그 파일을 골라요. 이 PC 안에서만 읽어요.<br>③ 읽은 내용을 확인하고 <b>옮기기</b>를 눌러요. 끝나면 사람마다 잔여를 시트 계산과 나란히 보여 드려요.</p>' +
     (has ? '<p class="err" style="margin:0">이미 명단 ' + D.people.length + '명이 있어요. 다시 옮기면 명단은 시트 내용으로 덮어쓰고, 연차기록은 옮긴 적 있는 줄은 건너뛰고, 새 앱에서 처리한 신청서는 그대로 둬요.</p>' : '') +
     '<div class="row"><input type="file" id="imp-file" accept=".xlsx" hidden><button class="btn pri" id="imp-file-btn">엑셀 파일 고르기</button><span class="muted">' + esc(imp && imp.file || '') + '</span></div></div>';
@@ -123,6 +128,59 @@ function runCheck() {
   imp.check = imp.X.compare(imp.read, P().D());
   P().render();
 }
+
+// ---------- 🧹 하우스키핑 연차 대장 가져오기 (2026-11-21) — 엑셀 대장 → 연차 명단(하우스키핑) · 달마다 사용
+// 발생은 앱이 입사일로 다시 셈 (대장 발생 칸은 비교만). 사용은 달마다 차이만 더해서 다시 가져와도 두 번 안 들어감
+const n1 = v => String(Math.round(Number(v || 0) * 10) / 10);
+function hkHtml() {
+  let h = '<div class="card imp-step"><h2>🧹 하우스키핑 연차 대장 가져오기</h2>' +
+    '<p class="muted" style="margin:0">하우스키핑 연차관리대장 엑셀을 고르면 이 PC 안에서만 읽어요. 숨긴 줄(환경)과 사우나는 빼 두었어요 — 가져올 분만 체크하세요.<br>발생 연차는 대장 숫자를 쓰지 않고 <b>연차 기준일로 다시 계산</b>해요 (첫해 매달 1개 · 1년 15 · 2년 15 · 3년 16 …). 대장 발생과 다르면 빨간색으로 보여요.<br>일용으로 일하다 하우스키퍼로 바뀐 분은 <b>연차 기준일</b>을 바뀐 날로 고쳐 주세요 (예: 2025-05-01). 첫해 빼기는 기본 0이에요.</p>' +
+    '<div class="row"><input type="file" id="hki-file" accept=".xlsx" hidden><button class="btn pri" id="hki-file-btn">대장 엑셀 고르기</button><span class="muted">' + esc(hki && hki.file || '') + '</span></div></div>';
+  if (hki && hki.err) h += '<div class="card"><p class="err" style="margin:0;white-space:pre-line">' + esc(hki.err) + '</p></div>';
+  if (hki && hki.read) {
+    const R = hki.read, n = R.people.filter(p => p.pick).length;
+    h += '<div class="card imp-step"><h2>읽은 내용 · ' + esc(R.sheet) + ' · 오늘 기준</h2><div class="tw"><table class="imp-tbl"><thead><tr><th></th><th>성명</th><th>파트</th><th>대장 입사일</th><th>연차 기준일</th><th>사용 합계</th><th>대장 발생</th><th>앱 발생</th><th>첫해 빼기</th><th>앱 잔여</th><th>확인할 것</th></tr></thead><tbody>' +
+      R.people.map((p, i) => {
+        const c = p.calc, diff = p.ledgerGen != null && p.ledgerGen !== c.gen;
+        return '<tr class="' + (p.pick && (diff || p.warn.length) ? 'bad' : '') + '" style="' + (p.pick ? '' : 'opacity:.5') + '"><td><input type="checkbox" data-hkpick="' + i + '"' + (p.pick ? ' checked' : '') + '></td><td><b>' + esc(p.name) + '</b>' + (p.hidden ? ' <small class="muted">(숨긴 줄)</small>' : '') + '</td><td>' + esc(p.part) + '</td><td>' + esc(p.hire) + '</td>' +
+          '<td><input data-hkbase="' + i + '" type="date" value="' + esc(p.base || '') + '" class="btn" style="padding:4px 6px' + (p.base !== p.hire ? ';border-color:var(--accent);color:var(--accent)' : '') + '"></td>' +
+          '<td>' + n1(c.used) + '</td><td>' + (p.ledgerGen == null ? '<span class="neg">빈 칸</span>' : n1(p.ledgerGen)) + '</td><td><b' + (diff ? ' class="neg"' : '') + '>' + n1(c.gen) + '</b></td>' +
+          '<td><input data-hkminus="' + i + '" type="number" min="0" max="11" value="' + (p.minus || '') + '" style="width:52px" class="btn"></td><td><b' + (c.remain < 0 ? ' class="neg"' : '') + '>' + n1(c.remain) + '</b></td>' +
+          '<td style="font-size:12px;text-align:left">' + p.warn.map(esc).join('<br>') + (p.minusHint ? (p.warn.length ? '<br>' : '') + '대장 첫해 빼기 ' + p.minusHint + ' (지금은 안 뺌)' : '') +
+          (c.pre || p.dropPre ? '<br><label><input type="checkbox" data-hkdrop="' + i + '"' + (p.dropPre ? ' checked' : '') + '> 연차 기준일 전 사용 빼기' + (p.dropPre ? '' : ' (' + n1(c.pre) + '개)') + '</label>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="row"><span class="muted grow">고른 분 ' + n + '명 · 연차 명단(하우스키핑)에 넣고 달마다 사용을 기록해요. 이미 가져온 분은 같은 문서에 덮어쓰고 바뀐 달만 더해요.</span><button class="btn pri" id="hki-go"' + (hki.busy || !n ? ' disabled' : '') + '>' + (hki.busy ? '가져오는 중… ' + esc(hki.prog || '') : hki.done ? '다시 가져오기' : n + '명 가져오기') + '</button></div>' +
+      (hki.done ? '<p class="imp-ok">' + esc(hki.done) + '</p>' : '') + '</div>';
+  }
+  return h;
+}
+async function runHk() {
+  if (!hki || !hki.read || hki.busy) return;
+  hki.busy = true; hki.err = ''; P().render();
+  try {
+    const n = await hki.X.write(hki.read, s => { hki.prog = s; const b = $('#hki-go'); if (b) b.textContent = '가져오는 중… ' + s; });
+    hki.busy = false; hki.done = '가져왔어요 · ' + n.people + '명 (새로 ' + n.added + '명), 기록 ' + n.recs + '줄. 위쪽 \'하우스키핑\' 을 눌러 확인하세요.';
+    P().run('leaveData', [null, ''], d => { P().set(d); });
+  } catch (err) { console.warn(err); hki.busy = false; hki.err = '가져오다가 멈췄어요: ' + (err && err.message || err); P().render(); }
+}
+document.addEventListener('change', e => {   // 첫해 빼기 · 연차 기준일 고치면 다시 셈
+  const d = e.target.dataset || {}; if ((d.hkminus === undefined && d.hkbase === undefined) || !hki || !hki.read) return;
+  const p = hki.read.people[Number(d.hkminus !== undefined ? d.hkminus : d.hkbase)];
+  if (d.hkminus !== undefined) p.minus = Math.max(0, Math.min(11, Number(e.target.value) || 0)); else p.base = e.target.value || p.hire;
+  p.calc = hki.X.calc(p, hki.asOf); P().render();
+});
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'hki-file') return;
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  hki = { file: f.name, asOf: new Date(Date.now() + 9 * 36e5).toISOString().slice(0, 10) };
+  P().render();
+  try {
+    const X = await import('./hkimp.js?v=' + VER);
+    hki.read = await X.read(new Uint8Array(await f.arrayBuffer()), hki.asOf);
+    hki.X = X;
+  } catch (err) { console.warn(err); hki.err = '대장을 읽지 못했어요: ' + (err && err.message || err); }
+  P().render();
+});
 
 window.LVX = { devHtml, impHtml };
 

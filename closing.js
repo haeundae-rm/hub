@@ -78,8 +78,9 @@ export function tenPeople(staff, lp) {
   (lp || []).forEach(q => {
     if (!q || !q.name) return;
     const s2 = out.find(p => nm(p.name) === nm(q.name)), hire = /^\d{4}-\d{2}-\d{2}$/.test(q.hire || '') ? q.hire : '', quit = /^\d{4}-\d{2}-\d{2}$/.test(q.quit || '') ? q.quit : '';
-    if (s2) { if (hire && (!s2.hired || hire < s2.hired)) s2.hired = hire; if (quit && !s2.left) s2.left = quit; if (!s2.job) s2.job = '룸메이드'; }
-    else if (hire) out.push({ id: q.id, name: q.name, job: '룸메이드', hired: hire, left: quit, status: '' });
+    const job = q.grp === 'hk' ? '하우스키퍼' : '룸메이드';   // 11/21: 연차 명단에 하우스키핑(grp 'hk')도 들어옴 → 근속 인상(룸메이드만)에 안 섞이게
+    if (s2) { if (hire && (!s2.hired || hire < s2.hired)) s2.hired = hire; if (quit && !s2.left) s2.left = quit; if (!s2.job) s2.job = job; }
+    else if (hire) out.push({ id: q.id, name: q.name, job, hired: hire, left: quit, status: '' });
   });
   return out;
 }
@@ -142,7 +143,7 @@ export function setupClosing(c) {
       st.tenDone = {}; xs.forEach(x => { if (/^ten-/.test(x.id)) st.tenDone[x.id] = x.data && x.data.del ? 'skip' : 1; });   // 근속: 넣었거나 '안 함'(del) 한 것
       st.items = xs.map(x => Object.assign({}, x.data, { id: x.id })).filter(x => !x.del);
       if (staff) st.staff = staff.map(x => Object.assign({}, x.data, { id: x.id }));
-      if (lp) st.lp = lp.map(x => ({ id: x.id, name: x.data.name, hire: x.data.hire, quit: x.data.quit }));   // 연차 명단: 이름 · 입사일 · 퇴사일만
+      if (lp) st.lp = lp.map(x => ({ id: x.id, name: x.data.name, hire: x.data.hire, quit: x.data.quit, grp: x.data.grp || '' }));   // 연차 명단: 이름 · 입사일 · 퇴사일만
       st.loadedAt = Date.now();
       await loadNote(st.ym);
     } catch (e) { st.err = '결산 자료를 못 읽었어요: ' + errTxt(e); }

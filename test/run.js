@@ -404,7 +404,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('⑨ 하우스키퍼 공용 계정 (허브)');
   p = await open(b, phone, 'busy', '', 2);
   const ht = await p.locator('.hm-tile').allInnerTexts();
-  ok(ht.length === 7 && !ht.some(t => /인사|연차|결산/.test(t)), '하우스키퍼: 인사 · 연차 · 결산 버튼 없음 (' + ht.length + '개)');
+  ok(ht.length === 7 && !ht.some(t => /인사|연차 · 근무|결산/.test(t)), '하우스키퍼: 인사 · 연차 · 결산 버튼 없음 (' + ht.length + '개)');
   ok(/하우스키퍼/.test(await p.innerText('#today')), '머리 줄에 하우스키퍼');
   const htodo = await p.innerText('main');
   ok(!/승인 대기|퇴사일/.test(htodo), '할 일에 연차 · 퇴사 줄 없음');
@@ -461,7 +461,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await fx(ctxN); await p.reload(); await p.waitForSelector('.hm-tile'); await sleep(700);
   const bt = await p.innerText('main');
   ok(new RegExp('야간 보고서 .* 밤 확인 대기[\\s\\S]*발주 필요: 비누').test(bt), '허브 할 일: 야간 보고서 확인 대기 · 발주 필요: 비누');
-  ok(/확인 1/.test(await p.locator('.hm-tile[href="./night/"]').innerText()), '야간 보고서 버튼에 확인 1');
+  ok(/확인 1/.test(await p.locator('.hk-card').innerText()), '하우스키퍼 카드 야간 보고서 버튼에 확인 1');
   await p.goto(BASE + 'hub/night/#' + ND);
   await p.waitForSelector('[data-ok="소장"]', { timeout: 6000 });
   ok(await p.locator('[data-ok]').count() === 1, '소장은 소장 칸에만 확인 버튼');
