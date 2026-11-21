@@ -8,6 +8,9 @@
 //   leave_work/{pid}_{yyyy-MM} 옛 '배정기록' 탭에서 옮긴 지난 달 근무 달력 (옮기기 때 한 번)
 //   meta/leave_busy     날짜별 쉬는 사람 수 (이름 없음) — 메이드 '몰리는 날' 안내용. 이 화면을 열거나 처리할 때마다 다시 계산
 //   meta/leave          옮기기 정보 (workUpto = 옛 달력을 옮긴 마지막 날)
+//   (11/21) 하우스키핑: leave_people.grp = 'hk' (없으면 룸메이드) · hkPin = 연차 현황 4자리 (소장이 정함, 관리자만 읽음)
+//   hk_leave/{SHA-256('hkleave|이름|4자리')} 하우스키퍼 연차 현황 한 사람 (입사일 · 첫해 빼기 · 달마다 사용) — 허브 '하우스키퍼 → 연차 현황'이 이름+4자리로 한 장만 읽음
+//   meta/hk_leave       { names: 하우스키퍼 이름 목록, sig } — 고를 이름 목록. 관리자가 연차 관리를 열거나 저장할 때 바뀐 게 있으면 다시 씀
 // 읽기 아끼기: 연차기록·신청서는 휴대폰(이 PC)에 보관해 두고 바뀐 것만 받음 (at · upd 시각 기준)
 import * as S from '../../rm/app/store.js';
 import * as L from '../../rm/app/leave.js';
@@ -115,7 +118,42 @@ async function saveBusy() {
 // ---------- 쓰기
 function check() { if (!isAdmin()) throw new Error('관리자 비밀번호가 필요해요.'); }
 const who = () => (me && me.uid === ADMINS[1] ? '부소장' : '소장');
-async function after(asOf, extra) { await fetchAll(); return Object.assign(data(asOf), extra || {}); }
+async function after(asOf, extra) { await fetchAll(); await publishHk(); return Object.assign(data(asOf), extra || {}); }
+
+// ---------- 🧹 하우스키퍼 연차 현황 (11/21): 하우스키퍼 공용 계정은 leave_* 를 못 읽음(규칙 v15) → 사람마다 '이름 + 4자리'로만 찾을 수 있는 한 장을 따로 씀
+// 규칙 v25: hk_leave 는 문서 이름을 알 때 한 장만 읽기(get) · 목록(list)·쓰기는 소장 · 부소장 · 봇
+export async function hkKey(name, pin) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('hkleave|' + cleanName(name) + '|' + String(pin)));
+  return Array.from(new Uint8Array(b)).map(x => ('0' + x.toString(16)).slice(-2)).join('');
+}
+export function hkSnap(p, rs) {
+  const months = {}, unpaid = {}; let paid = 0;
+  rs.forEach(x => {
+    if (x.kind === '연차' || x.kind === '조정') months[x.ym] = L.r1((months[x.ym] || 0) + x.days);
+    else if (x.kind === '무급') unpaid[x.ym] = L.r1((unpaid[x.ym] || 0) + x.days);
+    else if (x.kind === '지급') paid = L.r1(paid + x.days);
+  });
+  Object.keys(months).forEach(m => { if (!months[m]) delete months[m]; });
+  return { name: p.name, hire: p.hire || '', minus: Number(p.minus) || 0, pre: !!p.pre, months, unpaid, paid };
+}
+async function publishHk() {
+  const hk = people.filter(p => p.grp === 'hk' && p.target && (!p.quit || p.quit >= L.today()));
+  const list = hk.filter(p => /^\d{4}$/.test(p.hkPin || ''));
+  const by = {}; Object.keys(recs).forEach(id => { const x = recs[id]; (by[x.pid] = by[x.pid] || []).push(x); });
+  const docs = {};
+  for (const p of list) docs[await hkKey(p.name, p.hkPin)] = hkSnap(p, by[p.pid] || []);
+  const names = hk.map(p => ({ name: p.name, pin: list.indexOf(p) >= 0 })).sort((a, b) => (a.name < b.name ? -1 : 1));
+  const sig = await hkKey(JSON.stringify([docs, names]), 'sig');
+  try {
+    const m = await S.get('meta/hk_leave');
+    if (m && m.sig === sig) return;
+    if (!hk.length && !m) return;   // 하우스키핑 명단이 아직 없음
+    const old = await S.getQuery('hk_leave', []);
+    await Promise.all(Object.keys(docs).map(id => S.set('hk_leave/' + id, Object.assign({}, docs[id], { upd: S.SERVER_TIME }))));
+    await Promise.all(old.filter(x => !docs[x.id]).map(x => S.del('hk_leave/' + x.id)));
+    await S.set('meta/hk_leave', { names, sig, at: S.SERVER_TIME });
+  } catch (e) { console.warn('하우스키퍼 연차 현황 저장 실패', e); }
+}
 
 async function savePerson(p, orig, asOf) {
   const name = cleanName(p.name), hire = L.ymd(p.hire), target = p.target !== false;
@@ -127,9 +165,12 @@ async function savePerson(p, orig, asOf) {
   const clash = alias.filter(a => people.some(x => x !== cur && (x.name === a || (x.alias || []).indexOf(a) >= 0)));
   if (clash.length) throw new Error(clash.join(', ') + ' 은(는) 이미 다른 분의 이름(또는 같은 사람)으로 쓰이고 있어요.');
   const pid = cur ? cur.pid : newPid();
+  const grp = p.grp === 'hk' ? 'hk' : '', hkPin = grp ? String(p.hkPin || '').trim() : '';
+  if (hkPin && !/^\d{4}$/.test(hkPin)) throw new Error('연차 현황 비밀번호는 숫자 4자리로 적어 주세요.');
+  if (hkPin && people.some(x => x !== cur && x.grp === 'hk' && x.hkPin === hkPin)) throw new Error('다른 하우스키퍼와 같은 비밀번호예요. 다른 4자리로 정해 주세요.');
   await S.set('leave_people/' + pid, { name, hire, pre: !!p.pre, target, quit: L.ymd(p.quit), alias, emp: String(p.emp || '').trim().slice(0, 30),
     birth: L.ymd(p.birth) || String(p.birth || '').trim().slice(0, 20), phone: String(p.phone || '').trim().slice(0, 20), minus: Number(p.minus) || 0,
-    memo: String(p.memo || '').trim().slice(0, 200), upd: S.SERVER_TIME, by: who() });
+    memo: String(p.memo || '').trim().slice(0, 200), grp, hkPin, upd: S.SERVER_TIME, by: who() });
   return after(asOf);
 }
 function addRec(pid, name, ym, days, kind, memo, by) {
@@ -216,7 +257,7 @@ export async function call(fn, args) {
   args = args || [];
   check();
   switch (fn) {
-    case 'leaveData': await fetchAll(); await saveBusy(); return data(args[1]);
+    case 'leaveData': await fetchAll(); await saveBusy(); await publishHk(); return data(args[1]);
     case 'leaveSavePerson': return savePerson(args[1], args[2], args[3]);
     case 'leaveSetMonth': return setMonth(args[1], args[2], args[3]);
     case 'leaveAddRow': return addRow(args[1], args[2]);

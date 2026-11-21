@@ -1,7 +1,7 @@
 // hub/leave/import.js — 구글 시트(.xlsx 내려받기) → Firebase 옮기기 (처음 한 번, 2026-11-18)
 // 읽는 탭: 연차명단 · 연차기록 · 연차신청 · 배정기록(근무 달력). 읽는 규칙은 옛 Leave.gs(lvPeople_ · lvRecs_ · laApps_ · myWork)와 같게
 // 파일은 이 PC 브라우저에서만 열고, 바로 Firestore 로 씀 (다른 곳에 안 보냄)
-import { _int as I } from './api.js?v=2026.11.18-3';
+import { _int as I } from './api.js?v=2026.11.21-1';
 const { S, L, cleanName } = I;
 
 // ---------- xlsx(zip) 읽기 (브라우저 내장 압축 풀기)
@@ -58,14 +58,16 @@ export async function readSheets(u8, want) {
   const sh = /<sheet\s([^>]*?)\/?>/g;
   const sheets = []; while ((m = sh.exec(wb))) sheets.push({ name: attr(m[1], 'name'), id: attr(m[1], 'r:id') });
   for (const s of sheets) {
-    if (want.indexOf(s.name) < 0) continue;
+    if (want ? want.indexOf(s.name) < 0 : s !== sheets[0]) continue;   // want 없음 = 첫 시트만 (하우스키핑 대장, 11/21)
     let path = rid[s.id] || ''; path = path.replace(/^\/?xl\//, ''); path = 'xl/' + path.replace(/^\//, '');
     const x = await z.text(path), rows = [];
-    const rw = /<row\s[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g; let r;
+    rows.merge = []; { const mr = /<mergeCell\s+ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/g; let q; while ((q = mr.exec(x))) rows.merge.push({ c1: colNo(q[1]), r1: +q[2], c2: colNo(q[3]), r2: +q[4] }); }
+    const rw = /<row\s([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g; let r;
     while ((r = rw.exec(x))) {
       const row = [];
+      row.r = Number(attr(r[1], 'r') || 0); row.hidden = attr(r[1], 'hidden') === '1' || attr(r[1], 'hidden') === 'true'; row.f = {};   // 행 번호 · 숨김 · 수식 (11/21)
       const cr = /<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g; let c;
-      while ((c = cr.exec(r[1] || ''))) {
+      while ((c = cr.exec(r[2] || ''))) {
         const ref = attr(c[1], 'r'), t = attr(c[1], 't'), st = Number(attr(c[1], 's') || 0), inner = c[2] || '';
         const v = (/<v>([\s\S]*?)<\/v>/.exec(inner) || [])[1];
         let val = '';
@@ -75,6 +77,7 @@ export async function readSheets(u8, want) {
         else if (t === 'b') val = v === '1';
         else if (v != null) { const num = Number(v); val = ds[st] ? { t: Math.round((num - 25569) * 864e5) - 9 * 36e5 } : num; }
         row[colNo(ref)] = val;
+        const fm = /<f(?:\s[^>]*)?>([\s\S]*?)<\/f>/.exec(inner); if (fm) row.f[colNo(ref)] = ent(fm[1]);
       }
       rows.push(row);
     }

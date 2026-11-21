@@ -82,6 +82,7 @@ table.t{border-collapse:collapse;width:100%;min-width:720px;font-size:14px}
 .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{flex:1;border:0;background:transparent;padding:9px 6px;font-weight:700;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.grpsw{flex:0 0 auto;min-width:190px;background:#fff}.grpsw button{color:var(--navy,#1D3A6E)}.grpsw button[aria-pressed="true"]{color:#fff}
 .err{color:var(--red);font-weight:700;font-size:14px}
 .facts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .facts div{background:var(--soft);border-radius:10px;padding:8px 10px}
@@ -181,7 +182,8 @@ table.nt{border-collapse:collapse;width:100%;font-size:12.5px;line-height:1.3}
 </head>
 <body>
 <header class="top" id="top" hidden>
-  <div class="top-row"><h1>연차 관리<small>룸메이드 · 한화리조트 해운대</small></h1>
+  <div class="top-row"><h1>연차 관리<small id="gsub">룸메이드 · 한화리조트 해운대</small></h1>
+    <span class="seg grpsw" id="grpsw"><button data-grp="" aria-pressed="true">룸메이드</button><button data-grp="hk" aria-pressed="false">하우스키핑</button></span>
     <label class="asof">기준일 <input type="date" id="asof"></label><a class="back" href="../">← 허브</a></div>
   <nav class="tabs" id="tabs">
     <button data-tab="sum" aria-pressed="true">현황</button><button data-tab="apps">신청서</button><button data-tab="month">월 사용 입력</button><button data-tab="people">명단</button><button data-tab="print">대장 출력</button><button data-tab="dev">휴대폰 승인</button><button data-tab="imp">옮기기</button>
@@ -193,6 +195,10 @@ table.nt{border-collapse:collapse;width:100%;font-size:12.5px;line-height:1.3}
 <div id="print"></div>
 <script>
 var askDel = '';
+// 파트 (11/21): '' = 룸메이드 (원래 명단) · 'hk' = 하우스키핑. 현황 · 월 사용 입력 · 명단 · 대장 출력이 고른 파트만 보여 줌
+var grp = (function(){ try { return localStorage.getItem('lv_grp') || ''; } catch (e) { return ''; } })();
+function inG(p){ return (p.grp || '') === grp; }
+function GL(){ return grp === 'hk' ? '하우스키핑' : '룸메이드'; }
 var tok = null, D = null, tab = 'sum', ym = '', edits = {}, dlg = null, busy = false, first = true, apM = '';
 function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v){ try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
@@ -211,7 +217,7 @@ function run(fn, args, ok, fail){
     if (fail) fail(m); else toast(m);
   });
 }
-function active(){ return D ? D.people.filter(function(p){ return p.target && (!p.quit || p.quit >= D.asOf); }) : []; }
+function active(){ return D ? D.people.filter(function(p){ return inG(p) && p.target && (!p.quit || p.quit >= D.asOf); }) : []; }
 function tenure(p){ if (!p.hire) return ''; var a = p.hire.split('-').map(Number), b = D.asOf.split('-').map(Number); var m = (b[0] - a[0]) * 12 + (b[1] - a[1]) - (b[2] < a[2] ? 1 : 0); if (m < 0) return ''; return (m >= 12 ? Math.floor(m / 12) + '년 ' : '') + (m % 12) + '개월'; }
 
 // ---------- 로그인
@@ -242,6 +248,8 @@ function set(d){
 
 // ---------- 화면
 function render(){
+  document.querySelectorAll('#grpsw button').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-grp') === grp ? 'true' : 'false'); });
+  $('#gsub').textContent = GL() + ' · 한화리조트 해운대';
   document.querySelectorAll('#tabs button').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-tab') === tab ? 'true' : 'false'); });
   var tb = document.querySelector('#tabs [data-tab="apps"]'); if (tb) tb.innerHTML = '신청서' + (D && D.pending ? '<span class="cnt">'+D.pending+'</span>' : '');
   if (tab === 'imp') { $('#main').innerHTML = window.LVX.impHtml(); return; }
@@ -252,7 +260,7 @@ function render(){
   $('#main').innerHTML = h;
 }
 function unkHtml(){
-  if (!D.unknown.length || tab === 'print' || tab === 'apps') return '';
+  if (grp || !D.unknown.length || tab === 'print' || tab === 'apps') return '';
   return '<div class="unk"><b>정비 배정에 처음 보는 이름 '+D.unknown.length+'명</b><span class="muted" style="flex-basis:100%;margin:-4px 0 2px">누르면 연차 명단에 등록하거나, 기존 분과 연결하거나, 연차 대상 아님(외국인·일용직)으로 표시해요.</span>'+
     D.unknown.map(function(n){ return '<button class="chip" data-unk="'+esc(n)+'">'+esc(n)+'</button>'; }).join('')+'</div>';
 }
@@ -261,12 +269,15 @@ function sumHtml(){
   var soon = a.filter(function(p){ return p.next && p.next.date <= addDays(D.asOf, 31); });
   var h = '<div class="kpis"><div class="kpi"><b>'+a.length+'</b><span>연차 대상 (재직)</span></div><div class="kpi"><b>'+n1(rem)+'</b><span>잔여 연차 합계</span></div><div class="kpi'+(low ? ' warn' : '')+'"><b>'+low+'</b><span>잔여 0 이하</span></div><div class="kpi"><b>'+soon.length+'</b><span>한 달 안에 새로 발생</span></div></div>';
   h += '<div class="tw"><table class="t"><thead><tr><th>NO</th><th>성함</th><th>입사일</th><th>근속</th><th class="n">발생</th><th class="n">사용</th><th class="n">지급</th><th class="n">잔여</th><th class="n">무급</th><th>다음 발생</th></tr></thead><tbody>'+
-    D.people.filter(function(p){ return p.target; }).map(function(p, i){
+    D.people.filter(function(p){ return p.target && inG(p); }).map(function(p, i){
       var q = p.quit && p.quit < D.asOf;
       return '<tr class="'+(q ? 'quit' : '')+'" data-p="'+esc(p.name)+'"><td>'+(i + 1)+'</td><td><b>'+esc(p.name)+'</b>'+(p.pre ? '<span class="badge b-pre">선지급</span>' : '')+(q ? '<span class="badge b-out">퇴사</span>' : '')+'</td><td>'+dot(p.hire)+'</td><td>'+tenure(p)+'</td>'+
         '<td class="n">'+n1(p.gen)+'</td><td class="n">'+n1(p.used)+'</td><td class="n">'+(p.paid ? n1(p.paid) : '')+'</td><td class="n'+(p.remain <= 0 ? ' neg' : '')+'"><b>'+n1(p.remain)+'</b></td><td class="n">'+(p.unpaid ? n1(p.unpaid) : '')+'</td>'+
         '<td>'+(p.next && !q ? dot(p.next.date)+' <span class="muted">+'+p.next.n+'</span>' : '')+'</td></tr>';
     }).join('')+'</tbody></table></div><p class="muted">발생은 입사 기념일 기준으로 자동 계산돼요 (1년 미만: 매달 같은 날짜에 1개 · 1년마다 15개, 2년마다 1개씩 늘어남). 줄을 누르면 수정·지급·조정을 할 수 있어요.</p>';
+  if (grp === 'hk') { var np = a.filter(function(p){ return !p.hkPin; });
+    h += '<p class="muted">🧹 하우스키퍼는 허브 첫 화면 <b>하우스키퍼 → 연차 현황</b>에서 이름을 고르고 본인 4자리를 넣으면 자기 연차만 봐요. 4자리는 줄을 눌러 \'연차 현황 비밀번호\'에 정해 주세요.'+(np.length ? ' <b class="neg">아직 안 정한 분 '+np.length+'명: '+np.map(function(p){ return esc(p.name); }).join(', ')+'</b>' : '')+'</p>';
+    if (!a.length) h += '<div class="card"><p class="muted" style="margin:0">아직 하우스키핑 명단이 없어요. <b>옮기기</b> 탭의 \'하우스키핑 연차 대장 가져오기\'로 엑셀 대장을 넣어 주세요.</p><button class="btn pri" data-tab="imp" style="margin-top:8px">옮기기 열기</button></div>'; }
   return h;
 }
 function addDays(d, n){ var t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
@@ -358,10 +369,10 @@ function monthHtml(){
 }
 function stp(k, v, changed, lb){ return '<div class="stp"><label>'+lb+'</label><button data-st="'+k+'" data-d="-0.5" aria-label="'+lb+' 빼기">−</button><input data-k="'+k+'" inputmode="decimal" value="'+esc(v)+'" class="'+(changed ? 'chg' : '')+'"><button data-st="'+k+'" data-d="0.5" aria-label="'+lb+' 더하기">+</button></div>'; }
 function peopleHtml(){
-  var t = D.people.filter(function(p){ return p.target; }), o = D.people.filter(function(p){ return !p.target; });
+  var t = D.people.filter(function(p){ return p.target && inG(p); }), o = D.people.filter(function(p){ return !p.target && inG(p); });
   var h = '<div class="row"><h2 class="grow" style="margin:0;font-size:16px">연차 명단 '+t.length+'명</h2><button class="btn pri" id="addp">+ 직접 추가</button></div>';
-  h += '<div class="tw"><table class="t"><thead><tr><th>성함</th><th>입사일</th><th>선지급</th><th>같은 사람(다른 표기)</th><th>사번</th><th>생년월일</th><th>연락처</th><th>퇴사일</th></tr></thead><tbody>'+
-    t.map(function(p){ return '<tr data-p="'+esc(p.name)+'"><td><b>'+esc(p.name)+'</b></td><td>'+dot(p.hire)+'</td><td>'+(p.pre ? '<span class="badge b-pre">선지급</span>' : '')+'</td><td>'+esc(p.alias.join(', '))+'</td><td>'+esc(p.emp)+'</td><td>'+esc(dot(p.birth))+'</td><td>'+esc(p.phone)+'</td><td>'+dot(p.quit)+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  h += '<div class="tw"><table class="t"><thead><tr><th>성함</th><th>입사일</th><th>선지급</th>'+(grp === 'hk' ? '<th>연차 현황 비번</th>' : '')+'<th>같은 사람(다른 표기)</th><th>사번</th><th>생년월일</th><th>연락처</th><th>퇴사일</th></tr></thead><tbody>'+
+    t.map(function(p){ return '<tr data-p="'+esc(p.name)+'"><td><b>'+esc(p.name)+'</b></td><td>'+dot(p.hire)+'</td><td>'+(p.pre ? '<span class="badge b-pre">선지급</span>' : '')+'</td>'+(grp === 'hk' ? '<td>'+(p.hkPin ? '정함' : '<b class="neg">없음</b>')+'</td>' : '')+'<td>'+esc(p.alias.join(', '))+'</td><td>'+esc(p.emp)+'</td><td>'+esc(dot(p.birth))+'</td><td>'+esc(p.phone)+'</td><td>'+dot(p.quit)+'</td></tr>'; }).join('')+'</tbody></table></div>';
   var miss = t.filter(function(p){ return (!p.quit || p.quit >= D.asOf) && (!p.emp || !p.birth); }).length;
   if (miss) h += '<p class="muted" style="margin:0">사번·생년월일이 빈 분 '+miss+'명 — 휴가신청서에 자동으로 들어가는 칸이라 채워 두면 좋아요. (줄을 눌러 입력)</p>';
   if (o.length) h += '<div class="card"><h2>연차 대상 아님 ('+o.length+'명)</h2><p class="muted" style="margin:0 0 8px">외국인·일용직 등. 정비 배정에 나와도 다시 묻지 않아요.</p><div class="row">'+o.map(function(p){ return '<button class="chip" style="border-color:var(--line)" data-p="'+esc(p.name)+'">'+esc(p.name)+'</button>'; }).join('')+'</div></div>';
@@ -385,7 +396,7 @@ function preview(kind, arg){
   $('#pv').innerHTML = '<div class="pv-bar"><b>'+(kind === 'ledger' ? arg + '년 연차관리대장' : '월별 잔여 연차 안내')+'</b><button class="btn pri" id="doprint">인쇄 / PDF 저장</button><button class="btn" id="pvx">닫기</button></div><div class="pv">'+html+'</div>';
 }
 function ledgerHtml(y){
-  var rows = D.people.filter(function(p){ return p.target && p.hire && p.hire.slice(0, 4) <= String(y) && (!p.quit || p.quit.slice(0, 4) >= String(y)); });
+  var rows = D.people.filter(function(p){ return inG(p) && p.target && p.hire && p.hire.slice(0, 4) <= String(y) && (!p.quit || p.quit.slice(0, 4) >= String(y)); });
   var cut = D.asOf.slice(0, 7), mm = []; for (var i = 1; i <= 12; i++) mm.push(y + '-' + ('0' + i).slice(-2));
   var tot = { m: mm.map(function(){ return 0; }), yr: 0, used: 0, gen: 0, rem: 0, un: 0 };
   var body = rows.map(function(p, i){
@@ -399,7 +410,7 @@ function ledgerHtml(y){
     return '<tr class="'+(p.pre ? 'pre' : '')+'"><td>'+(i + 1)+'</td><td class="nm">'+esc(p.name)+'</td><td>'+dot(p.hire).slice(2)+'</td>'+cells+
       '<td class="num"><b>'+n1(yr)+'</b></td><td class="num">'+n1(p.used)+'</td><td class="num">'+n1(p.gen)+'</td><td class="num rem'+(p.remain < 0 ? ' neg' : '')+'">'+n1(p.remain)+'</td><td class="num">'+(un ? n1(un) : '')+'</td><td style="font-size:8.5px">'+esc(p.quit ? '퇴사 ' + dot(p.quit).slice(2) : p.paid ? '지급 ' + n1(p.paid) : '')+'</td></tr>';
   }).join('');
-  return '<div class="sheet land"><div class="ph"><div><h1>룸메이드 연차관리대장</h1><div class="sub">한화리조트 해운대 · 주식회사 유니에스 · '+y+'년</div></div>'+
+  return '<div class="sheet land"><div class="ph"><div><h1>'+GL()+' 연차관리대장</h1><div class="sub">한화리조트 해운대 · 주식회사 유니에스 · '+y+'년</div></div>'+
     '<div class="meta" style="display:flex;align-items:flex-end;gap:10px"><span>기준일 '+dot(D.asOf)+'<br>대상 '+rows.length+'명</span><span class="sign" style="margin:0"><div><div class="h">작성</div><div class="b"></div></div><div><div class="h">소장</div><div class="b"></div></div></span></div></div>'+
     '<table class="lg"><colgroup><col style="width:3%"><col style="width:7%"><col style="width:6.5%">'+mm.map(function(){ return '<col style="width:4.1%">'; }).join('')+'<col style="width:5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:4%"><col></colgroup>'+
     '<thead><tr><th>NO</th><th>성명</th><th>입사일자</th>'+mm.map(function(m, k){ return '<th class="mo">'+(k + 1)+'월</th>'; }).join('')+'<th>'+y+'<br>사용</th><th>누적<br>사용</th><th>누적<br>발생</th><th>잔여<br>연차</th><th>무급</th><th>비고</th></tr></thead><tbody>'+body+
@@ -407,9 +418,9 @@ function ledgerHtml(y){
     '<div class="pf"><span><i class="legend"></i>연차 선지급제 (매월 1일 급여 정산) · 발생: 입사 기념일 기준 (1년 미만 월 1일, 1년 15일, 2년마다 1일 가산) · 잔여 = 누적 발생 − 누적 사용 − 회사 지급 · 0.5 = 반차</span><span>출력 '+dot(D.today)+'</span></div></div>';
 }
 function noticeHtml(m){
-  var rows = D.people.filter(function(p){ return p.target && p.hire && p.hire.slice(0, 7) <= m && (!p.quit || p.quit.slice(0, 7) >= m); });
+  var rows = D.people.filter(function(p){ return inG(p) && p.target && p.hire && p.hire.slice(0, 7) <= m && (!p.quit || p.quit.slice(0, 7) >= m); });
   var a = m.split('-');
-  return '<div class="sheet port"><div class="ph"><div><h1>룸메이드 연차 현황 안내</h1><div class="sub">'+Number(a[0])+'년 '+Number(a[1])+'월 사용분 반영 · 한화리조트 해운대</div></div><div class="meta">기준일 '+dot(D.asOf)+'</div></div>'+
+  return '<div class="sheet port"><div class="ph"><div><h1>'+GL()+' 연차 현황 안내</h1><div class="sub">'+Number(a[0])+'년 '+Number(a[1])+'월 사용분 반영 · 한화리조트 해운대</div></div><div class="meta">기준일 '+dot(D.asOf)+'</div></div>'+
     '<table class="nt"><thead><tr><th>NO</th><th>성명</th><th>입사일자</th><th>당월 사용</th><th>누적 사용</th><th>발생 연차</th><th>잔여 연차</th><th>비고</th></tr></thead><tbody>'+
     rows.map(function(p, i){ var u = (p.months[m] || {}).used || 0; return '<tr class="'+(p.pre ? 'pre' : '')+'"><td>'+(i + 1)+'</td><td class="nm">'+esc(p.name)+'</td><td>'+dot(p.hire)+'</td><td>'+n1(u)+'</td><td>'+n1(p.used)+'</td><td>'+n1(p.gen)+'</td><td class="rem">'+n1(p.remain)+'</td><td>'+(p.pre ? '선지급제' : '')+'</td></tr>'; }).join('')+
     '</tbody></table><div class="pf"><span><i class="legend"></i>연차 선지급제 · 궁금한 점은 소장에게 문의해 주세요.</span><span>주식회사 유니에스</span></div></div>';
@@ -418,7 +429,7 @@ function noticeHtml(m){
 // ---------- 창 (사람 수정·등록)
 function openPerson(name, unk){
   var p = D.people.filter(function(x){ return x.name === name; })[0];
-  dlg = p ? { mode: 'edit', orig: p.name, p: JSON.parse(JSON.stringify(p)) } : { mode: unk ? 'unk' : 'new', unk: unk || '', orig: '', p: { name: unk || '', hire: '', pre: false, target: true, alias: [], emp: '', birth: '', phone: '', quit: '', minus: 0, memo: '' }, link: '' };
+  dlg = p ? { mode: 'edit', orig: p.name, p: JSON.parse(JSON.stringify(p)) } : { mode: unk ? 'unk' : 'new', unk: unk || '', orig: '', p: { name: unk || '', hire: '', pre: grp === 'hk', target: true, alias: [], emp: '', birth: '', phone: '', quit: '', minus: 0, memo: '', grp: unk ? '' : grp, hkPin: '' }, link: '' };
   drawDlg();
 }
 function drawDlg(){
@@ -441,6 +452,8 @@ function drawDlg(){
     '<label class="fld">연락처<input id="f-phone" inputmode="tel" value="'+esc(p.phone)+'"><span class="hint">메이드가 신청할 때 적으면 자동으로 채워져요</span></label><label class="fld">퇴사일<input id="f-quit" type="date" value="'+esc(p.quit)+'"></label>'+
     '<label class="fld">같은 사람(정비보고서 다른 표기)<input id="f-alias" value="'+esc((p.alias || []).join(', '))+'" placeholder="예) 혜진"></label><label class="fld">첫해 월차 차감 (만근 미달)<input id="f-minus" type="number" min="0" max="11" value="'+esc(p.minus || '')+'"></label></div>'+
     '<div class="row"><label class="row" style="gap:6px;font-weight:700"><input type="checkbox" id="f-pre"'+(p.pre ? ' checked' : '')+'> 연차 선지급제 (매달 1개 급여 정산)</label><span class="grow"></span><label class="row" style="gap:6px;font-weight:700"><input type="checkbox" id="f-out"'+(p.target ? '' : ' checked')+'> 연차 대상 아님</label></div>'+
+    '<div class="grid2"><label class="fld">파트<select id="f-grp"><option value=""'+(p.grp ? '' : ' selected')+'>룸메이드</option><option value="hk"'+(p.grp === 'hk' ? ' selected' : '')+'>하우스키핑</option></select></label>'+
+    (p.grp === 'hk' ? '<label class="fld">연차 현황 비밀번호 (4자리)<input id="f-hkpin" inputmode="numeric" maxlength="4" value="'+esc(p.hkPin || '')+'" placeholder="예) 0428"><span class="hint">허브 \'하우스키퍼 → 연차 현황\'에서 본인 연차를 볼 때 넣는 번호 · 다른 분과 겹치면 안 돼요</span></label>' : '<span class="hint" style="align-self:end">하우스키핑으로 바꾸고 저장하면 연차 현황 비밀번호 칸이 나와요</span>')+'</div>'+
     '<label class="fld">메모<input id="f-memo" value="'+esc(p.memo)+'"></label>';
   if (dlg.mode === 'edit') {
     h += '<div class="card" style="padding:12px;background:var(--soft);border:0"><b style="font-size:14px">회사 지급 · 조정</b><div class="row" style="margin-top:8px"><select id="x-kind" class="btn"><option>지급</option><option>조정</option></select><input id="x-ym" type="month" class="btn" value="'+D.asOf.slice(0, 7)+'"><input id="x-days" class="btn" style="width:80px" inputmode="decimal" placeholder="개수"><input id="x-memo" class="btn grow" placeholder="메모 (예: 회사 일괄 지급)"><button class="btn pri" id="x-add">추가</button></div>'+
@@ -456,7 +469,8 @@ function readForm(){
   var g = function(id){ var e = $('#f-' + id); return e ? e.value.trim() : ''; };
   return { name: g('name'), hire: g('hire'), emp: g('emp'), birth: g('birth'), phone: g('phone'), quit: g('quit'), memo: g('memo'),
     alias: g('alias').split(/[,\/]/).map(function(s){ return s.trim(); }).filter(Boolean), minus: Number(g('minus')) || 0,
-    pre: !!($('#f-pre') && $('#f-pre').checked), target: !($('#f-out') && $('#f-out').checked) };
+    pre: !!($('#f-pre') && $('#f-pre').checked), target: !($('#f-out') && $('#f-out').checked),
+    grp: $('#f-grp') ? $('#f-grp').value : (dlg.p.grp || ''), hkPin: $('#f-hkpin') ? $('#f-hkpin').value.replace(/\D/g, '') : (dlg.p.hkPin || '') };
 }
 function savePerson(){
   var p;
@@ -484,6 +498,7 @@ function send(p, orig, msg){
 
 // ---------- 이벤트
 document.addEventListener('click', function(e){
+  var gb = e.target.closest('[data-grp]'); if (gb && D) { grp = gb.getAttribute('data-grp'); try { localStorage.setItem('lv_grp', grp); } catch (x) {} edits = {}; if (tab === 'apps' || tab === 'dev') tab = 'sum'; render(); return; }
   var t = e.target;
   var tb = t.closest('[data-tab]'); if (tb && !t.closest('#dlg')) { tab = tb.getAttribute('data-tab'); render(); window.scrollTo(0, 0); return; }
   if (t.closest('#dlg')) {
@@ -541,6 +556,7 @@ function setEdit(name, k, v){
   render();
 }
 document.addEventListener('change', function(e){
+  if (e.target.id === 'f-grp' && dlg) { var keep = readForm(); dlg.p = Object.assign(dlg.p, keep); if (keep.grp === 'hk') dlg.p.pre = true; drawDlg(); return; }
   var t = e.target;
   if (t.id === 'asof') { load(); return; }
   if (t.id === 'ym') { if (Object.keys(edits).length && !confirm('저장하지 않은 입력이 있어요. 버리고 달을 바꿀까요?')) { t.value = ym; return; } edits = {}; ym = t.value; render(); return; }
@@ -552,6 +568,6 @@ document.addEventListener('change', function(e){
 // 시작은 app.js (로그인 확인 → load() 또는 gate())
 window.LVP = { load: load, gate: gate, set: set, render: render, toast: toast, run: run, D: function(){ return D; }, tab: function(){ return tab; }, setTab: function(t){ tab = t; render(); }, busy: function(){ return busy; } };
 </script>
-<script type="module" src="app.js?v=2026.11.18-7"></script>
+<script type="module" src="app.js?v=2026.11.21-1"></script>
 </body>
 </html>
