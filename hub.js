@@ -20,15 +20,15 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-4';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-4';
-import * as PIN from './pin.js?v=2026.11.21-4';
-import { setupClose } from './close.js?v=2026.11.21-4';
-import { setupClosing } from './closing.js?v=2026.11.21-4';
-import { supProgress } from './supcalc.js?v=2026.11.21-4';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.21-4';
+import * as K from '../rm/app/keys.js?v=2026.11.21-5';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.21-5';
+import * as PIN from './pin.js?v=2026.11.21-5';
+import { setupClose } from './close.js?v=2026.11.21-5';
+import { setupClosing } from './closing.js?v=2026.11.21-5';
+import { supProgress } from './supcalc.js?v=2026.11.21-5';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.21-5';
 
-const VER = '2026.11.21-4';
+const VER = '2026.11.21-5';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
