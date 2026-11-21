@@ -20,15 +20,15 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-5';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-5';
-import * as PIN from './pin.js?v=2026.11.21-5';
-import { setupClose } from './close.js?v=2026.11.21-5';
-import { setupClosing } from './closing.js?v=2026.11.21-5';
-import { supProgress } from './supcalc.js?v=2026.11.21-5';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.21-5';
+import * as K from '../rm/app/keys.js?v=2026.11.21-6';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.21-6';
+import * as PIN from './pin.js?v=2026.11.21-6';
+import { setupClose } from './close.js?v=2026.11.21-6';
+import { setupClosing } from './closing.js?v=2026.11.21-6';
+import { supProgress } from './supcalc.js?v=2026.11.21-6';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.21-6';
 
-const VER = '2026.11.21-5';
+const VER = '2026.11.21-6';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -140,15 +140,15 @@ async function load(force) {
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
-let ex = { rows: null, rm: null, sa: null, acts: null, at: 0, busy: false, d: '' };
+let ex = { rows: null, rm: null, sa: null, req: null, acts: null, at: 0, busy: false, d: '' };
 async function loadEx(force) {
   if (!admin || ex.busy) return;
   const d = ymd();
   if (!force && ex.d === d && ex.at && Date.now() - ex.at < 120000) return;
   ex.busy = true; draw();
   // 더티·정비보조: 오늘 기록 줄(체크·근태) / 진행 중 활동: 개수만 세기(count — 체크 문서를 받지 않음)
-  const [rows, acts, rm, sa] = await Promise.all([safe(S.getQuery('sup/' + d + '/rows', [])), safe(S.getQuery('acts', [['status', '==', '진행']])),
-    safe(S.getQuery('sup/' + d + '/rm', [])), supAuto()]);   // 레포트 앱 객실 변경 · 정비 지원 autosup.js (더티 % 를 정비 지원과 같게)
+  const [rows, acts, rm, sa, req] = await Promise.all([safe(S.getQuery('sup/' + d + '/rows', [])), safe(S.getQuery('acts', [['status', '==', '진행']])),
+    safe(S.getQuery('sup/' + d + '/rm', [])), supAuto(), safe(S.getQuery('sup/' + d + '/req', []))]);   // 🔔 메이드 더티 요청 (2026-11-21, 규칙 v23)   // 레포트 앱 객실 변경 · 정비 지원 autosup.js (더티 % 를 정비 지원과 같게)
   let actList = acts;
   if (Array.isArray(acts) && acts.length) {
     const ex = await actExcl();
@@ -160,7 +160,7 @@ async function loadEx(force) {
       return { id: a.id, name: x.name || a.id, color: x.color || '', due: x.due || '', doneName: x.doneName || '', proc: typeof proc === 'number' ? proc : null, today: typeof td === 'number' ? td : null, target };
     }));
   }
-  ex = { rows, rm, sa, acts: actList, at: Date.now(), busy: false, d }; draw();
+  ex = { rows, rm, sa, req, acts: actList, at: Date.now(), busy: false, d }; draw();
 }
 function reload(force) { load(force); if (route.sec === 'work' && route.tab === 'dirty') loadEx(force); }
 function bad(x) { return !x || x.__err; }
@@ -262,6 +262,31 @@ function dirtyHtml(v) {
   if (inNow.length) h += '<p class="note">출근: ' + esc(inNow.join(', ')) + '</p>';
   return h + '<button class="big-btn" style="margin-top:12px" data-sup="1">🛏 정비보조별 진행 보기 · 수정 <small style="display:block;font-weight:600;font-size:12.5px;opacity:.8;margin-top:2px">남은 더티 · 대신 체크 · 수량 · 추가 · 근무 종료</small></button>' +
     '<button class="big-btn sec" style="margin-top:10px" data-hdist="1">📋 더티 배분 ' + (plan.length ? '다시 만들기' : '만들기') + '</button></div>';
+}
+// 🔔 메이드 더티 요청 (2026-11-21): 레포트 앱 sup/{날}/req/{메이드} (오늘 몇 번 · 지난 시각 hist) + 정비 지원 체크 줄로 '몇 분 만에 왔는지'
+function dreqStats(req, rows) {
+  const ck = (Array.isArray(rows) ? rows : []).map(x => x.data || {}).filter(x => x.tab === '체크' && Array.isArray(x.row) && x.row[5] === '완료')
+    .map(x => ({ maid: String(x.row[3] || '').trim(), at: Number(x.at && x.at.toMillis ? x.at.toMillis() : x.at instanceof Date ? x.at.getTime() : x.at) || Date.parse(x.at) || 0 }));
+  return (Array.isArray(req) ? req : []).map(d => {
+    const x = d.data || {}, names = Array.isArray(x.names) && x.names.length ? x.names : [x.maid];
+    const tsOf = v => Number(v && v.toMillis ? v.toMillis() : v instanceof Date ? v.getTime() : v) || 0;
+    const ats = (Array.isArray(x.hist) ? x.hist : []).map(tsOf).concat([tsOf(x.at)]).filter(Boolean).sort((a, b) => a - b);
+    const waits = ats.map(t => { const c = ck.filter(k => names.indexOf(k.maid) >= 0 && k.at > t).sort((a, b) => a.at - b.at)[0]; return c ? Math.round((c.at - t) / 60000) : null; });
+    return { maid: x.maid || d.id, ws: x.ws || [], rooms: x.rooms || [], n: ats.length, last: ats[ats.length - 1] || 0, open: waits[waits.length - 1] === null, waits: waits.filter(w => w !== null) };
+  }).filter(r => r.n).sort((a, b) => (b.open - a.open) || (b.last - a.last));
+}
+function dreqHtml(req, rows) {
+  let h = '<div class="card"><h2>🔔 오늘 더티 요청 <small>메이드 → 정비보조</small></h2>';
+  if (req && req.__err) return h + '<p class="note" style="margin:0">아직 읽을 수 없어요 (규칙 v23 게시 전).</p></div>';
+  const L = dreqStats(req, rows);
+  if (!L.length) return h + '<p class="note" style="margin:0">오늘은 아직 요청이 없어요.</p></div>';
+  const allW = [].concat(...L.map(r => r.waits)), avg = allW.length ? Math.round(allW.reduce((s, w) => s + w, 0) / allW.length) : null;
+  const now = Date.now(), openN = L.filter(r => r.open).length;
+  h += '<div class="kv"><div><b>' + L.reduce((s, r) => s + r.n, 0) + '</b><span>요청 수</span></div><div><b>' + L.length + '</b><span>요청한 메이드</span></div><div><b>' + (avg === null ? '-' : avg + '분') + '</b><span>평균 기다림</span></div></div>';
+  h += '<div style="margin-top:8px">' + L.map(r => '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px">' +
+    '<span><b>' + esc(r.maid) + '</b> → ' + esc(r.ws.join(', ') || '-') + (r.n > 1 ? ' · <b>' + r.n + '번</b>' : '') + (r.rooms.length ? ' <small class="note">먼저 ' + esc(r.rooms.join(', ')) + '</small>' : '') + '</span>' +
+    '<span style="white-space:nowrap;font-weight:800;' + (r.open ? 'color:#C25A00' : 'color:var(--muted)') + '">' + (r.open ? '기다리는 중 ' + Math.max(0, Math.floor((now - r.last) / 60000)) + '분' : hm(r.last) + ' · ' + r.waits[r.waits.length - 1] + '분 만에 옴') + '</span></div>').join('') + '</div>';
+  return h + (openN ? '<p class="note">' + openN + '명이 아직 기다리고 있어요. 정비보조가 그 메이드 방을 체크하면 저절로 꺼져요.</p>' : '') + '</div>';
 }
 function actsHtml(v) {
   let h = '<div class="card"><h2>진행 중 활동 <small>객실 활동판</small></h2>';
@@ -597,7 +622,7 @@ function progHtml() {
 function exHtml() {
   const v = view.st;
   if (!ex.at || ex.d !== ymd()) return '<div class="card"><h2>더티 · 정비보조</h2><p class="note" style="margin:0">읽는 중…</p></div>';
-  return dirtyHtml(Object.assign({}, v || {}, { rows: ex.rows, rm: ex.rm, sa: ex.sa })) + actsHtml({ acts: ex.acts });
+  return dirtyHtml(Object.assign({}, v || {}, { rows: ex.rows, rm: ex.rm, sa: ex.sa })) + dreqHtml(ex.req, ex.rows) + actsHtml({ acts: ex.acts });
 }
 // ---------- 🧾 입퇴사 진행 (2026-11-18, 입퇴사 서류 부분 연결)
 // 입퇴사 앱(HrStaff.gs)이 1시간마다 staff/{id} 로 보내는 기본 정보만 씀. 서류·주민번호·사진은 입퇴사 앱에만 있음
