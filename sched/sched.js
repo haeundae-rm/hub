@@ -6,6 +6,7 @@
 // 쓰는 사람: 소장·부소장만 (허브 첫 화면 '근무 스케줄 편성' 칸). 하우스키퍼·파트장 계정이 열면 보기 화면(view.html)으로 보냄 (11/22 기능 분리)
 import * as DB from '../../rm/app/store.js';
 import { printSchedule } from './print.js?v=2026.11.22-12';
+import { snap } from './snap.js?v=2026.11.22-14';
 const $ = id => document.getElementById(id);
 const HOL = {2026:{1:[1],2:[16,17,18],3:[1],5:[1,5,24],6:[3,6],7:[17],8:[15],9:[24,25,26],10:[3,9],12:[25]},
              2027:{1:[1],2:[6,7,8],3:[1],5:[1,5,13],6:[6],7:[17],8:[15],9:[14,15,16],10:[3,9],12:[25]}};
@@ -195,6 +196,7 @@ function renderHist(){
     h += `<tr><td class="nm" colspan="${dates.length+4}" style="font-weight:400;color:var(--mut);font-size:12px">대체공휴일은 수당 대상이 아니라 집계하지 않음 · 하우스맨 중 출근율 최고는 붉게, 최저는 초록 · 자동 편성은 출근율이 높은 사람을 공휴일 휴무에 우선 배정</td></tr>`;
   }
   $('histT').innerHTML = h;
+  const sc = $('histT').parentElement; if (sc) sc.scrollLeft = sc.scrollWidth;   // 최근 달이 먼저 보이게
 }
 function renderSide(stats, full, X){
   renderHist();
@@ -272,6 +274,7 @@ const setMode = m => { mode = m; $('mOff').classList.toggle('on', m==='off'); $(
 $('hEC').onclick = () => { hView='ec'; $('hEC').classList.add('on'); $('hHol').classList.remove('on'); renderHist(); };
 $('hHol').onclick = () => { hView='hol'; $('hHol').classList.add('on'); $('hEC').classList.remove('on'); renderHist(); };
 $('hY').onchange = renderHist;
+$('hSnap').onclick = () => snap($('histT'), `${$('hY').value || S.year}년 ${hView==='ec'?'E조·C조 월별':'국공휴 출근'} 현황`, hView==='ec' ? 'E조·C조 월별 현황 (로테이터 월평균: 붉은색 최다 · 초록 최소)' : '국공휴 출근 현황 (출근율: 붉은색 최고 · 초록 최저)');
 $('mOff').onclick = () => setMode('off'); $('mEdit').onclick = () => setMode('edit');
 $('unlock').onclick = () => { S.locks = {}; save(); render(); toast('직접 고정한 칸을 모두 풀었습니다 (휴무신청은 유지)'); };
 
@@ -334,12 +337,7 @@ $('next').onclick = async () => {
     S.holidays.forEach(d => { s.cum.holT++; if (['A','E','C','B'].includes(r[d-1])) s.cum.holW++; });
     s.carry = HKSolver.nextCarry(r);
   });
-  const key = `${S.year}-${String(S.month).padStart(2,'0')}`, Gc = curGrid();
-  S.hist.ec[key] = {}; S.staff.forEach((s,p) => { if (s.kind!=='ot') S.hist.ec[key][s.name] = [Gc[p].filter(c=>c==='E').length, Gc[p].filter(c=>c==='C').length]; });
-  S.holidays.slice().sort((a,b)=>a-b).forEach(d => { const dt = `${key}-${String(d).padStart(2,'0')}`; const att = {};
-    S.staff.forEach((s,p) => att[s.name] = ['A','E','C','B'].includes(Gc[p][d-1]) ? '출' : '휴');
-    S.managers.forEach(m => { const c = mgrCode(m, d-1); att[m] = ['A','E','C','B','D'].includes(c) ? '출' : '휴'; });
-    S.hist.hol = S.hist.hol.filter(x => x.date!==dt).concat([{date:dt, name:'공휴일', att}]).sort((a,b)=>a.date<b.date?-1:1); });
+  recordHist();
   S.state = '확정'; latestKey = ymKey(S.year, S.month); confPending = latestKey; await saveNow();
   const ny = S.month === 12 ? S.year + 1 : S.year, nm = S.month === 12 ? 1 : S.month + 1;
   latestKey = ymKey(ny, nm); S.year = ny; S.month = nm; resetMonth(); S.state = '작성중'; await saveNow();
@@ -462,13 +460,27 @@ async function importPast(){
   if (btn) { btn.disabled = false; btn.textContent = '지난 스케줄 넣기'; }
 }
 $('pastBtn').onclick = importPast;
+// 누적 현황 기록 (11/22): 확정하는 순간 그 달 E조·C조 일수와 국공휴 출근을 hist 에 적음 (다시 확정하면 그 달 것만 덮어씀)
+const HOLNAME = {'01-01':'신정','03-01':'삼일절','05-01':'근로자의날','05-05':'어린이날','06-06':'현충일','07-17':'제헌절','08-15':'광복절','10-03':'개천절','10-09':'한글날','12-25':'성탄절'};
+function recordHist(){
+  const Gc = curGrid(); if (!Gc) return;
+  const key = ymKey(S.year, S.month);
+  S.hist.ec[key] = {}; S.staff.forEach((s,p) => { if (s.kind!=='ot') S.hist.ec[key][s.name] = [Gc[p].filter(c=>c==='E').length, Gc[p].filter(c=>c==='C').length]; });
+  S.hist.hol = S.hist.hol.filter(x => x.date.slice(0,7) !== key);
+  S.holidays.slice().sort((a,b)=>a-b).forEach(d => { const dt = `${key}-${String(d).padStart(2,'0')}`; const att = {};
+    S.staff.forEach((s,p) => att[s.name] = ['A','E','C','B','D'].includes(Gc[p][d-1]) ? '출' : '휴');
+    S.managers.forEach(m => { const c = mgrCode(m, d-1); att[m] = ['A','E','C','B','D'].includes(c) ? '출' : '휴'; });
+    S.hist.hol.push({date:dt, name:HOLNAME[dt.slice(5)] || '공휴일', att}); });
+  S.hist.hol.sort((a,b)=>a.date<b.date?-1:1);
+}
 $('conf').onclick = async () => {
   if (!canEdit()) return;
   if (S.state === '확정') {   // 실수로 두 번 눌러 풀리는 일 막기 — 풀 때만 한 번 더 물음
     if (!confirm(S.month + '월 스케줄 확정을 풀까요? 하우스키퍼 화면에서 이 달이 다시 안 보여요.')) return;
-    S.state = '작성중'; await saveNow(); render(); toast('작성 중으로 되돌렸어요'); return;
+    S.state = '작성중'; const k0 = ymKey(S.year, S.month); delete S.hist.ec[k0]; S.hist.hol = S.hist.hol.filter(x => x.date.slice(0,7) !== k0);
+    await saveNow(); render(); toast('작성 중으로 되돌렸어요 (누적 현황에서도 이 달을 뺐어요)'); return;
   }
-  S.state = '확정'; confPending = ymKey(S.year, S.month); render(); await saveNow();
+  S.state = '확정'; confPending = ymKey(S.year, S.month); recordHist(); render(); await saveNow();
   toast(saveErr ? '확정을 저장하지 못했어요 — 화면 위 저장 상태를 확인해 주세요' : '확정했어요 — 하우스키퍼 화면에도 보여요 (NEW)');
 };
 // ---------- 로그인 (야간 보고서와 같은 계정)

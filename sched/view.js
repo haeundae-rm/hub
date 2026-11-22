@@ -4,6 +4,7 @@
 // 읽는 곳: hksched/cfg (누적 현황) · hksched/{YYYY-MM} (그 달)
 import * as DB from '../../rm/app/store.js';
 import { printSchedule } from './print.js?v=2026.11.22-12';
+import { snap } from './snap.js?v=2026.11.22-14';
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -90,6 +91,7 @@ function draw() {
 
   if (tab === 'hist') h += histHtml(staff, mgrs);
   $('main').innerHTML = h;
+  const hb = document.getElementById('hBoard'); if (hb) hb.scrollLeft = hb.scrollWidth;   // 최근 달이 먼저 보이게
 }
 
 function memoHtml(staff, mgrs, notes, autoOff, dow) {
@@ -106,33 +108,57 @@ function doPrint() {
     codeOf: (n, d) => (locks[n] || {})[d + 1] || ((forced[n] || []).includes(d + 1) ? 'O' : (grid[n] || [])[d] || '') });
 }
 
+// 누적 현황: cfg.hist (확정할 때 기록) + 지금 보는 달이 확정됐는데 아직 기록 전이면 그 달도 셈. 로테이터 월평균 · 출근율 최다 붉은색 / 최소 초록 (편성 화면과 같음)
+const HOLNAME = { '01-01': '신정', '03-01': '삼일절', '05-01': '근로자의날', '05-05': '어린이날', '06-06': '현충일', '07-17': '제헌절', '08-15': '광복절', '10-03': '개천절', '10-09': '한글날', '12-25': '성탄절' };
+function histData(staff, mgrs) {
+  const H0 = (cfg && cfg.hist) || { ec: {}, hol: [] };
+  const H = { ec: Object.assign({}, H0.ec || {}), hol: (H0.hol || []).slice() };
+  if (doc && doc.state === '확정') {
+    const key = ymKey(Y, M), nd = new Date(Y, M, 0).getDate(), forced = doc.forced || {}, locks = doc.locks || {}, grid = doc.grid || {};
+    const code = (n, d) => (locks[n] || {})[d + 1] || ((forced[n] || []).includes(d + 1) ? 'O' : (grid[n] || [])[d] || '');
+    if (!H.ec[key]) { H.ec[key] = {}; staff.forEach(s => { if (s.kind !== 'ot') { const r = Array.from({ length: nd }, (_, d) => code(s.name, d)); H.ec[key][s.name] = [r.filter(c => c === 'E').length, r.filter(c => c === 'C').length]; } }); }
+    (doc.holidays || []).forEach(d => {
+      const dt = key + '-' + String(d).padStart(2, '0'); if (H.hol.some(x => x.date === dt)) return;
+      const att = {}; staff.forEach(s => { att[s.name] = WORK.includes(code(s.name, d - 1)) ? '출' : '휴'; });
+      mgrs.forEach(m => { att[m] = WORK.includes(((doc.mgr || {})[m] || {})[d] || 'A') ? '출' : '휴'; });
+      H.hol.push({ date: dt, name: HOLNAME[dt.slice(5)] || '공휴일', att });
+    });
+    H.hol.sort((a, b) => a.date < b.date ? -1 : 1);
+  }
+  return H;
+}
+const ext = (vals, x) => { if (vals.length < 2) return ''; const mx = Math.max(...vals), mn = Math.min(...vals); return mx - mn < .05 ? '' : x === mx ? 'hi' : x === mn ? 'lo' : ''; };
 function histHtml(staff, mgrs) {
-  const H = (cfg && cfg.hist) || { ec: {}, hol: [] };
+  const H = histData(staff, mgrs);
   const years = [...new Set(Object.keys(H.ec || {}).map(k => +k.slice(0, 4)).concat((H.hol || []).map(x => +x.date.slice(0, 4)), [Y]))].sort();
   const hy = years.includes(Y) ? Y : years[years.length - 1];
   let h = '<div class="card"><div class="seg">' + [['ec', 'E조 · C조 월별'], ['hol', '국공휴 출근']].map(([k, v]) => '<button data-hv="' + k + '" aria-pressed="' + (hView === k) + '">' + v + '</button>').join('') + '</div>' +
-    '<p class="note" style="margin:0 0 8px">' + hy + '년 확정된 달까지 · 형평성 참고용</p><div class="board"><table class="ht">';
+    '<div class="hbar"><p class="note" style="margin:0">' + hy + '년 확정된 달까지 · <b class="hi">붉은색</b> 가장 많음 · <b class="lo">초록</b> 가장 적음</p><button class="snapbtn" id="hSnap">🖼️ 이미지로 공유</button></div><div class="board" id="hBoard"><table class="ht" id="histT">';
   if (hView === 'ec') {
     const months = Object.keys(H.ec || {}).filter(k => +k.slice(0, 4) === hy).sort();
     const people = staff.filter(s => s.kind !== 'ot').map(s => s.name);
+    const rows = people.map(n => {
+      const v = months.map(k => (H.ec[k] || {})[n]).filter(Boolean), isRot = (staff.find(s => s.name === n) || {}).kind === 'rot';
+      return { n, isRot, aE: v.length ? +(v.reduce((a, x) => a + x[0], 0) / v.length).toFixed(1) : 0, aC: v.length ? +(v.reduce((a, x) => a + x[1], 0) / v.length).toFixed(1) : 0 };
+    });
+    const rE = rows.filter(r => r.isRot).map(r => r.aE), rC = rows.filter(r => r.isRot).map(r => r.aC);
     h += '<tr><th class="nm">이름</th>' + months.map(k => '<th colspan="2">' + (+k.slice(5)) + '월</th>').join('') + '<th colspan="2">월평균</th></tr>' +
       '<tr><th class="nm"></th>' + months.map(() => '<th>E</th><th>C</th>').join('') + '<th>E</th><th>C</th></tr>';
-    people.forEach(n => {
-      const v = months.map(k => (H.ec[k] || {})[n]).filter(Boolean), isRot = (staff.find(s => s.name === n) || {}).kind === 'rot';
-      const aE = v.length ? v.reduce((a, x) => a + x[0], 0) / v.length : 0, aC = v.length ? v.reduce((a, x) => a + x[1], 0) / v.length : 0;
-      h += '<tr><td class="nm">' + esc(n) + '</td>' + months.map(k => { const x = (H.ec[k] || {})[n]; return x ? '<td class="E">' + x[0] + '</td><td class="C">' + (isRot ? x[1] : '–') + '</td>' : '<td>–</td><td>–</td>'; }).join('') +
-        '<td><b>' + aE.toFixed(1) + '</b></td><td><b>' + (isRot ? aC.toFixed(1) : '–') + '</b></td></tr>';
+    rows.forEach(r => {
+      h += '<tr><td class="nm">' + esc(r.n) + '</td>' + months.map(k => { const x = (H.ec[k] || {})[r.n]; return x ? '<td class="E">' + x[0] + '</td><td class="C">' + (r.isRot ? x[1] : '–') + '</td>' : '<td>–</td><td>–</td>'; }).join('') +
+        '<td class="' + (r.isRot ? ext(rE, r.aE) : '') + '"><b>' + r.aE.toFixed(1) + '</b></td><td class="' + (r.isRot ? ext(rC, r.aC) : '') + '"><b>' + (r.isRot ? r.aC.toFixed(1) : '–') + '</b></td></tr>';
     });
     if (!months.length) h += '<tr><td class="nm" colspan="3">아직 기록이 없어요</td></tr>';
   } else {
     const hols = (H.hol || []).filter(x => +x.date.slice(0, 4) === hy);
     const people = staff.map(s => s.name).concat(mgrs);
+    const rows = people.map((n, i) => { const v = hols.map(x => (x.att || {})[n] || ''), w = v.filter(x => x === '출').length, tt = v.filter(Boolean).length; return { n, i, v, w, tt, r: tt ? Math.round(w / tt * 100) : null }; });
+    const rr = rows.filter(x => x.i < staff.length && x.r != null).map(x => x.r);
     h += '<tr><th class="nm">이름</th>' + hols.map(x => '<th>' + (+x.date.slice(5, 7)) + '/' + (+x.date.slice(8)) + '<br>' + esc(String(x.name || '').replace(/\s/g, '')) + '</th>').join('') + '<th>출근</th><th>대상</th><th>출근율</th></tr>';
-    people.forEach((n, i) => {
-      const v = hols.map(x => (x.att || {})[n] || ''), w = v.filter(x => x === '출').length, tt = v.filter(Boolean).length;
-      h += '<tr' + (i === staff.length ? ' class="top2"' : '') + '><td class="nm">' + esc(n) + (i >= staff.length ? ' <small>관리자</small>' : '') + '</td>' +
-        v.map(x => '<td class="' + (x === '출' ? 'on' : x === '휴' ? 'off' : '') + '">' + (x || '–') + '</td>').join('') +
-        '<td>' + w + '</td><td>' + tt + '</td><td><b>' + (tt ? Math.round(w / tt * 100) + '%' : '–') + '</b></td></tr>';
+    rows.forEach(x => {
+      h += '<tr' + (x.i === staff.length ? ' class="top2"' : '') + '><td class="nm">' + esc(x.n) + (x.i >= staff.length ? ' <small>관리자</small>' : '') + '</td>' +
+        x.v.map(c => '<td class="' + (c === '출' ? 'on' : c === '휴' ? 'off' : '') + '">' + (c || '–') + '</td>').join('') +
+        '<td>' + x.w + '</td><td>' + x.tt + '</td><td class="' + (x.i < staff.length && x.r != null ? ext(rr, x.r) : '') + '"><b>' + (x.r == null ? '–' : x.r + '%') + '</b></td></tr>';
     });
     if (!hols.length) h += '<tr><td class="nm" colspan="3">아직 기록이 없어요</td></tr>';
   }
@@ -140,9 +166,10 @@ function histHtml(staff, mgrs) {
 }
 
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-m],[data-tab],[data-me],[data-hv],[data-who],#doLogin,#prt');
+  const b = e.target.closest('[data-m],[data-tab],[data-me],[data-hv],[data-who],#doLogin,#prt,#hSnap');
   if (!b) return;
   if (b.id === 'prt') { doPrint(); return; }
+  if (b.id === 'hSnap') { snap(document.getElementById('histT'), Y + '년 ' + (hView === 'ec' ? 'E조·C조 월별' : '국공휴 출근') + ' 현황', hView === 'ec' ? '월평균: 붉은색 가장 많음 · 초록 가장 적음' : '출근율: 붉은색 가장 높음 · 초록 가장 낮음'); return; }
   if (b.dataset.m) go(+b.dataset.m);
   else if (b.dataset.tab) { tab = b.dataset.tab; draw(); }
   else if (b.dataset.me != null) { me = b.dataset.me; ls.set('hksv_me', me); draw(); }
