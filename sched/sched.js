@@ -5,7 +5,7 @@
 //       hksched/{YYYY-MM} = 그 달 휴무신청 · 직접 고정 · 관리자 칸 · 편성 결과 · 상태(작성중/확정)
 // 쓰는 사람: 소장·부소장만 (허브 첫 화면 '근무 스케줄 편성' 칸). 하우스키퍼·파트장 계정이 열면 보기 화면(view.html)으로 보냄 (11/22 기능 분리)
 import * as DB from '../../rm/app/store.js';
-import { printSchedule } from './print.js?v=2026.11.22-4';
+import { printSchedule } from './print.js?v=2026.11.22-5';
 const $ = id => document.getElementById(id);
 const HOL = {2026:{1:[1],2:[16,17,18],3:[1],5:[1,5,24],6:[3,6],7:[17],8:[15],9:[24,25,26],10:[3,9],12:[25]},
              2027:{1:[1],2:[6,7,8],3:[1],5:[1,5,13],6:[6],7:[17],8:[15],9:[14,15,16],10:[3,9],12:[25]}};
@@ -33,6 +33,9 @@ const ymKey = (y, m) => y + '-' + String(m).padStart(2, '0');
 const canEdit = () => !!(role && role.k === 'boss');
 const save = () => { if (!canEdit()) return; clearTimeout(saveT); setSave('저장 대기…'); saveT = setTimeout(saveNow, 800); };
 function setSave(t){ const el = $('saveSt'); if (el) el.textContent = t; }
+// 확정 버튼을 누른 달 → cfg.lastConf (허브 하우스키퍼 칸 '근무 스케줄' NEW 표시용). 한 번 보내면 지움
+let confPending = '';
+const newConf = key => { if (confPending !== key) return {}; confPending = ''; return { lastConf: { ym: key, at: DB.SERVER_TIME } }; };
 async function saveNow(){
   clearTimeout(saveT); if (!canEdit()) return;
   const key = ymKey(S.year, S.month); saving = true; setSave('저장 중…');
@@ -42,8 +45,8 @@ async function saveNow(){
     await DB.set('hksched/' + key, month);
     if (key >= latestKey) {   // 지난 달을 고칠 때는 명단 원본(이월·누적)을 건드리지 않음
       latestKey = key;
-      await DB.set('hksched/cfg', { staff:S.staff, managers:S.managers, need:S.need, eDay:S.eDay, hist:S.hist, cur:key, by:role.label, at:DB.SERVER_TIME });
-    } else await DB.merge('hksched/cfg', { managers:S.managers, eDay:S.eDay, hist:S.hist });
+      await DB.merge('hksched/cfg', Object.assign({ staff:S.staff, managers:S.managers, need:S.need, eDay:S.eDay, hist:S.hist, cur:key, by:role.label, at:DB.SERVER_TIME }, newConf(key)));
+    } else await DB.merge('hksched/cfg', Object.assign({ managers:S.managers, eDay:S.eDay, hist:S.hist }, newConf(key)));
     savedAt = Date.now(); saveErr = ''; setSave('저장됨 ' + new Date().toTimeString().slice(0,5));
   } catch (e) { saveErr = String(e && (e.code || e.message) || e); setSave('저장 실패: ' + saveErr); toast('저장하지 못했어요 — 인터넷 연결이나 권한(규칙)을 확인해 주세요'); }
   saving = false;
@@ -334,7 +337,7 @@ $('next').onclick = async () => {
     S.staff.forEach((s,p) => att[s.name] = ['A','E','C','B'].includes(Gc[p][d-1]) ? '출' : '휴');
     S.managers.forEach(m => { const c = (S.mgr[m]||{})[d]; if (c) att[m] = ['A','E','C','B'].includes(c) ? '출' : '휴'; });
     S.hist.hol = S.hist.hol.filter(x => x.date!==dt).concat([{date:dt, name:'공휴일', att}]).sort((a,b)=>a.date<b.date?-1:1); });
-  S.state = '확정'; latestKey = ymKey(S.year, S.month); await saveNow();
+  S.state = '확정'; latestKey = ymKey(S.year, S.month); confPending = latestKey; await saveNow();
   const ny = S.month === 12 ? S.year + 1 : S.year, nm = S.month === 12 ? 1 : S.month + 1;
   latestKey = ymKey(ny, nm); S.year = ny; S.month = nm; resetMonth(); S.state = '작성중'; await saveNow();
   location.hash = ymKey(ny, nm); toast('확정했어요 — 이월값과 누적 현황을 기록하고 다음 달로 넘어왔어요');
@@ -441,7 +444,7 @@ async function importPast(){
   if (!canEdit()) return;
   const btn = $('pastBtn'); if (btn) { btn.disabled = true; btn.textContent = '넣는 중…'; }
   try {
-    const P = await (await fetch('./past2026.json?v=2026.11.22-4')).json();
+    const P = await (await fetch('./past2026.json?v=2026.11.22-5')).json();
     let added = 0;
     for (const k of Object.keys(P).sort()) {
       const ex = await DB.get('hksched/' + k);
@@ -455,7 +458,7 @@ async function importPast(){
   if (btn) { btn.disabled = false; btn.textContent = '지난 스케줄 넣기'; }
 }
 $('pastBtn').onclick = importPast;
-$('conf').onclick = () => { if (!canEdit()) return; S.state = S.state === '확정' ? '작성중' : '확정'; save(); render(); toast(S.state === '확정' ? '확정했어요 — 하우스키퍼 계정에서도 보여요' : '작성 중으로 되돌렸어요'); };
+$('conf').onclick = () => { if (!canEdit()) return; S.state = S.state === '확정' ? '작성중' : '확정'; if (S.state === '확정') confPending = ymKey(S.year, S.month); save(); render(); toast(S.state === '확정' ? '확정했어요 — 하우스키퍼 계정에서도 보여요' : '작성 중으로 되돌렸어요'); };
 // ---------- 로그인 (야간 보고서와 같은 계정)
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },

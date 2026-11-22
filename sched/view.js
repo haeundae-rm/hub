@@ -3,7 +3,7 @@
 // 보여 주는 것: 확정된 달의 스케줄표(관리자 줄 포함) · 그 달 휴무신청(확정 전에도) · 사람별 합계 · E조·C조 월별 · 국공휴 출근 현황
 // 읽는 곳: hksched/cfg (누적 현황) · hksched/{YYYY-MM} (그 달)
 import * as DB from '../../rm/app/store.js';
-import { printSchedule } from './print.js?v=2026.11.22-4';
+import { printSchedule } from './print.js?v=2026.11.22-5';
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -33,6 +33,7 @@ async function open() {
   $('main').innerHTML = '<div class="card"><p class="note" style="margin:0">불러오는 중…</p></div>';
   try { [cfg, doc] = await Promise.all([DB.get('hksched/cfg'), DB.get('hksched/' + ymKey(Y, M))]); }
   catch (e) { $('main').innerHTML = '<div class="card"><p class="err">불러오지 못했어요 (' + esc(e.code || e.message) + '). 인터넷 연결을 확인해 주세요.</p></div>'; return; }
+  try { if (cfg && cfg.lastConf && cfg.lastConf.at) localStorage.setItem('hksv_seen', String(cfg.lastConf.at)); } catch (e) {}   // 허브 NEW 표시 끄기
   draw();
 }
 function go(dm) { let y = Y, m = M + dm; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } location.hash = ymKey(y, m); }

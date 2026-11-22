@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.22-3';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.22-3';
-import * as PIN from './pin.js?v=2026.11.22-3';
-import { setupClose } from './close.js?v=2026.11.22-3';
-import { setupClosing } from './closing.js?v=2026.11.22-3';
-import { supProgress } from './supcalc.js?v=2026.11.22-3';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.22-3';
-import { setupMeal } from './meal.js?v=2026.11.22-3';
-import * as BD from './bday.js?v=2026.11.22-3';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.22-4';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.22-4';
+import * as PIN from './pin.js?v=2026.11.22-4';
+import { setupClose } from './close.js?v=2026.11.22-4';
+import { setupClosing } from './closing.js?v=2026.11.22-4';
+import { supProgress } from './supcalc.js?v=2026.11.22-4';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.22-4';
+import { setupMeal } from './meal.js?v=2026.11.22-4';
+import * as BD from './bday.js?v=2026.11.22-4';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.22-3';
+const VER = '2026.11.22-4';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -127,8 +127,8 @@ async function load(force) {
     }
   }
   // 연차 신청서 승인 대기 수 (count — 문서를 받지 않음, 1천 건까지 읽기 1건)
-  const [hr, lvq, ng] = await Promise.all([hrP, isHk() ? null : safe(S.count('leave_apps', [['status', '==', '대기'], ['deleted', '==', false]])),
-    Promise.all([addDays(d, -1), d].map(x => safe(S.get('night/' + x))))]);
+  const [hr, lvq, ng, hs] = await Promise.all([hrP, isHk() ? null : safe(S.count('leave_apps', [['status', '==', '대기'], ['deleted', '==', false]])),
+    Promise.all([addDays(d, -1), d].map(x => safe(S.get('night/' + x)))), safe(S.get('hksched/cfg'))]);   // hs: 근무 스케줄 새 확정 알림 (11/22)
   // 🔑 플로어키 (2026-11-19): 켜져 있을 때만 오늘 배정 · 변경 · 키 줄 · 대조를 읽음 (꺼져 있으면 meta/keys 1건)
   const kc = await safe(S.get('meta/keys'));
   let ks = null;
@@ -143,7 +143,7 @@ async function load(force) {
   }
   const [ls, lt] = await Promise.all([safe(S.get('meta/lost_sum')), safe(S.getQuery('lost', [['date', '==', d]]))]);   // 🧳 습득물: 서버가 매일 아침 센 처리 대기 + 오늘 접수
   const bd = isHk() ? null : await BD.load(S, d);   // 🎂 하루 한 번만 연차 명단을 읽음 (소장 · 부소장)
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd, ls, lt };
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd, ls, lt, hs };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -671,12 +671,19 @@ function hrHtml(v) {
   return h + open + '</div>';
 }
 // 🛎️ 하우스키퍼 (11/21): 첫 화면 칸 → 안쪽에서 야간 업무 보고서 · 근무 스케줄 보기(11/22, sched/view.html) · 근무 스케줄 편성(sched/, 소장·부소장에게만 보임) · 연차 현황 고르기 (다른 칸과 같은 방식)
+// 🗓️ 근무 스케줄이 새로 확정됐는데 이 휴대폰에서 아직 안 열어 봤으면 NEW (보기 화면 sched/view.html 이 열 때 hksv_seen 을 적음)
+function schedNew(v) {
+  const lc = v && v.hs && !v.hs.__err && v.hs.lastConf;
+  let seen = 0; try { seen = Number(localStorage.getItem('hksv_seen') || 0); } catch (e) {}
+  return lc && Number(lc.at) > seen ? lc : null;
+}
 function hkSecHtml() {
-  const n = view.st ? nightWait(view.st).length : 0;
+  const n = view.st ? nightWait(view.st).length : 0, sn = schedNew(view.st);
   return '<div class="card"><h2>무엇을 열까요?</h2><div class="go-grid">' +
     '<a class="go" href="./night/"><span class="ic">🌙</span><b>야간 업무 보고서' + (n ? ' <i class="hm-bd wait" style="position:static;margin-left:4px">확인 ' + n + '</i>' : '') + '</b><span>야간 근무 보고 · 확인 · 인쇄</span></a>' +
-    (admin && !isHk() ? '<a class="go" href="./sched/"><span class="ic">✏️</span><b>근무 스케줄 편성</b><span>편성 · 수정 · 확정 · 엑셀 · 인쇄 (소장 · 부소장만 보임)</span></a>' : '') +
-    '<a class="go" href="./sched/view.html"><span class="ic">🗓️</span><b>근무 스케줄</b><span>확정된 스케줄표 · 휴무신청 · 누적 현황 (보기)</span></a>' +
+    (admin && !isHk() ? '<a class="go" href="./sched/"><span class="ic">✏️</span><b>근무 스케줄 편성</b><span>편성 · 수정 · 확정 · 엑셀 · 인쇄</span></a>' : '') +
+    '<a class="go" href="./sched/view.html' + (sn ? '#' + sn.ym : '') + '" style="position:relative"><span class="ic">🗓️</span><b>근무 스케줄</b><span>스케줄 확인 · 휴무신청 · 누적 현황</span>' +
+      (sn ? '<i class="hm-bd new" title="' + esc(Number(sn.ym.slice(5)) + '월 스케줄이 새로 확정됐어요') + '">NEW</i>' : '') + '</a>' +
     '<button class="go" data-hkleave="1"><span class="ic">📅</span><b>연차 현황</b><span>이름 고르고 본인 비밀번호 4자리 → 내 연차</span></button></div></div>';
 }
 function linksHtml() {
@@ -802,7 +809,7 @@ function badgeOf(t, v) {
     return p.total ? B('ok', p.pct + '%') : '';
   }
   if (t.go === 'field') return Array.isArray(v.errs) && v.errs.length ? B('wait', '오류 ' + v.errs.length) : '';
-  if (t.href === './night/' || t.go === 'hk') { const n = nightWait(v).length; return n ? B('wait', '확인 ' + n) : ''; }
+  if (t.href === './night/' || t.go === 'hk') { const n = nightWait(v).length; return n ? B('wait', '확인 ' + n) : schedNew(v) ? B('new', 'NEW') : ''; }
   if (t.href === './keys/') {
     const k = v.ks; if (!k) return v.kc && v.kc.from && v.kc.on !== false && v.kc.from > v.d ? B('wait', md(v.kc.from) + ' 시작') : '';
     const bad = k.late.length + k.nosign.length; if (bad) return B('bad', '미반납 ' + bad);
