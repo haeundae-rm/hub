@@ -3,7 +3,7 @@
 // 보여 주는 것: 확정된 달의 스케줄표(관리자 줄 포함) · 그 달 휴무신청(확정 전에도) · 사람별 합계 · E조·C조 월별 · 국공휴 출근 현황
 // 읽는 곳: hksched/cfg (누적 현황) · hksched/{YYYY-MM} (그 달)
 import * as DB from '../../rm/app/store.js';
-import { printSchedule } from './print.js?v=2026.11.22-5';
+import { printSchedule } from './print.js?v=2026.11.22-7';
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -72,7 +72,7 @@ function draw() {
       if (mgrs.length) { h += '<tr class="sep"><td colspan="' + (nd + 6) + '">관리자</td></tr>'; mgrs.forEach(n => { h += row(n, '관리자', Array.from({ length: nd }, (_, d) => (mgr[n] || {})[d + 1] || ''), 'mg'); }); h += '<tr class="sep"><td colspan="' + (nd + 6) + '">하우스맨</td></tr>'; }
       staff.forEach(s => { h += row(s.name, carryLbl(s.carry) ? '전월 ' + carryLbl(s.carry) : '', Array.from({ length: nd }, (_, d) => code(s.name, d)), ''); });
       h += '</tbody></table></div>' +
-        '<div class="legend"><span><i class="A">A</i>주간 09:00~18:00</span><span><i class="E">E</i>11:30~22:00</span><span><i class="C">C</i>야간 22:00~09:00</span><span><i class="B">B</i>09:00~22:00</span><span><i class="O">O</i>휴무</span><span><i class="L">연</i>연차</span><span><i class="O f">O</i>휴무신청</span></div>' +
+        '<div class="legend"><span><i class="A">A</i>주간 09:00~18:00</span><span><i class="E">E</i>11:30~22:00</span><span><i class="C">C</i>야간 22:00~09:00</span><span><i class="B">B</i>09:00~22:00</span><span><i class="O">O</i>휴무</span><span><i class="L">연</i>연차</span><span><i class="O f">O</i>신청 휴무(빨간 테두리)</span></div>' +
         memoHtml(staff, mgrs, notes, autoOff, dow) +
         (hol.length ? '<p class="note">국공휴일: ' + hol.slice().sort((a, b) => a - b).map(d => M + '/' + d).join(', ') + '</p>' : '') +
         (extra.length ? '<p class="note">인원 추가일(재고조사·행사 등): ' + extra.slice().sort((a, b) => a - b).map(d => M + '/' + d).join(', ') + '</p>' : '') + '</div>';
