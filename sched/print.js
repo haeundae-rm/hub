@@ -88,7 +88,7 @@ function html(o) {
   };
   if ((o.managers || []).length) {
     h += '<tr class="grp"><td colspan="' + (nd + 9) + '">관리자</td></tr>';
-    o.managers.forEach(n => { h += row(n, '', Array.from({ length: nd }, (_, d) => (mgr[n] || {})[d + 1] || ''), true); });
+    o.managers.forEach(n => { h += row(n, '', Array.from({ length: nd }, (_, d) => (mgr[n] || {})[d + 1] || o.mgrDefault || ''), true); });
     h += '<tr class="grp"><td colspan="' + (nd + 9) + '">하우스맨</td></tr>';
   }
   const G = o.staff.map(s => Array.from({ length: nd }, (_, d) => o.codeOf(s.name, d) || ''));
