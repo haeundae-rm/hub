@@ -95,7 +95,7 @@ function cellCode(p, d){
 function render(){
   $('ttl').textContent = `${S.year}년 ${S.month}월 근무 스케줄`;
   $('pastBox').hidden = !canEdit() || !!S._pastDone;
-  $('conf').textContent = S.state === '확정' ? '확정 풀기' : '확정하기';
+  $('conf').textContent = S.state === '확정' ? '✓ 확정됨 (풀기)' : '확정하기'; $('conf').classList.toggle('done', S.state === '확정');
   $('stChip').textContent = S.state === '확정' ? '확정' : (S._exists ? '작성 중' : '새 달'); $('stChip').className = 'stc ' + (S.state === '확정' ? 'ok' : '');
   if (!canEdit() && S.state !== '확정') {
     $('grid').innerHTML = `<tr><td style="padding:24px;text-align:left">${S.month}월 스케줄은 아직 확정 전이에요. 소장님이 확정하면 여기에 보여요.</td></tr>`;
@@ -436,7 +436,8 @@ $('xls').onclick = () => {
 };
 
 $('setBox').addEventListener('toggle', renderSet);
-$('prt').onclick = () => {
+$('prt').onclick = async () => {
+  if (saveT) await saveNow();   // 바뀐 게 있으면 먼저 저장 (인쇄물 확정 표시 = 저장된 상태와 같게)
   const N = nd(), G = S.staff.map((s,p) => Array.from({length:N}, (_,d) => cellCode(p,d)));
   if (!G.every(r => r.every(c => c))) { toast('먼저 편성을 완성해 주세요'); return; }
   printSchedule({ year:S.year, month:S.month, staff:S.staff, managers:S.managers, mgr:S.mgr, mgrDefault:'A', autoOff:S.autoOff, forced:S.forced, notes:S.notes, holidays:S.holidays, extra:S.extra, state:S.state, leaveMode:S.leaveMode,
@@ -461,7 +462,15 @@ async function importPast(){
   if (btn) { btn.disabled = false; btn.textContent = '지난 스케줄 넣기'; }
 }
 $('pastBtn').onclick = importPast;
-$('conf').onclick = () => { if (!canEdit()) return; S.state = S.state === '확정' ? '작성중' : '확정'; if (S.state === '확정') confPending = ymKey(S.year, S.month); save(); render(); toast(S.state === '확정' ? '확정했어요 — 하우스키퍼 계정에서도 보여요' : '작성 중으로 되돌렸어요'); };
+$('conf').onclick = async () => {
+  if (!canEdit()) return;
+  if (S.state === '확정') {   // 실수로 두 번 눌러 풀리는 일 막기 — 풀 때만 한 번 더 물음
+    if (!confirm(S.month + '월 스케줄 확정을 풀까요? 하우스키퍼 화면에서 이 달이 다시 안 보여요.')) return;
+    S.state = '작성중'; await saveNow(); render(); toast('작성 중으로 되돌렸어요'); return;
+  }
+  S.state = '확정'; confPending = ymKey(S.year, S.month); render(); await saveNow();
+  toast(saveErr ? '확정을 저장하지 못했어요 — 화면 위 저장 상태를 확인해 주세요' : '확정했어요 — 하우스키퍼 화면에도 보여요 (NEW)');
+};
 // ---------- 로그인 (야간 보고서와 같은 계정)
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
