@@ -3,7 +3,7 @@
 // 보여 주는 것: 확정된 달의 스케줄표(관리자 줄 포함) · 그 달 휴무신청(확정 전에도) · 사람별 합계 · E조·C조 월별 · 국공휴 출근 현황
 // 읽는 곳: hksched/cfg (누적 현황) · hksched/{YYYY-MM} (그 달)
 import * as DB from '../../rm/app/store.js';
-import { printSchedule } from './print.js?v=2026.11.22-5';
+import { printSchedule } from './print.js?v=2026.11.22-11';
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -69,10 +69,10 @@ function draw() {
           x += '<td class="c ' + (v === '연' || v === '대' ? 'L' : v) + (f ? ' f' : '') + (ho ? ' ho' : '') + (nt ? ' nt' : '') + (d + 1 === today ? ' today' : '') + '"' + (nt || ho ? ' title="' + esc((ho ? '국공휴 휴무 ' : '') + (nt || '')) + '"' : '') + '>' + (v === '대' ? '대휴' : v) + '</td>'; });
         return x + '<td class="s"><b>' + (c('A') + c('B')) + '</b></td><td class="s"><b>' + c('E') + '</b></td><td class="s"><b>' + c('C') + '</b></td><td class="s"><b>' + c('O') + '</b></td><td class="s">' + r.filter(v => WORK.includes(v)).length + '</td></tr>';
       };
-      if (mgrs.length) { h += '<tr class="sep"><td colspan="' + (nd + 6) + '">관리자</td></tr>'; mgrs.forEach(n => { h += row(n, '관리자', Array.from({ length: nd }, (_, d) => (mgr[n] || {})[d + 1] || ''), 'mg'); }); h += '<tr class="sep"><td colspan="' + (nd + 6) + '">하우스맨</td></tr>'; }
+      if (mgrs.length) { h += '<tr class="sep"><td colspan="' + (nd + 6) + '">관리자</td></tr>'; mgrs.forEach(n => { h += row(n, '관리자', Array.from({ length: nd }, (_, d) => (mgr[n] || {})[d + 1] || 'A'), 'mg'); }); h += '<tr class="sep"><td colspan="' + (nd + 6) + '">하우스맨</td></tr>'; }
       staff.forEach(s => { h += row(s.name, carryLbl(s.carry) ? '전월 ' + carryLbl(s.carry) : '', Array.from({ length: nd }, (_, d) => code(s.name, d)), ''); });
       h += '</tbody></table></div>' +
-        '<div class="legend"><span><i class="A">A</i>주간 09:00~18:00</span><span><i class="E">E</i>11:30~22:00</span><span><i class="C">C</i>야간 22:00~09:00</span><span><i class="B">B</i>09:00~22:00</span><span><i class="O">O</i>휴무</span><span><i class="L">연</i>연차</span><span><i class="O f">O</i>휴무신청</span></div>' +
+        '<div class="legend"><span><i class="A">A</i>주간 09:00~18:00</span><span><i class="E">E</i>11:30~22:00</span><span><i class="C">C</i>야간 22:00~09:00</span><span><i class="B">B</i>09:00~22:00</span><span><i class="O">O</i>휴무</span><span><i class="L">연</i>연차</span><span><i class="O f">O</i>신청 휴무(빨간 테두리)</span></div>' +
         memoHtml(staff, mgrs, notes, autoOff, dow) +
         (hol.length ? '<p class="note">국공휴일: ' + hol.slice().sort((a, b) => a - b).map(d => M + '/' + d).join(', ') + '</p>' : '') +
         (extra.length ? '<p class="note">인원 추가일(재고조사·행사 등): ' + extra.slice().sort((a, b) => a - b).map(d => M + '/' + d).join(', ') + '</p>' : '') + '</div>';
@@ -102,7 +102,7 @@ function memoHtml(staff, mgrs, notes, autoOff, dow) {
 }
 function doPrint() {
   const nd = new Date(Y, M, 0).getDate(), staff = doc.staff || [], forced = doc.forced || {}, locks = doc.locks || {}, grid = doc.grid || {};
-  printSchedule({ year: Y, month: M, staff, managers: doc.managers || [], mgr: doc.mgr || {}, forced, notes: doc.notes || {}, holidays: doc.holidays || [], extra: doc.extra || [], state: doc.state, leaveMode: doc.leaveMode,
+  printSchedule({ year: Y, month: M, staff, managers: doc.managers || [], mgr: doc.mgr || {}, mgrDefault: 'A', autoOff: doc.autoOff || {}, forced, notes: doc.notes || {}, holidays: doc.holidays || [], extra: doc.extra || [], state: doc.state, leaveMode: doc.leaveMode,
     codeOf: (n, d) => (locks[n] || {})[d + 1] || ((forced[n] || []).includes(d + 1) ? 'O' : (grid[n] || [])[d] || '') });
 }
 

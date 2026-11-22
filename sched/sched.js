@@ -5,7 +5,7 @@
 //       hksched/{YYYY-MM} = 그 달 휴무신청 · 직접 고정 · 관리자 칸 · 편성 결과 · 상태(작성중/확정)
 // 쓰는 사람: 소장·부소장만 (허브 첫 화면 '근무 스케줄 편성' 칸). 하우스키퍼·파트장 계정이 열면 보기 화면(view.html)으로 보냄 (11/22 기능 분리)
 import * as DB from '../../rm/app/store.js';
-import { printSchedule } from './print.js?v=2026.11.22-5';
+import { printSchedule } from './print.js?v=2026.11.22-11';
 const $ = id => document.getElementById(id);
 const HOL = {2026:{1:[1],2:[16,17,18],3:[1],5:[1,5,24],6:[3,6],7:[17],8:[15],9:[24,25,26],10:[3,9],12:[25]},
              2027:{1:[1],2:[6,7,8],3:[1],5:[1,5,13],6:[6],7:[17],8:[15],9:[14,15,16],10:[3,9],12:[25]}};
@@ -83,6 +83,8 @@ function buildInput(){
       cum:{ C:s.kind==='rot'?s.cum.C:null, E:s.kind!=='ot'?s.cum.E:null, workRate:s.cum.work, holRate:((s.cum.holW||0) + 1.5) / ((s.cum.holT||0) + 2), holW:s.cum.holW||0, holT:s.cum.holT||0 } })) };
 }
 function gridArr(){ if(!S.grid) return null; return S.staff.map(s => (S.grid[s.name] || []).slice(0, nd())); }
+// 관리자 3인 (11/22): 휴무 등 적은 날 말고는 모두 A(일근)
+const mgrCode = (m, d) => (S.mgr[m]||{})[d+1] || 'A';
 function cellCode(p, d){
   const s = S.staff[p], L = (S.locks[s.name]||{})[d+1];
   if (L) return L;
@@ -114,10 +116,10 @@ function render(){
   const stats = [];
   const W = c => ['A','E','C','B'].includes(c);
   if (S.managers.length) {
-    h += `<tr class="sep"><td class="nm" colspan="${N+9}">관리자 · 직접 입력 (자동 편성·인원 집계 제외)</td></tr>`;
+    h += `<tr class="sep"><td class="nm" colspan="${N+9}">관리자 · 휴무만 표시 (나머지는 자동 A · 하우스맨 인원 집계 제외)</td></tr>`;
     S.managers.forEach((m,i) => {
-      const r = Array.from({length:N}, (_,d) => (S.mgr[m]||{})[d+1] || ''), cnt = k => r.filter(c => c===k).length;
-      h += `<tr class="mg"><td class="nm">${esc(m)}<small>관리자</small></td>` + r.map((c,d) => `<td class="c m ${c==='연'?'L':c==='대'?'D':c}" data-m="${i}" data-d="${d}">${c==='대'?'대휴':c}</td>`).join('') +
+      const r = Array.from({length:N}, (_,d) => mgrCode(m, d)), cnt = k => r.filter(c => c===k).length;
+      h += `<tr class="mg"><td class="nm">${esc(m)}<small>관리자</small></td>` + r.map((c,d) => `<td class="c m ${c==='연'||c==='대'?'L':c}" data-m="${i}" data-d="${d}">${c==='대'?'대휴':c}</td>`).join('') +
         `<td class="s first"><b>${cnt('A')+cnt('B')}</b></td><td class="s"><b>${cnt('E')}</b></td><td class="s"><b>${cnt('C')}</b></td><td class="s"><b>${cnt('O')}</b></td><td class="s">${r.filter(W).length}</td><td class="s">${r.some(c=>c)?wkEnd-cnt('O'):''}</td><td class="s">${S.holidays.length&&r.some(c=>c)?S.holidays.filter(d=>W(r[d-1])).length+'/'+S.holidays.length:'–'}</td><td class="s"></td></tr>`;
     });
     h += `<tr class="sep"><td class="nm" colspan="${N+9}">하우스맨 · 자동 편성</td></tr>`;
@@ -180,7 +182,7 @@ function renderHist(){
     const pv = G && S.year===hy ? S.holidays.map(d => `${S.year}-${String(S.month).padStart(2,'0')}-${String(d).padStart(2,'0')}`).filter(dt => !hols.some(x => x.date===dt)) : [];
     const people = S.staff.map(s => s.name).concat(S.managers);
     const att = (dt, n) => { const rec = hols.find(x => x.date===dt); if (rec) return rec.att[n] || '';
-      const d = +dt.slice(8), p = S.staff.findIndex(s => s.name===n); const c = p>=0 ? G[p][d-1] : (S.mgr[n]||{})[d];
+      const d = +dt.slice(8), p = S.staff.findIndex(s => s.name===n); const c = p>=0 ? G[p][d-1] : mgrCode(n, d-1);
       return !c ? '' : ['A','E','C','B'].includes(c) ? '출' : '휴'; };
     const dates = hols.map(x => x.date).concat(pv);
     const nameOf = dt => (hols.find(x => x.date===dt)||{}).name || '공휴';
@@ -244,7 +246,8 @@ $('grid').addEventListener('click', e => {
     return; }
   if (!td) return;
   if (td.classList.contains('m')) { const m = S.managers[+td.dataset.m], d = +td.dataset.d;
-    openPop(e.clientX, e.clientY, `<div class="t">${esc(m)} · ${d+1}일</div><div class="row">${['A','E','C','B','O','연','대'].map(c => `<button data-c="${c}">${c==='대'?'대휴':c}</button>`).join('')}<button data-c="">지우기</button></div>`);
+    if (mode === 'off') { const o = S.mgr[m] = S.mgr[m] || {}; if (o[d+1] === 'O') delete o[d+1]; else o[d+1] = 'O'; save(); render(); return; }   // 휴무신청 표시 상태: 누르면 휴무 ↔ A
+    openPop(e.clientX, e.clientY, `<div class="t">${esc(m)} · ${d+1}일</div><div class="row">${['A','E','C','B','O','연','대'].map(c => `<button data-c="${c}">${c==='대'?'대휴':c}</button>`).join('')}<button data-c="">지우기(A)</button></div>`);
     pop.onclick = ev => { const b = ev.target.closest('[data-c]'); if (!b) return; const o = S.mgr[m] = S.mgr[m] || {};
       if (b.dataset.c) o[d+1] = b.dataset.c; else delete o[d+1]; closePop(); save(); render(); };
     return; }
@@ -335,7 +338,7 @@ $('next').onclick = async () => {
   S.hist.ec[key] = {}; S.staff.forEach((s,p) => { if (s.kind!=='ot') S.hist.ec[key][s.name] = [Gc[p].filter(c=>c==='E').length, Gc[p].filter(c=>c==='C').length]; });
   S.holidays.slice().sort((a,b)=>a-b).forEach(d => { const dt = `${key}-${String(d).padStart(2,'0')}`; const att = {};
     S.staff.forEach((s,p) => att[s.name] = ['A','E','C','B'].includes(Gc[p][d-1]) ? '출' : '휴');
-    S.managers.forEach(m => { const c = (S.mgr[m]||{})[d]; if (c) att[m] = ['A','E','C','B'].includes(c) ? '출' : '휴'; });
+    S.managers.forEach(m => { const c = mgrCode(m, d-1); att[m] = ['A','E','C','B','D'].includes(c) ? '출' : '휴'; });
     S.hist.hol = S.hist.hol.filter(x => x.date!==dt).concat([{date:dt, name:'공휴일', att}]).sort((a,b)=>a.date<b.date?-1:1); });
   S.state = '확정'; latestKey = ymKey(S.year, S.month); confPending = latestKey; await saveNow();
   const ny = S.month === 12 ? S.year + 1 : S.year, nm = S.month === 12 ? 1 : S.month + 1;
@@ -381,8 +384,8 @@ $('xls').onclick = () => {
   if (typeof XLSX === 'undefined') { toast('엑셀 모듈을 불러오지 못했습니다'); return; }
   const N = nd(), G = S.staff.map((s,p) => Array.from({length:N}, (_,d) => cellCode(p,d)));
   if (!G.every(r => r.every(c => c))) { toast('먼저 편성을 완성해 주세요'); return; }
-  const FILL = {A:['DCE9FB','1B4F91'],E:['FDEAD2','B4650B'],C:['E7E1F6','5B3E96'],B:['FBE1E8','B23A5C'],O:['FFFFFF','A6A6A6'],'연':['ECECEC','555555']};
-  const thin = {style:'thin',color:{rgb:'C5CEDB'}}, red = {style:'medium',color:{rgb:'FF0000'}};
+  const FILL = {A:['DCE9FB','1B4F91'],E:['FDEAD2','B4650B'],C:['E7E1F6','5B3E96'],B:['FBE1E8','B23A5C'],O:['A6A6A6','A6A6A6'],'연':['ECECEC','555555']};
+  const thin = {style:'thin',color:{rgb:'C5CEDB'}}, red = {style:'thick',color:{rgb:'E02020'}};
   const B = (b) => ({top:b,bottom:b,left:b,right:b});
   const ctr = {horizontal:'center',vertical:'center',wrapText:true};
   const font = (o) => Object.assign({name:'맑은 고딕',sz:10}, o||{});
@@ -399,7 +402,7 @@ $('xls').onclick = () => {
     return cell(hol ? '공휴' : ex ? '+1' : WD[w], {fill:{fgColor:{rgb: w===6 ? 'EAF1FA' : w===0 || hol ? 'FCEEEE' : 'F3F5F8'}},font:font({bold:true,color:{rgb: w===6 ? '1F4E79' : (w===0||hol) ? '8B2E3F' : '333333'}}),alignment:ctr,border:B(thin)}); }), ...tail.map(() => cell('',head))]);
   const FILLX = Object.assign({}, FILL, {'대':['ECECEC','555555']});
   S.managers.forEach(m => {
-    const r = Array.from({length:N}, (_,d) => (S.mgr[m]||{})[d+1] || ''), cnt = k => r.filter(c => c===k).length;
+    const r = Array.from({length:N}, (_,d) => mgrCode(m, d)), cnt = k => r.filter(c => c===k).length;
     const base = {font:font({bold:true}),alignment:ctr,border:B(thin),fill:{fgColor:{rgb:'F3F5F8'}}};
     rows.push([cell(m, base), cell('관리자', {font:font({color:{rgb:'888888'}}),alignment:ctr,border:B(thin)}),
       ...r.map(c => { const [bg, fg] = FILLX[c] || ['FFFFFF','000000']; return cell(c==='대'?'대휴':c, {fill:{fgColor:{rgb:bg}},font:font({bold:c!=='O',sz:c==='대'?8:10,color:{rgb:fg}}),alignment:ctr,border:B(thin)}); }),
@@ -411,7 +414,7 @@ $('xls').onclick = () => {
     const base = {font:font({bold:true}),alignment:ctr,border:B(thin)};
     rows.push([cell(s.name, base), cell(carryLbl(s.carry), {font:font({color:{rgb:'666666'}}),alignment:ctr,border:B(thin)}),
       ...r.map((c,d) => { const f = (S.forced[s.name]||[]).includes(d+1); const [bg, fg] = FILL[c] || ['FFFFFF','000000'];
-        return cell(c, {fill:{fgColor:{rgb:bg}},font:font({bold:c!=='O',color:{rgb: f && c==='O' ? 'FF0000' : fg}}),alignment:ctr,border:B(f ? red : thin)}); }),
+        return cell(c, {fill:{fgColor:{rgb:bg}},font:font({bold:true,color:{rgb: fg}}),alignment:ctr,border:B(f ? red : thin)}); }),
       ...[cnt('A')+cnt('B'), cnt('E'), cnt('C'), cnt('O'), work, wkEnd - cnt('O'), S.holidays.length ? `${holW}/${S.holidays.length}` : '-', carryLbl(nc)].map(v => cell(v, base))]);
   });
   rows.push([]);
@@ -421,7 +424,7 @@ $('xls').onclick = () => {
       return cell(n, {alignment:ctr,border:B(thin),font:font()}); })]);
   });
   rows.push([]);
-  [['A','09:00 ~ 18:00'],['E','11:30 ~ 22:00'],['C','22:00 ~ 09:00 (휴게 2시간)'],['B','09:00 ~ 22:00'],['연','연차'],['빨간 테두리','휴무신청']].forEach(([a,b]) => rows.push([cell(a,{font:font({bold:true})}), cell(b,{font:font()})]));
+  [['A','09:00 ~ 18:00'],['E','11:30 ~ 22:00'],['C','22:00 ~ 09:00 (휴게 2시간)'],['B','09:00 ~ 22:00'],['O','휴무 (회색)'],['연','연차'],['빨간 테두리','신청 휴무']].forEach(([a,b]) => rows.push([cell(a,{font:font({bold:true})}), cell(b,{font:font()})]));
   const ws = XLSX.utils.aoa_to_sheet(rows.map(r => r.map(c => c && c.v !== undefined ? c.v : (c && c.v === undefined ? '' : null))));
   rows.forEach((r,ri) => r.forEach((c,ci) => { if (!c) return; const a = XLSX.utils.encode_cell({r:ri,c:ci}); if (!ws[a]) ws[a] = {t:'s',v:''}; ws[a].s = c.s; }));
   ws['!merges'] = merges;
@@ -436,7 +439,7 @@ $('setBox').addEventListener('toggle', renderSet);
 $('prt').onclick = () => {
   const N = nd(), G = S.staff.map((s,p) => Array.from({length:N}, (_,d) => cellCode(p,d)));
   if (!G.every(r => r.every(c => c))) { toast('먼저 편성을 완성해 주세요'); return; }
-  printSchedule({ year:S.year, month:S.month, staff:S.staff, managers:S.managers, mgr:S.mgr, forced:S.forced, notes:S.notes, holidays:S.holidays, extra:S.extra, state:S.state, leaveMode:S.leaveMode,
+  printSchedule({ year:S.year, month:S.month, staff:S.staff, managers:S.managers, mgr:S.mgr, mgrDefault:'A', autoOff:S.autoOff, forced:S.forced, notes:S.notes, holidays:S.holidays, extra:S.extra, state:S.state, leaveMode:S.leaveMode,
     codeOf:(n,d) => G[S.staff.findIndex(s => s.name===n)][d] });
 };
 // ---------- 2026년 2~11월 지난 스케줄 넣기 (엑셀 '26년 근무스케줄'에서 옮긴 past2026.json) — 이미 있는 달은 건드리지 않음
