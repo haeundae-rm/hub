@@ -5,7 +5,7 @@
 //       hksched/{YYYY-MM} = 그 달 휴무신청 · 직접 고정 · 관리자 칸 · 편성 결과 · 상태(작성중/확정)
 // 쓰는 사람: 소장·부소장만 (허브 첫 화면 '근무 스케줄 편성' 칸). 하우스키퍼·파트장 계정이 열면 보기 화면(view.html)으로 보냄 (11/22 기능 분리)
 import * as DB from '../../rm/app/store.js';
-import { printSchedule } from './print.js?v=2026.11.22-7';
+import { printSchedule } from './print.js?v=2026.11.22-8';
 const $ = id => document.getElementById(id);
 const HOL = {2026:{1:[1],2:[16,17,18],3:[1],5:[1,5,24],6:[3,6],7:[17],8:[15],9:[24,25,26],10:[3,9],12:[25]},
              2027:{1:[1],2:[6,7,8],3:[1],5:[1,5,13],6:[6],7:[17],8:[15],9:[14,15,16],10:[3,9],12:[25]}};
@@ -381,7 +381,7 @@ $('xls').onclick = () => {
   if (typeof XLSX === 'undefined') { toast('엑셀 모듈을 불러오지 못했습니다'); return; }
   const N = nd(), G = S.staff.map((s,p) => Array.from({length:N}, (_,d) => cellCode(p,d)));
   if (!G.every(r => r.every(c => c))) { toast('먼저 편성을 완성해 주세요'); return; }
-  const FILL = {A:['DCE9FB','1B4F91'],E:['FDEAD2','B4650B'],C:['E7E1F6','5B3E96'],B:['FBE1E8','B23A5C'],O:['A6A6A6','FFFFFF'],'연':['ECECEC','555555']};
+  const FILL = {A:['DCE9FB','1B4F91'],E:['FDEAD2','B4650B'],C:['E7E1F6','5B3E96'],B:['FBE1E8','B23A5C'],O:['A6A6A6','A6A6A6'],'연':['ECECEC','555555']};
   const thin = {style:'thin',color:{rgb:'C5CEDB'}}, red = {style:'thick',color:{rgb:'E02020'}};
   const B = (b) => ({top:b,bottom:b,left:b,right:b});
   const ctr = {horizontal:'center',vertical:'center',wrapText:true};

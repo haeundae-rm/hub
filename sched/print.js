@@ -36,10 +36,10 @@ const CSS = `
 #schPrint tbody td.sm.z{color:#B0B7C3;font-weight:500}
 #schPrint tr.grp td{height:4.2mm;font-size:6.8pt;font-weight:800;color:#5A6472;background:#EEF1F5;text-align:left;padding-left:1.6mm;border-left:0;border-right:0}
 #schPrint td.A{background:#DCE9FB;color:#1B4F91}#schPrint td.E{background:#FDEAD2;color:#B4650B}#schPrint td.C{background:#E7E1F6;color:#5B3E96}
-#schPrint td.B{background:#FBE1E8;color:#B23A5C}#schPrint td.D{background:#DDF0EA;color:#1F7A5C}#schPrint td.O{background:#A6A6A6;color:#fff;font-weight:800}
+#schPrint td.B{background:#FBE1E8;color:#B23A5C}#schPrint td.D{background:#DDF0EA;color:#1F7A5C}#schPrint td.O{background:#A6A6A6;color:#A6A6A6;font-weight:800}
 #schPrint td.L{background:#ECECEC;color:#444;font-size:7pt}
 #schPrint td.sat0{background-image:linear-gradient(#0000,#0000)}
-#schPrint td.f{outline:1.8pt solid #E02020;outline-offset:-1.8pt}#schPrint td.f.O{color:#fff;font-weight:900}
+#schPrint td.f{outline:1.8pt solid #E02020;outline-offset:-1.8pt}#schPrint td.f.O{color:#A6A6A6;font-weight:900}
 #schPrint td .n{display:block;font-size:5pt;font-weight:700;line-height:1;margin-top:.2mm;color:#333;white-space:normal}
 #schPrint tfoot td{height:5mm;font-size:7.2pt;font-weight:700;color:#333;background:#F7F8FA}
 #schPrint tfoot td.k{text-align:left;padding-left:1.6mm;font-weight:900}
@@ -108,8 +108,8 @@ function html(o) {
   h += '<div class="ft"><div class="lg">' +
     '<span><i style="background:#DCE9FB;color:#1B4F91">A</i>주간 09:00~18:00</span><span><i style="background:#FDEAD2;color:#B4650B">E</i>11:30~22:00</span>' +
     '<span><i style="background:#E7E1F6;color:#5B3E96">C</i>야간 22:00~09:00 (휴게 2시간)</span><span><i style="background:#FBE1E8;color:#B23A5C">B</i>09:00~22:00</span>' +
-    '<span><i style="background:#DDF0EA;color:#1F7A5C">D</i>14:00~22:00</span><span><i style="background:#A6A6A6;color:#fff">O</i>휴무</span><span><i style="background:#ECECEC;color:#444">연</i>연차</span>' +
-    '<span><i style="background:#A6A6A6;color:#fff;outline:1.4pt solid #E02020;outline-offset:-1.4pt">O</i>신청 휴무</span>' +
+    '<span><i style="background:#DDF0EA;color:#1F7A5C">D</i>14:00~22:00</span><span><i style="background:#A6A6A6;color:#A6A6A6">O</i>휴무</span><span><i style="background:#ECECEC;color:#444">연</i>연차</span>' +
+    '<span><i style="background:#A6A6A6;color:#A6A6A6;outline:1.4pt solid #E02020;outline-offset:-1.4pt">O</i>신청 휴무</span>' +
     (hol.length ? '<br><b>국공휴일</b> ' + hol.slice().sort((a, b) => a - b).map(d => o.month + '/' + d + '(' + WD[dow(d)] + ')').join(', ') : '') +
     (ext.length ? ' · <b>인원 추가일</b> ' + ext.slice().sort((a, b) => a - b).map(d => o.month + '/' + d).join(', ') : '') +
     '</div>' + (memo.length ? '<div class="memo"><b>메모</b> ' + esc(memo.join(' · ')) + '</div>' : '') + '</div>' +
