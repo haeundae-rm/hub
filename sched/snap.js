@@ -4,13 +4,14 @@
 // 쓰는 곳: sched/sched.js (편성 화면 누적 현황) · sched/view.js (보기 화면 누적 현황)
 const H2C = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
 let loading = null;
-const load = () => loading || (loading = new Promise((res, rej) => {
+export const load = () => loading || (loading = new Promise((res, rej) => {
   if (window.html2canvas) return res(window.html2canvas);
   const s = document.createElement('script'); s.src = H2C; s.onload = () => res(window.html2canvas); s.onerror = () => { loading = null; rej(new Error('이미지 도구를 불러오지 못했어요 (인터넷 연결 확인)')); };
   document.head.appendChild(s);
 }));
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const toast = t => { const el = document.createElement('div'); el.textContent = t; el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#10233F;color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;z-index:99;font-family:inherit'; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); };
+export const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+export const toast = t => { const el = document.createElement('div'); el.textContent = t; el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#10233F;color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;z-index:99;font-family:inherit'; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); };
 
 export async function snap(table, title, sub) {
   if (!table) return;
@@ -33,14 +34,18 @@ export async function snap(table, title, sub) {
   try {
     const canvas = await h2c(wrap, { scale: 2, backgroundColor: '#ffffff', logging: false });
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const name = title.replace(/[\\/:*?"<>|\s]+/g, '_') + '.png';
-    const file = new File([blob], name, { type: 'image/png' });
-    if (navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
-      try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
-    }
-    const url = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
-    toast('이미지를 내려받았어요 — 카톡에 끌어다 놓으면 돼요');
+    await deliver(blob, title.replace(/[\\/:*?"<>|\s]+/g, '_') + '.png', title);
   } catch (e) { toast('이미지를 만들지 못했어요: ' + (e.message || e)); }
   finally { wrap.remove(); }
+}
+
+// 만든 파일 건네기: 휴대폰은 공유창(카톡 · 파일에 저장 등) → 안 되면 내려받기
+export async function deliver(blob, name, title) {
+  const file = new File([blob], name, { type: blob.type });
+  if (isMobile() && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 8000);
+  toast(isMobile() ? '내려받았어요 — 다운로드(파일) 앱에서 볼 수 있어요' : '내려받았어요');
 }

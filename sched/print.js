@@ -3,6 +3,7 @@
 // 보고서처럼 보이게: 머리(제목 · 요약 · 확정 표시) → 표(주 단위 구분선, 둥근 칸) → 범례 · 메모 → 바닥글
 // 인쇄 창에서 'PDF로 저장' → 글자가 깨지지 않는 벡터 PDF
 // 쓰는 곳: sched/sched.js · sched/view.js — printSchedule({ year, month, staff, managers, codeOf, mgr, mgrDefault, forced, notes, holidays, extra, state, leaveMode, autoOff })
+import { load as loadH2C, deliver, toast } from './snap.js?v=2026.11.22-15';
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
 const WORK = ['A', 'E', 'C', 'B', 'D'];
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -84,6 +85,46 @@ export function printSchedule(o) {
   box.innerHTML = html(o);
   const t = document.title; document.title = o.year + '년 ' + o.month + '월 하우스맨 근무스케줄';
   setTimeout(() => { window.print(); setTimeout(() => { document.title = t; }, 500); }, 80);
+}
+
+// 📱 휴대폰용 (11/22): 인쇄 창 대신 같은 A4 가로 양식을 그림으로 찍어 PDF 또는 PNG 로 바로 내려받기 · 공유
+const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+let jsp = null;
+const loadPdf = () => jsp || (jsp = new Promise((res, rej) => {
+  if (window.jspdf) return res(window.jspdf.jsPDF);
+  const s = document.createElement('script'); s.src = JSPDF; s.onload = () => res(window.jspdf.jsPDF); s.onerror = () => { jsp = null; rej(new Error('PDF 도구를 불러오지 못했어요 (인터넷 연결 확인)')); };
+  document.head.appendChild(s);
+}));
+export async function exportSchedule(o, kind) {
+  toast(kind === 'pdf' ? 'PDF 만드는 중…' : '이미지 만드는 중…');
+  let h2c, JsPDF;
+  try { h2c = await loadH2C(); if (kind === 'pdf') JsPDF = await loadPdf(); } catch (e) { toast(e.message); return; }
+  let st = document.getElementById('schPrintCss');
+  if (!st) { st = document.createElement('style'); st.id = 'schPrintCss'; document.head.appendChild(st); }
+  st.textContent = CSS;
+  const old = document.getElementById('schPrint'); if (old) old.remove();
+  const box = document.createElement('div'); box.id = 'schPrint';
+  box.style.cssText = 'display:block;position:fixed;left:-20000px;top:0;width:281mm;background:#fff;padding:5mm 6mm';
+  box.innerHTML = html(o); document.body.appendChild(box);
+  const fr = box.querySelector('.frame'), over = fr ? fr.scrollWidth - fr.clientWidth : 0;
+  if (over > 0) box.style.width = box.offsetWidth + over + 4 + 'px';   // 표가 틀보다 넓으면 잘리지 않게 넓혀서 찍음
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const cv = await h2c(box, { scale: 2.5, backgroundColor: '#ffffff', logging: false, windowWidth: 1200 });
+    const title = o.year + '년 ' + o.month + '월 하우스맨 근무스케줄';
+    let blob, name;
+    if (kind === 'pdf') {
+      const pdf = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const W = 297 - 4, H = 210 - 4, r = Math.min(W / cv.width, H / cv.height), w = cv.width * r, h = cv.height * r;   // 여백은 그림 안에 들어 있음
+      pdf.addImage(cv.toDataURL('image/jpeg', 0.95), 'JPEG', (297 - w) / 2, (210 - h) / 2, w, h);
+      pdf.setProperties({ title });
+      blob = pdf.output('blob'); name = title.replace(/\s+/g, '_') + '.pdf';
+    } else {
+      blob = await new Promise(r => cv.toBlob(r, 'image/png')); name = title.replace(/\s+/g, '_') + '.png';
+    }
+    await deliver(blob, name, title);
+  } catch (e) { toast('만들지 못했어요: ' + (e.message || e)); }
+  finally { box.remove(); }
 }
 
 function html(o) {
