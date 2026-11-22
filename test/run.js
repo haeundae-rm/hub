@@ -414,11 +414,13 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('⑨ 하우스키퍼 공용 계정 (허브)');
   p = await open(b, phone, 'busy', '', 2);
   const ht = await p.locator('.hm-tile').allInnerTexts();
-  ok(ht.length === 8 && !ht.some(t => /인사|연차 · 근무|결산/.test(t)), '하우스키퍼: 인사 · 연차 · 결산 버튼 없음 (' + ht.length + '개)');
+  ok(ht.length === 8 && !ht.some(t => /인사|연차 · 근무|결산|스케줄 편성/.test(t)), '하우스키퍼: 인사 · 연차 · 결산 버튼 없음 (' + ht.length + '개)');
   ok(/하우스키퍼/.test(await p.innerText('#today')), '머리 줄에 하우스키퍼');
   const htodo = await p.innerText('main');
   ok(!/승인 대기|퇴사일/.test(htodo), '할 일에 연차 · 퇴사 줄 없음');
   ok(await p.evaluate(() => window.__counts) === 0, '연차 신청서 개수도 안 읽음 (규칙상 못 읽음)');
+  await p.goto(BASE + 'hub/#hk'); await sleep(900);
+  ok(await p.locator('a.go[href="./sched/view.html"]').count() === 1 && await p.locator('a.go[href="./sched/"]').count() === 0, '하우스키퍼 칸: 근무 스케줄 보기만 (편성 칸 없음)');
   await p.goto(BASE + 'hub/#people'); await sleep(900);
   ok(await p.locator('.hm-tile').count() === 8 && !/입퇴사 진행|비밀번호가 필요/.test(await p.innerText('main')), '주소로 #people → 첫 화면');
   await p.click('[data-go="apps"]'); await sleep(250);

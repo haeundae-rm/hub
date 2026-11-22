@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>근무 스케줄</title>
+<meta name="theme-color" content="#10233F">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+/* 🗓️ 근무 스케줄 보기 (2026-11-22) — 하우스키퍼 · 파트장 열람 전용. 색은 편성 화면 · 옛 엑셀과 같음 */
+:root{--bg:#F4F6F9;--surface:#fff;--ink:#111827;--muted:#4B5563;--line:#E5E8EE;--tile:#F2F5FA;--navy:#10233F;--brand:#1D3A6E;--gold:#C8A96A;--warn:#B23A48;--red:#d23b3b;
+  --A:#DCE9FB;--Af:#1B4F91;--C:#E7E1F6;--Cf:#5B3E96;--E:#FDEAD2;--Ef:#B4650B;--B:#FBE1E8;--Bf:#B23A5C;--L:#ECECEC;--Lf:#555;--Of:#A6A6A6;
+  --f:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color-scheme:light}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f);-webkit-text-size-adjust:100%}
+button,input{font:inherit;color:inherit}
+.top{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:3px solid var(--gold)}
+.top a.back{color:#fff;text-decoration:none;font-size:26px;line-height:1;padding:0 6px}
+.top h1{margin:0;font-size:17px;font-weight:900;flex:1}.top h1 small{display:block;font-size:12px;font-weight:500;opacity:.75}
+main{max-width:1200px;margin:0 auto;padding:12px 12px 60px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
+.card h2{margin:0 0 10px;font-size:16px;font-weight:900}
+.note{color:var(--muted);font-size:13px;margin:8px 0 0}.err{color:var(--warn);font-weight:700;font-size:14px}
+.mbar{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.mbar button{min-width:44px;min-height:44px;border-radius:12px;border:1.5px solid var(--line);background:#fff;font-size:20px;font-weight:900;cursor:pointer}
+.mbar .d{flex:1;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px}.mbar .d b{font-size:19px}
+.stc{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:800;background:var(--tile);color:var(--muted)}.stc.ok{background:var(--brand);color:#fff}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1;min-width:80px;min-height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--tile);font-weight:800;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+.mine{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px;font-size:13px;color:var(--muted)}
+.mine button{min-height:36px;padding:0 10px;border-radius:99px;border:1.5px solid var(--line);background:#fff;font-weight:700;font-size:13px;cursor:pointer}
+.mine button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.board{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table.g{border-collapse:separate;border-spacing:0;font-size:13px;width:max-content;min-width:100%}
+.g th,.g td{text-align:center;padding:0;height:34px;border-bottom:1px solid var(--line);min-width:32px}
+.g thead th{position:sticky;top:0;background:#fff;color:var(--muted);font-weight:500;font-size:12px;height:40px;line-height:1.15;z-index:1}
+.g .nm{position:sticky;left:0;background:#fff;z-index:2;text-align:left;padding:0 8px;min-width:78px;font-weight:800;font-size:14px;border-right:1px solid var(--line)}
+.g .nm small{display:block;font-weight:400;color:var(--muted);font-size:11px;line-height:1.1}
+.g .sat{color:#2f62c8}.g .sun{color:var(--red)}.g th.today{background:#FFF6D6;color:var(--ink);font-weight:900}
+td.c{font-weight:800}td.c.A{background:var(--A);color:var(--Af)}td.c.C{background:var(--C);color:var(--Cf)}td.c.E{background:var(--E);color:var(--Ef)}
+td.c.B{background:var(--B);color:var(--Bf)}td.c.L{background:var(--L);color:var(--Lf);font-size:11px}td.c.O{color:var(--Of);font-weight:500}
+td.c.f{box-shadow:inset 0 0 0 2px var(--red)}td.c.f.O{color:var(--red)}td.c.today{outline:2px solid #E0B43C;outline-offset:-2px}
+td.s{padding:0 8px;color:var(--muted);font-variant-numeric:tabular-nums}td.s b{color:var(--ink)}
+tr.sep td{height:22px;font-size:11.5px;color:var(--muted);text-align:left;padding-left:8px;background:var(--tile);font-weight:800}
+tr.mg .nm{background:var(--tile)}
+tr.me td{border-bottom:2px solid var(--ink);border-top:2px solid var(--ink)}tr.me .nm{background:#FFF6D6}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12.5px;color:var(--muted);margin:10px 2px 0}
+.legend i{display:inline-block;width:22px;height:18px;border-radius:4px;vertical-align:-4px;margin-right:4px;text-align:center;font-style:normal;font-weight:800;font-size:12px;line-height:18px}
+.legend i.A{background:var(--A);color:var(--Af)}.legend i.E{background:var(--E);color:var(--Ef)}.legend i.C{background:var(--C);color:var(--Cf)}.legend i.B{background:var(--B);color:var(--Bf)}
+.legend i.O{color:var(--Of)}.legend i.L{background:var(--L);color:var(--Lf)}.legend i.f{box-shadow:inset 0 0 0 2px var(--red);color:var(--red)}
+.offl{list-style:none;margin:0;padding:0}.offl li{display:grid;grid-template-columns:76px 1fr;gap:8px;padding:9px 2px;border-bottom:1px solid var(--line);align-items:center}
+.offl span{display:flex;flex-wrap:wrap;gap:6px}.offl i{font-style:normal;font-weight:800;font-size:13px;padding:3px 9px;border-radius:99px;box-shadow:inset 0 0 0 1.5px var(--red);color:var(--red)}
+.offl i.lv{box-shadow:none;background:var(--L);color:var(--Lf)}.offl em{font-style:normal;color:var(--muted);font-size:13px}
+table.ht{border-collapse:collapse;font-size:13px;width:max-content;min-width:100%}
+.ht th,.ht td{padding:5px 7px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ht th{color:var(--muted);font-weight:500;font-size:12px}.ht .nm{text-align:left;font-weight:800;position:sticky;left:0;background:#fff}
+.ht .nm small{font-weight:400;color:var(--muted)}.ht td.E{color:var(--Ef);font-weight:800}.ht td.C{color:var(--Cf);font-weight:800}
+.ht td.on{background:var(--A);color:var(--Af);font-weight:800}.ht td.off{color:var(--Of)}.ht tr.top2 td{border-top:2px solid var(--line)}
+input.t{display:block;width:100%;min-height:46px;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;margin:10px 0;font-size:16px}
+.big{display:block;width:100%;min-height:52px;border-radius:14px;border:0;background:var(--brand);color:#fff;font-weight:900;font-size:16px;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none}.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header class="top"><a class="back" href="../#hk" aria-label="허브로">‹</a><h1>🗓️ 근무 스케줄<small id="who"></small></h1></header>
+<main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
+<div class="toast" id="toast"></div>
+<script type="module" src="./view.js?v=2026.11.22-3"></script>
+</body>
+</html>
