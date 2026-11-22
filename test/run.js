@@ -25,6 +25,12 @@ function seed(kind) {
   ['1101', '1102', '1103', '1104', '1105', '1001'].forEach((r, i) => { s['sup/' + DAY + '/rows/k' + i] = { tab: '체크', row: [null, DAY, "'" + r, r < '1100' ? '메이드1' : '메이드2', '정비보조B', '완료', ''], at: now - 3 * 3600e3 + i }; });
   // 2026-11-21 🔔 메이드 더티 요청: 메이드1 = 3시간 10분 전 요청(1001 체크로 약 10분 만에 옴) + 20분 전 다시(아직 기다림)
   s['sup/' + DAY + '/req/메이드1'] = { maid: '메이드1', names: ['메이드1'], ws: ['정비보조A'], rooms: ['1006'], at: now - 20 * 60000, n: 2, hist: [now - 3 * 3600e3 - 10 * 60000], why: 'left', left: 3, R: 5, dc: 1 };
+  // 2026-11-22 🎂 이번 주 생일: 오늘 · 3일 뒤 · 퇴사자(안 나옴) · 하우스키핑(안 나옴)
+  const dPlus = k => fmt(now + k * 864e5);
+  s['leave_people/bd1'] = { name: '생일이', birth: '1970-' + DAY.slice(5), quit: '' };
+  s['leave_people/bd2'] = { name: '사흘뒤', birth: '1981-' + dPlus(3).slice(5), quit: '' };
+  s['leave_people/bd3'] = { name: '퇴사생일', birth: '1975-' + DAY.slice(5), quit: '2020-01-01' };
+  s['leave_people/bd4'] = { name: '키퍼생일', birth: '1976-' + DAY.slice(5), grp: 'hk' };
   s['sup/' + DAY + '/rows/x1'] = { tab: '근태', row: ['', '', '정비보조A', '출근'], at: now - 5 * 3600e3 };
   // 2026-11-21 📄 정비보고서 연결 상태
   if (kind === 'rsstop') s['meta/rsync'] = { on: true, day: DAY, at: now - 60000, state: 'stop', msg: '양식 검사에서 다른 점: 카드와 다른 메이드', file: '정비보고서.xlsx', fileAt: now - 120000, pend: 0, diff: 0, mode: 'confirm' };
@@ -91,9 +97,13 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(/승인 2/.test(await p.locator('.hm-tile[href="./leave/"]').innerText()), '연차 버튼에 승인 2 표시');
   const r0 = await p.evaluate(() => window.__reads);
   ok(!(await p.evaluate(() => /더티/.test(document.querySelector('main').innerText.replace(/더티 배분 · 활동판|더티 배분이|더티 배분 만들기|더티 지원 필요[^\n]*/g, '')))), '첫 화면에서 더티 칸 안 그림');
+  const bdt = await p.locator('.hm-bday').innerText().catch(() => '');
+  ok(/이번 주 생일/.test(bdt) && /생일이 오늘/.test(bdt) && /사흘뒤/.test(bdt), '🎂 이번 주 생일: 오늘 · 사흘 뒤 (' + bdt.replace(/\n/g, ' ') + ')');
+  ok(!/퇴사생일|키퍼생일|19(70|81)/.test(bdt), '퇴사자 · 하우스키핑 · 생년은 안 보임');
   const h = await p.evaluate(() => document.documentElement.scrollHeight);
   // 11/21: 시험 자료에 '더티 지원 필요' 한 줄을 더해 1500 → 1600
-  ok(h < 1600, '첫 화면 길이 ' + h + 'px (예전보다 짧음)');
+  // 11/22: 🎂 이번 주 생일 한 줄(생일 있는 주에만)을 더해 1600 → 1750
+  ok(h < 1750, '첫 화면 길이 ' + h + 'px (예전보다 짧음)');
   await shot(p, '1_첫화면_할일.png');
   console.log('② 오늘 정비 → 탭');
   await p.click('[data-go="work"]'); await sleep(300);
