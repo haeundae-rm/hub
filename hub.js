@@ -675,7 +675,7 @@ function hkSecHtml() {
   const n = view.st ? nightWait(view.st).length : 0;
   return '<div class="card"><h2>무엇을 열까요?</h2><div class="go-grid">' +
     '<a class="go" href="./night/"><span class="ic">🌙</span><b>야간 업무 보고서' + (n ? ' <i class="hm-bd wait" style="position:static;margin-left:4px">확인 ' + n + '</i>' : '') + '</b><span>야간 근무 보고 · 확인 · 인쇄</span></a>' +
-    (admin && !isHk() ? '<a class="go" href="./sched/"><span class="ic">✏️</span><b>근무 스케줄 편성</b><span>자동 편성 · 수정 · 확정 · 엑셀 · 인쇄 (소장 · 부소장만 보임)</span></a>' : '') +
+    (admin && !isHk() ? '<a class="go" href="./sched/"><span class="ic">✏️</span><b>근무 스케줄 편성</b><span>편성 · 수정 · 확정 · 엑셀 · 인쇄 (소장 · 부소장만 보임)</span></a>' : '') +
     '<a class="go" href="./sched/view.html"><span class="ic">🗓️</span><b>근무 스케줄</b><span>확정된 스케줄표 · 휴무신청 · 누적 현황 (보기)</span></a>' +
     '<button class="go" data-hkleave="1"><span class="ic">📅</span><b>연차 현황</b><span>이름 고르고 본인 비밀번호 4자리 → 내 연차</span></button></div></div>';
 }

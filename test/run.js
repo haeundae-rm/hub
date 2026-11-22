@@ -423,6 +423,9 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(await p.locator('a.go[href="./sched/view.html"]').count() === 1 && await p.locator('a.go[href="./sched/"]').count() === 0, '하우스키퍼 칸: 근무 스케줄 보기만 (편성 칸 없음)');
   await p.goto(BASE + 'hub/#people'); await sleep(900);
   ok(await p.locator('.hm-tile').count() === 8 && !/입퇴사 진행|비밀번호가 필요/.test(await p.innerText('main')), '주소로 #people → 첫 화면');
+  await p.goto(BASE + 'hub/sched/#2026-12'); await sleep(1500);
+  ok(/\/sched\/view\.html#2026-12$/.test(p.url()) && !(await p.locator('#gen').count()), '하우스키퍼가 편성 주소로 들어오면 보기 화면으로 넘어감 (자동 편성 버튼 없음)');
+  await p.goto(BASE + 'hub/'); await sleep(900);
   await p.click('[data-go="apps"]'); await sleep(250);
   ok(!/입퇴사 서류/.test(await p.innerText('main')) && /정비 레포트/.test(await p.innerText('main')), '현장 앱: 입퇴사 서류 없음');
   await p.click('[data-home]'); await sleep(200);
