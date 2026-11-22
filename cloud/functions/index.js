@@ -3,9 +3,11 @@
 // 서울(asia-northeast3) = Firestore 와 같은 곳. 동시에 2개까지만 떠서 요금이 튀지 않게
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 const { plan, dead } = require('./dreq');
+const B = require('./bday');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'asia-northeast3', maxInstances: 2, memory: '256MiB', timeoutSeconds: 30 });
@@ -44,4 +46,18 @@ exports.dreqPush = onDocumentWritten({ document: 'sup/{date}/req/{maid}', retry:
     to: p.names, sent, fail, gone: gone.length, none: p.targets.length === 0
   }).catch(e => logger.error('meta/push_fn 저장 실패', e));
   logger.info('더티 요청 푸시', { maid: after.maid, to: p.names, sent, fail, gone: gone.length });
+});
+
+// 🎂 생일 축하 (2026-11-22) — 매일 아침 6시(서울) 오늘 생일인 룸메이드에게 본인만 보이는 '꼭 확인' 공지를 올림
+//   레포트 앱이 공지를 열면 폭죽. 이름은 연차 명단(leave_people) 기준, 퇴사자 · 하우스키핑 제외, 생년(나이)은 안 씀
+exports.bdayNotice = onSchedule({ schedule: '0 6 * * *', timeZone: 'Asia/Seoul', retryCount: 1 }, async () => {
+  const day = B.seoulDay(Date.now());
+  const snap = await db().collection('leave_people').get();
+  const names = B.todays(snap.docs.map(d => ({ id: d.id, data: d.data() })), day);
+  for (const n of names) {
+    const x = B.notice(n, day);
+    await db().doc('notices/' + x.id).set(Object.assign(x.doc, { at: admin.firestore.FieldValue.serverTimestamp() }));
+  }
+  await db().doc('meta/bday_fn').set({ at: admin.firestore.FieldValue.serverTimestamp(), day, n: names.length }).catch(() => {});
+  logger.info('생일 공지', { day, n: names.length });
 });

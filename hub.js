@@ -20,17 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.21-12';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.21-12';
-import * as PIN from './pin.js?v=2026.11.21-12';
-import { setupClose } from './close.js?v=2026.11.21-12';
-import { setupClosing } from './closing.js?v=2026.11.21-12';
-import { supProgress } from './supcalc.js?v=2026.11.21-12';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.21-12';
-import { setupMeal } from './meal.js?v=2026.11.21-12';
+import * as K from '../rm/app/keys.js?v=2026.11.22-1';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.22-1';
+import * as PIN from './pin.js?v=2026.11.22-1';
+import { setupClose } from './close.js?v=2026.11.22-1';
+import { setupClosing } from './closing.js?v=2026.11.22-1';
+import { supProgress } from './supcalc.js?v=2026.11.22-1';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.22-1';
+import { setupMeal } from './meal.js?v=2026.11.22-1';
+import * as BD from './bday.js?v=2026.11.22-1';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.21-12';
+const VER = '2026.11.22-1';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -140,7 +141,8 @@ async function load(force) {
       ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, C), mr: K.maidRooms ? K.maidRooms(P, C) : null, recs: Array.isArray(recs) ? recs : null, mate: (tmz && !tmz.__err && tmz.mate) || {} });
     }
   }
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs };
+  const bd = isHk() ? null : await BD.load(S, d);   // 🎂 하루 한 번만 연차 명단을 읽음 (소장 · 부소장)
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -818,6 +820,7 @@ function homeHtml() {
         }).join('') + '</ul></div>';
     } else h += '<div class="card hm-ok"><b>✅ 모두 정상</b><span>' + hm(view.at) + ' 기준</span><button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></div>';
   }
+  if (v && v.bd) h += BD.html(v.bd, esc);
   h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.go === 'close' || t.href === './leave/'))).map(t => {
     const inner = badgeOf(t, v) + '<span class="hm-ic">' + t.ic + '</span><span class="hm-tx"><b>' + esc(t.t) + '</b><small>' + esc(t.s) + '</small></span>';
     return t.href ? '<a class="hm-tile' + (t.wide ? ' wide' : '') + '" href="' + t.href + '">' + inner + '</a>'

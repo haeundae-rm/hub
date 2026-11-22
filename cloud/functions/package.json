@@ -7,5 +7,5 @@
     "firebase-admin": "^14.5.1",
     "firebase-functions": "^7.4.0"
   },
-  "scripts": { "test": "node test/dreq_test.js" }
+  "scripts": { "test": "node test/dreq_test.js && node test/bday_test.js" }
 }
