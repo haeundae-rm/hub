@@ -5,7 +5,7 @@ export const kind = 'fake';
 const D = window.__seed || {}; window.__reads = 0; window.__counts = 0;
 // 새로 열어도 남는 자료 (야간 보고서 시험): sessionStorage 'fx' = { path: data } — night/ 에 쓴 것도 여기 남김
 const FX = JSON.parse(sessionStorage.getItem('fx') || '{}'); Object.assign(D, FX);
-const keepFx = p => { if (!/^(night\/|days\/[^/]+\/(key|recs)|meta\/keys)/.test(p)) return; if (D[p]) FX[p] = D[p]; else delete FX[p]; sessionStorage.setItem('fx', JSON.stringify(FX)); };
+const keepFx = p => { if (!/^(night\/|hksched\/|days\/[^/]+\/(key|recs)|meta\/keys)/.test(p)) return; if (D[p]) FX[p] = D[p]; else delete FX[p]; sessionStorage.setItem('fx', JSON.stringify(FX)); };
 let user = JSON.parse(sessionStorage.getItem('fu') || 'null') || (window.__anonUid ? { uid: window.__anonUid, anon: true, email: '' } : null), cbs = [];
 // 실시간 흉내 (window.__live, 키 서명 시험): 쓰면 듣고 있던 화면에 다시 알려 줌
 const LS = [];

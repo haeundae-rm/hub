@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>하우스맨 근무 스케줄</title>
+<meta name="theme-color" content="#10233F">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+<style>
+/* 하우스맨 근무 스케줄 편성 (2026-11-22) — 프로토타입(claude.ai 아티팩트)에서 옮김. 앱의 다른 쪽처럼 밝은 화면만 씀
+   VOICE: 현장 관리자의 월간 근무표 — 차분하고 정확하게
+   IDEA: 사무실 벽에 붙는 엑셀 근무표를 그대로 살린 편성판
+   PICTURE: 근무 코드 색상 칸으로 채워진 31일 그리드가 첫 화면
+   COLOUR and TYPE: 딥네이비 배너 + 원본 엑셀의 A/E/C/B 코드 색, Noto Sans KR
+   LAYOUT: 상단 조작줄 → 편성판 → 규칙검사·형평성 → 설정 */
+:root{color-scheme:light;
+--bg:light-dark(#f6f7f9,#0e1420);--card:light-dark(#fff,#162033);--ink:light-dark(#152033,#e6ebf3);--mut:light-dark(#5d6b80,#9aa6b8);
+--line:light-dark(#dfe4ec,#273349);--navy:#10233F;--gold:#C8A96A;--red:#d23b3b;--amber:light-dark(#b9770e,#e2a646);
+--A:light-dark(#DCE9FB,#21395e);--Af:light-dark(#1B4F91,#a9c8f3);--C:light-dark(#E7E1F6,#3a2f5c);--Cf:light-dark(#5B3E96,#cdbdf5);
+--E:light-dark(#FDEAD2,#4d3416);--Ef:light-dark(#B4650B,#f3bf80);--B:light-dark(#FBE1E8,#4d2230);--Bf:light-dark(#B23A5C,#f2a5ba);
+--L:light-dark(#ececec,#2b3240);--Lf:light-dark(#555,#bbb);--Of:light-dark(#A6A6A6,#6d7787)}
+
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Noto Sans KR",system-ui,sans-serif;overflow-x:clip}
+.top{position:sticky;top:0;z-index:20;background:var(--navy);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:3px solid var(--gold)}
+.top a.back{color:#fff;text-decoration:none;font-size:26px;line-height:1;padding:0 6px}
+.top h1{margin:0;font-size:17px;font-weight:800;flex:1}.top h1 small{display:block;font-size:12px;font-weight:500;opacity:.75}
+.top .lo{background:transparent;color:#fff;border-color:rgba(255,255,255,.35);min-height:36px;padding:4px 12px}
+.ttlrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 12px}.ttlrow h2{margin:0;font-size:clamp(20px,2.6vw,26px);font-weight:800}
+.stc{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:800;background:#F2F5FA;color:var(--mut)}.stc.ok{background:#1D3A6E;color:#fff}
+body.ro .edit{display:none!important}body.ro td.c{cursor:default}body.ro .g thead th.day{cursor:default}
+.wrap{padding:16px max(4vw,16px) 40px;max-width:1500px;margin:0 auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.bar .sp{flex:1}
+select,input,button{font:inherit;color:inherit}
+select,input[type=number],input[type=text]{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:16px;min-height:40px}
+button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;min-height:40px;cursor:pointer;font-weight:500}
+button:hover{border-color:var(--mut)}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #3b6fd8;outline-offset:2px}
+button.pri{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+button.pri[disabled]{opacity:.6;cursor:wait}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--card)}.seg button.on{background:var(--ink);color:var(--bg)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13.5px;white-space:nowrap}
+.chip b{font-weight:700}.chip.bad{border-color:var(--red);color:var(--red)}.chip.ok{border-color:#2f8a5b;color:light-dark(#1f6b45,#7fd1a5)}
+.board{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto;position:relative}
+table.g{border-collapse:separate;border-spacing:0;font-size:13px;width:max-content;min-width:100%}
+.g th,.g td{text-align:center;padding:0;height:34px;border-bottom:1px solid var(--line)}
+.g thead th{position:sticky;top:0;background:var(--card);z-index:2;font-weight:500;color:var(--mut);font-size:12px;height:40px;line-height:1.15}
+.g thead th.day{width:34px;min-width:34px;cursor:pointer}
+.g th.nm,.g td.nm{position:sticky;left:0;background:var(--card);z-index:3;text-align:left;padding:0 10px;min-width:96px;font-weight:700;font-size:14px;border-right:1px solid var(--line)}
+.g td.nm small{display:block;font-weight:400;color:var(--mut);font-size:11.5px;line-height:1.1}
+.g .sat{color:#2f62c8}.g .sun,.g .hol{color:var(--red)}.g .hol{font-weight:800}
+.g thead th.ext{background:light-dark(#fff6dd,#3a3114)}
+td.c{width:34px;min-width:34px;cursor:pointer;font-weight:700;position:relative;border-left:1px solid light-dark(#f0f2f6,#1d283c)}
+td.c.A{background:var(--A);color:var(--Af)}td.c.C{background:var(--C);color:var(--Cf)}td.c.E{background:var(--E);color:var(--Ef)}
+td.c.B{background:var(--B);color:var(--Bf)}td.c.L{background:var(--L);color:var(--Lf);font-size:11px}td.c.O{color:var(--Of);font-weight:500}
+td.c.f{box-shadow:inset 0 0 0 2px var(--red)}td.c.f.O{color:var(--red)}
+td.c.lk::after{content:"";position:absolute;right:3px;top:3px;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+td.c.bad{outline:2px solid var(--amber);outline-offset:-3px}
+td.c.flash{animation:fl 1s 2}@keyframes fl{50%{background:#ffd54a}}
+td.s{padding:0 8px;font-variant-numeric:tabular-nums;color:var(--mut);min-width:40px}td.s.first{border-left:2px solid var(--line)}
+td.s b{color:var(--ink)}
+tr.mg td.nm{background:light-dark(#f3f5f8,#1a2538)}tr.mg td.nm small{color:var(--mut)}
+tr.sep td{height:22px;font-size:11.5px;color:var(--mut);text-align:left;padding-left:10px;background:light-dark(#f3f5f8,#1a2538);font-weight:700}
+td.c.D{background:var(--L);color:var(--Lf);font-size:11px}
+table.ht{border-collapse:collapse;font-size:13px;width:max-content;min-width:100%}
+.ht th,.ht td{padding:5px 7px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ht th{color:var(--mut);font-weight:500;font-size:12px;position:sticky;top:0;background:var(--card)}
+.ht td.nm,.ht th.nm{text-align:left;font-weight:700;position:sticky;left:0;background:var(--card);z-index:1}
+.ht .pv{opacity:.55;font-style:italic}.ht .grp{border-left:2px solid var(--line)}
+.ht td.E{color:var(--Ef);font-weight:700}.ht td.C{color:var(--Cf);font-weight:700}
+.ht td.on{background:var(--A);color:var(--Af);font-weight:700}.ht td.off{color:var(--Of)}
+.ht td.hi{background:light-dark(#fde8e8,#3d1d1d);color:var(--red);font-weight:800}.ht td.lo{background:light-dark(#e6f4ec,#173527);color:light-dark(#1f6b45,#7fd1a5);font-weight:800}
+tr.cnt td{height:26px;font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+tr.cnt td.nm{font-size:12px;font-weight:500}
+tr.cnt td.x{color:var(--red);font-weight:800;background:light-dark(#fde8e8,#3d1d1d)}
+.pop{position:fixed;z-index:50;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:8px;display:none;max-width:300px}
+.pop .t{font-size:13px;color:var(--mut);padding:2px 4px 6px}
+.pop .row{display:flex;flex-wrap:wrap;gap:6px}
+.pop button{min-width:44px;min-height:44px;padding:6px 10px;font-weight:700}
+.cols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;margin-top:16px}
+@media(max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h2{font-size:17px;margin:0 0 8px;font-weight:800}
+.iss{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto}
+.iss li{padding:6px 4px;border-bottom:1px dashed var(--line);cursor:pointer;font-size:14px}
+.iss li::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+.iss li.hard::before{background:var(--red)}.iss li.soft::before{background:var(--amber)}.iss li.info::before{background:var(--Of)}
+.iss li.info{color:var(--mut);font-size:13px}
+.bars .r{display:grid;grid-template-columns:64px minmax(0,1fr) 36px;gap:8px;align-items:center;font-size:13px;margin:3px 0}
+.bars .tr{background:light-dark(#eef1f5,#1f2a3d);border-radius:4px;height:14px;position:relative}
+.bars .fl{height:100%;border-radius:4px}
+.bars .tg{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.55}
+.bars h3{font-size:13px;margin:10px 0 4px;color:var(--mut);font-weight:500}
+details.set{margin-top:16px}details.set>summary{cursor:pointer;font-weight:800;font-size:17px;padding:6px 0}
+.scroll{overflow-x:auto}
+table.st{border-collapse:collapse;font-size:14px;width:100%;min-width:820px}
+.st th{font-weight:500;color:var(--mut);font-size:12.5px;text-align:left;padding:6px}
+.st td{padding:4px 6px;border-top:1px solid var(--line)}
+.st input,.st select{min-height:36px;padding:4px 6px;width:100%}
+.st input[type=number]{width:76px}.st input[type=checkbox]{width:20px;height:20px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--mut);margin:10px 2px 0}
+.legend span i{display:inline-block;width:22px;height:18px;border-radius:4px;vertical-align:-4px;margin-right:5px;text-align:center;font-style:normal;font-weight:700;font-size:12px;line-height:18px}
+.prog{height:4px;background:var(--gold);width:0;transition:width .2s;position:absolute;left:0;top:0;z-index:5}
+.note{font-size:13px;color:var(--mut)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+.toast.on{opacity:1}
+@media(prefers-reduced-motion:reduce){td.c.flash{animation:none;outline:3px solid #ffd54a}}
+@media(max-width:600px){.g th.nm,.g td.nm{min-width:70px;padding:0 6px;font-size:13px}}
+</style>
+</head>
+<body class="ro">
+
+<header class="top"><a class="back" href="../#hk" aria-label="허브로">‹</a><h1>📅 하우스맨 근무 스케줄<small id="who"></small></h1><button id="logout" class="lo">나가기</button></header>
+<div class="wrap">
+  <div class="card" id="loginBox" hidden style="max-width:440px;margin:24px auto"></div>
+  <div id="app" hidden>
+  <div class="ttlrow"><h2 id="ttl"></h2><span class="stc" id="stChip"></span><span class="note" id="saveSt"></span></div>
+  <div class="bar">
+    <select id="yy" aria-label="연도"></select>
+    <select id="mm" aria-label="월"></select>
+    <div class="seg edit" role="group" aria-label="입력 방식">
+      <button id="mOff" class="on">휴무신청 표시</button><button id="mEdit">근무 직접 수정</button>
+    </div>
+    <span class="sp"></span>
+    <button id="gen" class="pri edit">자동 편성</button>
+    <button id="unlock" class="edit">고정 해제</button>
+    <button id="xls">엑셀 저장</button>
+    <button id="conf" class="edit">확정하기</button>
+    <button id="next" class="edit">확정하고 다음 달로</button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="board"><div class="prog" id="prog"></div><table class="g" id="grid"></table></div>
+  <div class="legend">
+    <span><i style="background:var(--A);color:var(--Af)">A</i>주간 09–18</span>
+    <span><i style="background:var(--E);color:var(--Ef)">E</i>11:30–22</span>
+    <span><i style="background:var(--C);color:var(--Cf)">C</i>야간 22–09</span>
+    <span><i style="background:var(--B);color:var(--Bf)">B</i>09–22</span>
+    <span><i style="color:var(--Of)">O</i>휴무</span>
+    <span><i style="background:var(--L);color:var(--Lf)">연</i>연차</span>
+    <span><i style="box-shadow:inset 0 0 0 2px var(--red);color:var(--red)">O</i>휴무신청(고정)</span>
+    <span>· E조는 최대 4일 연속 · 점 표시 = 직접 고정한 칸 · 날짜 머리글을 누르면 국공휴일/인원추가일 지정</span>
+  </div>
+  <div class="cols">
+    <div class="card"><h2 id="issT">규칙 검사</h2><ul class="iss" id="iss"></ul></div>
+    <div class="card bars" id="fair"><h2>형평성</h2></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="bar" style="margin:0 0 8px"><h2 style="margin:0;font-size:17px;font-weight:800">누적 현황</h2>
+      <div class="seg" role="group" aria-label="현황 종류"><button id="hEC" class="on">E조·C조 월별</button><button id="hHol">국공휴 출근</button></div>
+      <select id="hY" aria-label="현황 연도"></select><span class="sp"></span><span class="note">이번 달 편성안은 흐린 열로 미리 보여주고, "확정하고 다음 달로" 때 기록됩니다</span></div>
+    <div class="scroll"><table class="ht" id="histT"></table></div>
+  </div>
+  <details class="set edit" id="setBox">
+    <summary>인원·이월·누적 형평성 설정</summary>
+    <div class="card">
+      <div class="bar">
+        <label>일일 필요인원 A <input type="number" id="nA" min="0" max="8" style="width:64px"></label>
+        <label>E <input type="number" id="nE" min="0" max="8" style="width:64px"></label>
+        <label>C <input type="number" id="nC" min="0" max="8" style="width:64px"></label>
+        <label>O <input type="number" id="nO" min="0" max="8" style="width:64px"></label>
+        <label>주간전용 E조 목표 <input type="number" id="eDay" min="0" max="31" style="width:70px"></label>
+        <label>관리자(직접 입력) <input type="text" id="mgrs" style="width:220px" placeholder="이름을 쉼표로 구분"></label>
+      </div>
+      <div class="scroll"><table class="st" id="staffT"></table></div>
+      <div class="bar" style="margin-top:10px">
+        <button id="addP">인원 추가</button><span class="sp"></span>
+        <button id="bk">설정 백업(.json)</button>
+        <label class="note" style="display:inline-flex;align-items:center;gap:6px">백업 불러오기 <input type="file" id="imp" accept=".json"></label>
+      </div>
+      <p class="note">전월 마감: 지난달 마지막 날까지 이어온 근무(주=주간·E 포함, 야=야간, 휴=휴무)와 연속 일수. 누적값은 다음 달로 넘길 때 이번 달 실적으로 자동 갱신되며, 편성 시 1일 안팎의 미세 조정에만 쓰입니다. 국공휴일 목록은 연휴·선거일이 바뀔 수 있으니 날짜 머리글에서 확인해 주세요.</p>
+    </div>
+  </details>
+</div>
+</div>
+<div class="pop" id="pop"></div>
+<div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="./solver.js?v=2026.11.22-1"></script>
+<script type="module" src="./sched.js?v=2026.11.22-1"></script>
+</body>
+</html>
