@@ -3,11 +3,12 @@
 // 보여 주는 것: 확정된 달의 스케줄표(관리자 줄 포함) · 그 달 휴무신청(확정 전에도) · 사람별 합계 · E조·C조 월별 · 국공휴 출근 현황
 // 읽는 곳: hksched/cfg (누적 현황) · hksched/{YYYY-MM} (그 달)
 import * as DB from '../../rm/app/store.js';
+import { printSchedule } from './print.js?v=2026.11.22-4';
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
-const WORK = ['A', 'E', 'C', 'B'];
+const WORK = ['A', 'E', 'C', 'B', 'D'];
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
   { k: 'boss', label: '소장', email: 'unieshaeundae+admin@gmail.com', uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2' },
@@ -44,7 +45,7 @@ function draw() {
   const staff = (doc && doc.staff) || (cfg && cfg.staff) || [];
   const mgrs = (doc && doc.managers) || (cfg && cfg.managers) || [];
   const hol = (doc && doc.holidays) || [], extra = (doc && doc.extra) || [];
-  const forced = (doc && doc.forced) || {}, locks = (doc && doc.locks) || {}, mgr = (doc && doc.mgr) || {}, grid = (doc && doc.grid) || {};
+  const forced = (doc && doc.forced) || {}, locks = (doc && doc.locks) || {}, mgr = (doc && doc.mgr) || {}, grid = (doc && doc.grid) || {}, notes = (doc && doc.notes) || {}, autoOff = (doc && doc.autoOff) || {};
   const code = (n, d) => (locks[n] || {})[d + 1] || ((forced[n] || []).includes(d + 1) ? 'O' : (grid[n] || [])[d] || '');
   const t = seoul(), today = t.getUTCFullYear() === Y && t.getUTCMonth() + 1 === M ? t.getUTCDate() : 0;
   let h = '<div class="card"><div class="mbar"><button data-m="-1" aria-label="이전 달">‹</button><div class="d"><b>' + Y + '년 ' + M + '월</b>' +
@@ -55,7 +56,7 @@ function draw() {
     if (!ok) h += '<div class="card"><p class="note" style="margin:0">' + M + '월 스케줄은 아직 확정 전이에요. 소장님이 확정하면 여기에 보여요.<br>휴무신청이 잘 들어갔는지는 <b>휴무신청</b> 탭에서 볼 수 있어요.</p></div>';
     else {
       const names = staff.map(s => s.name);
-      h += '<div class="card"><div class="mine"><span>내 줄 강조</span>' + ['', ...names].map(n => '<button data-me="' + esc(n) + '" aria-pressed="' + (me === n) + '">' + (n ? esc(n) : '없음') + '</button>').join('') + '</div>';
+      h += '<div class="card"><div class="prow"><button class="big sec" id="prt">🖨️ 인쇄 · PDF 저장</button></div><div class="mine"><span>내 줄 강조</span>' + ['', ...names].map(n => '<button data-me="' + esc(n) + '" aria-pressed="' + (me === n) + '">' + (n ? esc(n) : '없음') + '</button>').join('') + '</div>';
       h += '<div class="board"><table class="g"><thead><tr><th class="nm">이름</th>';
       for (let d = 1; d <= nd; d++) { const w = dow(d), ho = hol.includes(d);
         h += '<th class="' + (w === 6 ? 'sat ' : '') + (w === 0 || ho ? 'sun ' : '') + (d === today ? 'today ' : '') + '">' + d + '<br>' + (ho ? '공' : extra.includes(d) ? '+1' : WD[w]) + '</th>'; }
@@ -63,14 +64,15 @@ function draw() {
       const row = (n, sub, r, cls) => {
         const c = k => r.filter(x => x === k).length;
         let x = '<tr class="' + cls + (me && me === n ? ' me' : '') + '"><td class="nm">' + esc(n) + '<small>' + esc(sub) + '</small></td>';
-        r.forEach((v, d) => { const f = (forced[n] || []).includes(d + 1);
-          x += '<td class="c ' + (v === '연' || v === '대' ? 'L' : v) + (f ? ' f' : '') + (d + 1 === today ? ' today' : '') + '">' + (v === '대' ? '대휴' : v) + '</td>'; });
+        r.forEach((v, d) => { const f = (forced[n] || []).includes(d + 1), nt = (notes[n] || {})[d + 1], ho = (autoOff[n] || []).includes(d + 1) && v === 'O';
+          x += '<td class="c ' + (v === '연' || v === '대' ? 'L' : v) + (f ? ' f' : '') + (ho ? ' ho' : '') + (nt ? ' nt' : '') + (d + 1 === today ? ' today' : '') + '"' + (nt || ho ? ' title="' + esc((ho ? '국공휴 휴무 ' : '') + (nt || '')) + '"' : '') + '>' + (v === '대' ? '대휴' : v) + '</td>'; });
         return x + '<td class="s"><b>' + (c('A') + c('B')) + '</b></td><td class="s"><b>' + c('E') + '</b></td><td class="s"><b>' + c('C') + '</b></td><td class="s"><b>' + c('O') + '</b></td><td class="s">' + r.filter(v => WORK.includes(v)).length + '</td></tr>';
       };
       if (mgrs.length) { h += '<tr class="sep"><td colspan="' + (nd + 6) + '">관리자</td></tr>'; mgrs.forEach(n => { h += row(n, '관리자', Array.from({ length: nd }, (_, d) => (mgr[n] || {})[d + 1] || ''), 'mg'); }); h += '<tr class="sep"><td colspan="' + (nd + 6) + '">하우스맨</td></tr>'; }
       staff.forEach(s => { h += row(s.name, carryLbl(s.carry) ? '전월 ' + carryLbl(s.carry) : '', Array.from({ length: nd }, (_, d) => code(s.name, d)), ''); });
       h += '</tbody></table></div>' +
         '<div class="legend"><span><i class="A">A</i>주간 09:00~18:00</span><span><i class="E">E</i>11:30~22:00</span><span><i class="C">C</i>야간 22:00~09:00</span><span><i class="B">B</i>09:00~22:00</span><span><i class="O">O</i>휴무</span><span><i class="L">연</i>연차</span><span><i class="O f">O</i>휴무신청</span></div>' +
+        memoHtml(staff, mgrs, notes, autoOff, dow) +
         (hol.length ? '<p class="note">국공휴일: ' + hol.slice().sort((a, b) => a - b).map(d => M + '/' + d).join(', ') + '</p>' : '') +
         (extra.length ? '<p class="note">인원 추가일(재고조사·행사 등): ' + extra.slice().sort((a, b) => a - b).map(d => M + '/' + d).join(', ') + '</p>' : '') + '</div>';
     }
@@ -87,6 +89,20 @@ function draw() {
 
   if (tab === 'hist') h += histHtml(staff, mgrs);
   $('main').innerHTML = h;
+}
+
+function memoHtml(staff, mgrs, notes, autoOff, dow) {
+  const L = [];
+  staff.map(s => s.name).concat(mgrs).forEach(n => Object.keys(notes[n] || {}).forEach(d => L.push([+d, n, notes[n][d]])));
+  const hd = {}; Object.keys(autoOff).forEach(n => autoOff[n].forEach(d => (hd[d] = hd[d] || []).push(n)));
+  Object.keys(hd).forEach(d => L.push([+d, hd[d].join('·'), '국공휴 휴무 (누적 출근율 순)']));
+  if (!L.length) return '';
+  return '<div class="memo"><b>메모 · 일정</b><ul>' + L.sort((a, b) => a[0] - b[0]).map(x => '<li><span>' + M + '/' + x[0] + '(' + WD[dow(x[0])] + ')</span><b>' + esc(x[1]) + '</b> ' + esc(x[2]) + '</li>').join('') + '</ul></div>';
+}
+function doPrint() {
+  const nd = new Date(Y, M, 0).getDate(), staff = doc.staff || [], forced = doc.forced || {}, locks = doc.locks || {}, grid = doc.grid || {};
+  printSchedule({ year: Y, month: M, staff, managers: doc.managers || [], mgr: doc.mgr || {}, forced, notes: doc.notes || {}, holidays: doc.holidays || [], extra: doc.extra || [], state: doc.state, leaveMode: doc.leaveMode,
+    codeOf: (n, d) => (locks[n] || {})[d + 1] || ((forced[n] || []).includes(d + 1) ? 'O' : (grid[n] || [])[d] || '') });
 }
 
 function histHtml(staff, mgrs) {
@@ -123,8 +139,9 @@ function histHtml(staff, mgrs) {
 }
 
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-m],[data-tab],[data-me],[data-hv],[data-who],#doLogin');
+  const b = e.target.closest('[data-m],[data-tab],[data-me],[data-hv],[data-who],#doLogin,#prt');
   if (!b) return;
+  if (b.id === 'prt') { doPrint(); return; }
   if (b.dataset.m) go(+b.dataset.m);
   else if (b.dataset.tab) { tab = b.dataset.tab; draw(); }
   else if (b.dataset.me != null) { me = b.dataset.me; ls.set('hksv_me', me); draw(); }

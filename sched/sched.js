@@ -5,6 +5,7 @@
 //       hksched/{YYYY-MM} = 그 달 휴무신청 · 직접 고정 · 관리자 칸 · 편성 결과 · 상태(작성중/확정)
 // 쓰는 사람: 소장·부소장만 (허브 첫 화면 '근무 스케줄 편성' 칸). 하우스키퍼·파트장 계정이 열면 보기 화면(view.html)으로 보냄 (11/22 기능 분리)
 import * as DB from '../../rm/app/store.js';
+import { printSchedule } from './print.js?v=2026.11.22-4';
 const $ = id => document.getElementById(id);
 const HOL = {2026:{1:[1],2:[16,17,18],3:[1],5:[1,5,24],6:[3,6],7:[17],8:[15],9:[24,25,26],10:[3,9],12:[25]},
              2027:{1:[1],2:[6,7,8],3:[1],5:[1,5,13],6:[6],7:[17],8:[15],9:[14,15,16],10:[3,9],12:[25]}};
@@ -36,7 +37,7 @@ async function saveNow(){
   clearTimeout(saveT); if (!canEdit()) return;
   const key = ymKey(S.year, S.month); saving = true; setSave('저장 중…');
   try {
-    const month = { year:S.year, month:S.month, staff:S.staff, managers:S.managers, forced:S.forced, locks:S.locks, mgr:S.mgr, holidays:S.holidays, extra:S.extra,
+    const month = { year:S.year, month:S.month, staff:S.staff, managers:S.managers, forced:S.forced, locks:S.locks, mgr:S.mgr, holidays:S.holidays, extra:S.extra, notes:S.notes || {}, autoOff:S.autoOff || {}, src:S.src || '',
       grid:S.grid || null, leaveMode:S.leaveMode, seed:S.seed, need:S.need, state:S.state || '작성중', by:role.label, at:DB.SERVER_TIME };
     await DB.set('hksched/' + key, month);
     if (key >= latestKey) {   // 지난 달을 고칠 때는 명단 원본(이월·누적)을 건드리지 않음
@@ -52,11 +53,15 @@ async function loadMonth(y, m){
   try { [cfg, md] = await Promise.all([DB.get('hksched/cfg'), DB.get('hksched/' + ymKey(y, m))]); }
   catch (e) { toast('불러오지 못했어요: ' + (e.code || e.message)); }
   const b = defaults(); b.year = y; b.month = m;
-  b.holidays = ((HOL[y]||{})[m]||[]).slice(); b.extra = []; b.forced = {}; b.locks = {}; b.mgr = {}; b.grid = null; b.state = '작성중';
+  b.holidays = ((HOL[y]||{})[m]||[]).slice(); b.extra = []; b.forced = {}; b.locks = {}; b.mgr = {}; b.grid = null; b.state = '작성중'; b.notes = {}; b.autoOff = {}; b.src = '';
   if (cfg) { ['staff','managers','need','eDay','hist'].forEach(k => { if (cfg[k] != null) b[k] = cfg[k]; }); latestKey = cfg.cur || ''; }
-  if (md) ['staff','managers','forced','locks','mgr','holidays','extra','grid','leaveMode','seed','need','state'].forEach(k => { if (md[k] != null) b[k] = md[k]; });
+  if (md) ['staff','managers','forced','locks','mgr','holidays','extra','grid','leaveMode','seed','need','state','notes','autoOff','src'].forEach(k => { if (md[k] != null) b[k] = md[k]; });
+  // 지난 달(엑셀에서 가져온 달)의 명단에는 누적값이 없음 → 지금 명단(cfg)의 값, 없으면 기본값
+  const cfgCum = {}; ((cfg && cfg.staff) || defaults().staff).forEach(s => { cfgCum[s.name] = s.cum; });
+  b.staff = b.staff.map(s => s.cum ? s : Object.assign({}, s, { cum: cfgCum[s.name] || { m:0, C:10, E:7.5, work:.77, holW:0, holT:0 } }));
+  b.notes = b.notes || {}; b.autoOff = b.autoOff || {};
   b.hist = b.hist || JSON.parse(JSON.stringify(HIST0)); b.hist.ec = b.hist.ec || {}; b.hist.hol = b.hist.hol || [];
-  S = b; S._exists = !!md; S._cfg = !!cfg;
+  S = b; S._exists = !!md; S._cfg = !!cfg; S._pastDone = !!(cfg && cfg.pastImported);
   if (!cfg && canEdit()) { latestKey = ymKey(y, m); saveNow(); }
 }
 let mode = 'off', issues = [];
@@ -71,7 +76,8 @@ function buildInput(){
     extraDays:S.extra.slice(), holidays:S.holidays.slice(),
     staff:S.staff.map(s => ({ name:s.name, kind:s.kind, nightKey:s.nightKey, carry:s.carry,
       forced:(S.forced[s.name]||[]).slice(), locks:Object.assign({}, S.locks[s.name]||{}),
-      cum:{ C:s.kind==='rot'?s.cum.C:null, E:s.kind!=='ot'?s.cum.E:null, workRate:s.cum.work, holRate:s.cum.holT? s.cum.holW/s.cum.holT : .75 } })) };
+      minO:s.minO != null ? s.minO : (s.kind==='ot' ? 8 : 0),
+      cum:{ C:s.kind==='rot'?s.cum.C:null, E:s.kind!=='ot'?s.cum.E:null, workRate:s.cum.work, holRate:((s.cum.holW||0) + 1.5) / ((s.cum.holT||0) + 2), holW:s.cum.holW||0, holT:s.cum.holT||0 } })) };
 }
 function gridArr(){ if(!S.grid) return null; return S.staff.map(s => (S.grid[s.name] || []).slice(0, nd())); }
 function cellCode(p, d){
@@ -83,6 +89,7 @@ function cellCode(p, d){
 
 function render(){
   $('ttl').textContent = `${S.year}년 ${S.month}월 근무 스케줄`;
+  $('pastBox').hidden = !canEdit() || !!S._pastDone;
   $('conf').textContent = S.state === '확정' ? '확정 풀기' : '확정하기';
   $('stChip').textContent = S.state === '확정' ? '확정' : (S._exists ? '작성 중' : '새 달'); $('stChip').className = 'stc ' + (S.state === '확정' ? 'ok' : '');
   if (!canEdit() && S.state !== '확정') {
@@ -121,7 +128,8 @@ function render(){
     h += `<tr><td class="nm">${esc(s.name)}<small>${carryLbl(s.carry)}${s.nightKey?' · 방편성':''}</small></td>`;
     for (let d = 0; d < N; d++) {
       const c = r[d], f = (S.forced[s.name]||[]).includes(d+1), lk = !!(S.locks[s.name]||{})[d+1];
-      h += `<td class="c ${c==='연'?'L':c} ${f?'f':''} ${lk?'lk':''} ${badCells.has(p+'_'+(d+1))?'bad':''}" data-p="${p}" data-d="${d}">${c||''}</td>`;
+      const nt = ((S.notes||{})[s.name]||{})[d+1], ho = ((S.autoOff||{})[s.name]||[]).includes(d+1) && c === 'O';
+      h += `<td class="c ${c==='연'?'L':c} ${f?'f':''} ${lk?'lk':''} ${ho?'ho':''} ${nt?'nt':''} ${badCells.has(p+'_'+(d+1))?'bad':''}" data-p="${p}" data-d="${d}"${nt||ho?` title="${esc((ho?'국공휴 휴무 (누적 출근율 순) ':'')+(nt||''))}"`:''}>${c||''}</td>`;
     }
     h += `<td class="s first"><b>${cnt('A')+cnt('B')}</b></td><td class="s"><b>${cnt('E')}</b></td><td class="s"><b>${cnt('C')}</b></td><td class="s"><b>${cnt('O')}</b></td><td class="s">${work}</td><td class="s">${wkEnd-cnt('O')}</td><td class="s">${S.holidays.length?holW+'/'+S.holidays.length:'–'}</td><td class="s">${nc?carryLbl(nc):''}</td></tr>`;
   });
@@ -196,7 +204,11 @@ function renderSide(stats, full, X){
     chips.push(`<span class="chip ${spread(stats,'O')>1?'bad':''}">휴무 <b>${rng(stats,'O')}</b>일</span>`);
     chips.push(`<span class="chip ${spread(rot,'C')>1?'bad':''}">야간(로테이터) <b>${rng(rot,'C')}</b>일</span>`);
     chips.push(`<span class="chip">E조 로테이터 <b>${rng(rot,'E')}</b> · 주간전용 <b>${stats.filter(x=>x.s.kind==='day').map(x=>x.E).join('/')||'–'}</b></span>`);
+    if (S.src) chips.unshift(`<span class="chip">📂 ${esc(S.src)}에서 가져온 지난 기록 (그때 실제 근무 — 규칙 검사는 참고용)</span>`);
     if (S.leaveMode==='reduceA') chips.push(`<span class="chip">연차일은 근무 인원에서 차감해 편성</span>`);
+    const ao = S.autoOff || {}, hd = {}; Object.keys(ao).forEach(n => ao[n].forEach(d => (hd[d] = hd[d] || []).push(n)));
+    Object.keys(hd).sort((a,b)=>a-b).forEach(d => chips.push(`<span class="chip">${S.month}/${d} 국공휴 휴무 <b>${hd[d].map(esc).join('·')}</b> (누적 출근율 순)</span>`));
+    const ot = stats.filter(x => x.s.kind==='ot'); if (ot.length) chips.push(`<span class="chip ${ot.some(x=>x.O<8)?'bad':''}">오더테이커 휴무 <b>${ot.map(x=>x.O).join('/')}</b>일 (최소 8)</span>`);
   }
   $('chips').innerHTML = chips.join('');
   $('issT').textContent = full ? `규칙 검사 — 필수 ${hard.length} · 권장 ${soft.length} · 참고 ${info.length}` : '규칙 검사';
@@ -265,7 +277,7 @@ $('gen').onclick = async () => {
   try {
     S.seed = (S.seed || 1) + 1;
     let inp = HKSolver.chooseMode(buildInput(), S.seed * 101);
-    S.leaveMode = inp.leaveMode;
+    S.leaveMode = inp.leaveMode; S.autoOff = inp.autoOff || {};
     const RUNS = 3, IT = 220000; let best = null;
     for (let k = 0; k < RUNS; k++) {
       const run = HKSolver.createRun(inp, S.seed * 7919 + k * 104729, IT);
@@ -287,7 +299,7 @@ function fillYM(){
   $('yy').innerHTML = [2026,2027,2028].map(y => `<option ${y===S.year?'selected':''}>${y}</option>`).join('');
   $('mm').innerHTML = Array.from({length:12}, (_,i) => `<option value="${i+1}" ${i+1===S.month?'selected':''}>${i+1}월</option>`).join('');
 }
-function resetMonth(){ S.state = '작성중'; S.mgr = {}; S.forced = {}; S.locks = {}; S.grid = null; S.extra = []; S.leaveMode = 'inO'; S.holidays = ((HOL[S.year]||{})[S.month]||[]).slice(); }
+function resetMonth(){ S.state = '작성중'; S.notes = {}; S.autoOff = {}; S.mgr = {}; S.forced = {}; S.locks = {}; S.grid = null; S.extra = []; S.leaveMode = 'inO'; S.holidays = ((HOL[S.year]||{})[S.month]||[]).slice(); }
 $('yy').onchange = () => goMonth(+$('yy').value, S.month);
 $('mm').onchange = () => goMonth(S.year, +$('mm').value);
 async function goMonth(y, m){ await saveNow(); location.hash = ymKey(y, m); }
@@ -418,6 +430,31 @@ $('xls').onclick = () => {
 };
 
 $('setBox').addEventListener('toggle', renderSet);
+$('prt').onclick = () => {
+  const N = nd(), G = S.staff.map((s,p) => Array.from({length:N}, (_,d) => cellCode(p,d)));
+  if (!G.every(r => r.every(c => c))) { toast('먼저 편성을 완성해 주세요'); return; }
+  printSchedule({ year:S.year, month:S.month, staff:S.staff, managers:S.managers, mgr:S.mgr, forced:S.forced, notes:S.notes, holidays:S.holidays, extra:S.extra, state:S.state, leaveMode:S.leaveMode,
+    codeOf:(n,d) => G[S.staff.findIndex(s => s.name===n)][d] });
+};
+// ---------- 2026년 2~11월 지난 스케줄 넣기 (엑셀 '26년 근무스케줄'에서 옮긴 past2026.json) — 이미 있는 달은 건드리지 않음
+async function importPast(){
+  if (!canEdit()) return;
+  const btn = $('pastBtn'); if (btn) { btn.disabled = true; btn.textContent = '넣는 중…'; }
+  try {
+    const P = await (await fetch('./past2026.json?v=2026.11.22-4')).json();
+    let added = 0;
+    for (const k of Object.keys(P).sort()) {
+      const ex = await DB.get('hksched/' + k);
+      if (!ex) { await DB.set('hksched/' + k, Object.assign({}, P[k], { by: role.label, at: DB.SERVER_TIME })); added++; }
+      const ec = {}; P[k].staff.forEach(s => { if (s.kind !== 'ot') { const g = P[k].grid[s.name]; ec[s.name] = [g.filter(c=>c==='E').length, g.filter(c=>c==='C').length]; } });
+      S.hist.ec[k] = ec;   // E조·C조 월별도 실제 스케줄 기준으로 맞춤
+    }
+    await DB.merge('hksched/cfg', { hist:S.hist, pastImported:'2026-02~11', by:role.label, at:DB.SERVER_TIME });
+    S._pastDone = true; render(); toast(`지난 스케줄 ${added}달을 넣었어요 (이미 있던 달은 그대로) — 연·월을 바꿔 볼 수 있어요`);
+  } catch (e) { toast('넣지 못했어요: ' + (e.code || e.message)); }
+  if (btn) { btn.disabled = false; btn.textContent = '지난 스케줄 넣기'; }
+}
+$('pastBtn').onclick = importPast;
 $('conf').onclick = () => { if (!canEdit()) return; S.state = S.state === '확정' ? '작성중' : '확정'; save(); render(); toast(S.state === '확정' ? '확정했어요 — 하우스키퍼 계정에서도 보여요' : '작성 중으로 되돌렸어요'); };
 // ---------- 로그인 (야간 보고서와 같은 계정)
 const ROLES = [
