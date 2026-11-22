@@ -3,7 +3,7 @@
 // 보여 주는 것: 확정된 달의 스케줄표(관리자 줄 포함) · 그 달 휴무신청(확정 전에도) · 사람별 합계 · E조·C조 월별 · 국공휴 출근 현황
 // 읽는 곳: hksched/cfg (누적 현황) · hksched/{YYYY-MM} (그 달)
 import * as DB from '../../rm/app/store.js';
-import { printSchedule } from './print.js?v=2026.11.22-9';
+import { printSchedule } from './print.js?v=2026.11.22-11';
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -102,7 +102,7 @@ function memoHtml(staff, mgrs, notes, autoOff, dow) {
 }
 function doPrint() {
   const nd = new Date(Y, M, 0).getDate(), staff = doc.staff || [], forced = doc.forced || {}, locks = doc.locks || {}, grid = doc.grid || {};
-  printSchedule({ year: Y, month: M, staff, managers: doc.managers || [], mgr: doc.mgr || {}, mgrDefault: 'A', forced, notes: doc.notes || {}, holidays: doc.holidays || [], extra: doc.extra || [], state: doc.state, leaveMode: doc.leaveMode,
+  printSchedule({ year: Y, month: M, staff, managers: doc.managers || [], mgr: doc.mgr || {}, mgrDefault: 'A', autoOff: doc.autoOff || {}, forced, notes: doc.notes || {}, holidays: doc.holidays || [], extra: doc.extra || [], state: doc.state, leaveMode: doc.leaveMode,
     codeOf: (n, d) => (locks[n] || {})[d + 1] || ((forced[n] || []).includes(d + 1) ? 'O' : (grid[n] || [])[d] || '') });
 }
 

@@ -5,7 +5,7 @@
 //       hksched/{YYYY-MM} = 그 달 휴무신청 · 직접 고정 · 관리자 칸 · 편성 결과 · 상태(작성중/확정)
 // 쓰는 사람: 소장·부소장만 (허브 첫 화면 '근무 스케줄 편성' 칸). 하우스키퍼·파트장 계정이 열면 보기 화면(view.html)으로 보냄 (11/22 기능 분리)
 import * as DB from '../../rm/app/store.js';
-import { printSchedule } from './print.js?v=2026.11.22-9';
+import { printSchedule } from './print.js?v=2026.11.22-11';
 const $ = id => document.getElementById(id);
 const HOL = {2026:{1:[1],2:[16,17,18],3:[1],5:[1,5,24],6:[3,6],7:[17],8:[15],9:[24,25,26],10:[3,9],12:[25]},
              2027:{1:[1],2:[6,7,8],3:[1],5:[1,5,13],6:[6],7:[17],8:[15],9:[14,15,16],10:[3,9],12:[25]}};
@@ -439,7 +439,7 @@ $('setBox').addEventListener('toggle', renderSet);
 $('prt').onclick = () => {
   const N = nd(), G = S.staff.map((s,p) => Array.from({length:N}, (_,d) => cellCode(p,d)));
   if (!G.every(r => r.every(c => c))) { toast('먼저 편성을 완성해 주세요'); return; }
-  printSchedule({ year:S.year, month:S.month, staff:S.staff, managers:S.managers, mgr:S.mgr, mgrDefault:'A', forced:S.forced, notes:S.notes, holidays:S.holidays, extra:S.extra, state:S.state, leaveMode:S.leaveMode,
+  printSchedule({ year:S.year, month:S.month, staff:S.staff, managers:S.managers, mgr:S.mgr, mgrDefault:'A', autoOff:S.autoOff, forced:S.forced, notes:S.notes, holidays:S.holidays, extra:S.extra, state:S.state, leaveMode:S.leaveMode,
     codeOf:(n,d) => G[S.staff.findIndex(s => s.name===n)][d] });
 };
 // ---------- 2026년 2~11월 지난 스케줄 넣기 (엑셀 '26년 근무스케줄'에서 옮긴 past2026.json) — 이미 있는 달은 건드리지 않음
