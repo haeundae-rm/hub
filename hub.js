@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.22-2';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.22-2';
-import * as PIN from './pin.js?v=2026.11.22-2';
-import { setupClose } from './close.js?v=2026.11.22-2';
-import { setupClosing } from './closing.js?v=2026.11.22-2';
-import { supProgress } from './supcalc.js?v=2026.11.22-2';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.22-2';
-import { setupMeal } from './meal.js?v=2026.11.22-2';
-import * as BD from './bday.js?v=2026.11.22-2';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.22-3';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.22-3';
+import * as PIN from './pin.js?v=2026.11.22-3';
+import { setupClose } from './close.js?v=2026.11.22-3';
+import { setupClosing } from './closing.js?v=2026.11.22-3';
+import { supProgress } from './supcalc.js?v=2026.11.22-3';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.22-3';
+import { setupMeal } from './meal.js?v=2026.11.22-3';
+import * as BD from './bday.js?v=2026.11.22-3';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.22-2';
+const VER = '2026.11.22-3';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -141,8 +141,9 @@ async function load(force) {
       ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, C), mr: K.maidRooms ? K.maidRooms(P, C) : null, recs: Array.isArray(recs) ? recs : null, mate: (tmz && !tmz.__err && tmz.mate) || {} });
     }
   }
+  const [ls, lt] = await Promise.all([safe(S.get('meta/lost_sum')), safe(S.getQuery('lost', [['date', '==', d]]))]);   // 🧳 습득물: 서버가 매일 아침 센 처리 대기 + 오늘 접수
   const bd = isHk() ? null : await BD.load(S, d);   // 🎂 하루 한 번만 연차 명단을 읽음 (소장 · 부소장)
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd };
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd, ls, lt };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -706,6 +707,7 @@ const TILES = [
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
   { go: 'hk', ic: '🛎️', t: '하우스키퍼', s: '야간 업무 보고서 · 근무 스케줄 · 연차 현황' },
   { href: './keys/', ic: '🔑', t: '플로어 키', s: '키 서명 현황 · 오후 대조 · 미반납 · 대장 인쇄' },
+  { href: './lost/', ic: '🧳', t: '습득물', s: '습득물 관리대장 · 확인 · 조치 · 귀중품 · 엑셀' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
   { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
   { go: 'close', ic: '📊', t: '결산', s: '결산 특이사항 · 입퇴사 현황 · 출역표 · 연차 대장' },
@@ -758,10 +760,20 @@ function todoItems(v) {
   if (p.issue) L.push({ lv: 'wait', title: '이상 보고 ' + p.issue + '실', sub: '메이드가 이상으로 표시한 객실 · 정비 레포트에서 보기', go: 'work/now' });
   if (typeof v.lvq === 'number' && v.lvq) L.push({ lv: 'bad', title: '휴가신청서 승인 대기 ' + v.lvq + '건', sub: '연차 관리에서 승인 · 반려', href: './leave/' });
   keyTodo(v).forEach(x => L.push(x));
+  lostTodo(v).forEach(x => L.push(x));
   nightWait(v).forEach(n => L.push({ lv: 'wait', title: '야간 보고서 ' + md(n.date) + ' 밤 확인 대기', sub: n.need, href: './night/#' + n.date }));
   const r = v.hr;
   if (r && !r.__err && r.past.length) L.push({ lv: 'wait', title: '퇴사일 지난 분 ' + r.past.length + '명', sub: '아직 재직으로 남아 있어요 · 입퇴사 서류에서 퇴사 처리', go: 'people' });
   return L.sort((a, b) => (a.lv === 'bad' ? 0 : 1) - (b.lv === 'bad' ? 0 : 1));
+}
+// 🧳 습득물 (2026-11-22): 오늘 접수 중 확인 안 한 것 · 경찰 인계 대기 · 30일 폐기 대상 (meta/lost_sum = 서버 함수 lostDaily 가 매일 아침 셈)
+function lostTodo(v) {
+  const L = [], lt = Array.isArray(v.lt) ? v.lt.map(x => x.data || {}) : [], s = v.ls && !v.ls.__err ? v.ls : null;
+  const un = lt.filter(x => !x.chk).length;
+  if (un) L.push({ lv: 'wait', title: '습득물 확인 안 함 ' + un + '건', sub: '오늘 접수 ' + lt.length + '건 · 실물을 받으면 [확인]', href: './lost/' });
+  if (s && s.dispose) L.push({ lv: 'wait', title: '습득물 폐기 대상 ' + s.dispose + '건', sub: '일반 물품 30일 지남 · ' + md(s.day) + ' 아침 기준', href: './lost/#todo' });
+  if (s && s.food) L.push({ lv: 'wait', title: '습득물 음식 3일 지남 ' + s.food + '건', sub: '습득물 냉장고 정리', href: './lost/#todo' });
+  return L;
 }
 // 🔑 플로어키: 키 서명 누락(시작한 층만) · 대조 때 키 없음(미반납 · 서명 없이 없음)
 function keyTodo(v) {
@@ -796,6 +808,7 @@ function badgeOf(t, v) {
     if (k.unanswered.length) return B('bad', '누락 ' + k.unanswered.length);
     return B('ok', '대조 ' + k.checked + '/' + k.cells);
   }
+  if (t.href === './lost/') { const lt = Array.isArray(v.lt) ? v.lt : [], s = v.ls && !v.ls.__err ? v.ls : null; const un = lt.filter(x => !(x.data || {}).chk).length; if (un) return B('wait', '확인 ' + un); if (s && s.police) return B('bad', '귀중품 ' + s.police); return lt.length ? B('ok', '오늘 ' + lt.length) : ''; }
   if (t.href === './leave/') return typeof v.lvq === 'number' && v.lvq ? B('bad', '승인 ' + v.lvq) : '';
   if (t.go === 'people') {
     const r = v.hr; if (!r || r.__err) return '';

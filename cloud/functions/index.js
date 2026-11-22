@@ -8,6 +8,7 @@ const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 const { plan, dead } = require('./dreq');
 const B = require('./bday');
+const LO = require('./lost');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'asia-northeast3', maxInstances: 2, memory: '256MiB', timeoutSeconds: 30 });
@@ -60,4 +61,21 @@ exports.bdayNotice = onSchedule({ schedule: '0 6 * * *', timeZone: 'Asia/Seoul',
   }
   await db().doc('meta/bday_fn').set({ at: admin.firestore.FieldValue.serverTimestamp(), day, n: names.length }).catch(() => {});
   logger.info('생일 공지', { day, n: names.length });
+});
+
+// 🧳 습득물 매일 정리 (2026-11-22) — 아침 6시 10분(서울): 처리 대기 수 → meta/lost_sum, 조치 끝나고 3개월 지난 사진 지움 (소장님 결정)
+//   읽기: 보관 중인 줄은 최근 1년 날짜 한 조건 / 사진 정리는 조치일 한 조건 (복합 색인 없음)
+exports.lostDaily = onSchedule({ schedule: '10 6 * * *', timeZone: 'Asia/Seoul', retryCount: 1 }, async () => {
+  const day = B.seoulDay(Date.now());
+  const snap = await db().collection('lost').where('date', '>=', LO.addDays(day, -366)).get();
+  const list = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+  const s = LO.sum(list, day);
+  const old = await db().collection('lost').where('actDay', '>=', '2000-01-01').where('actDay', '<', LO.addDays(day, -LO.PHOTO_KEEP)).get();   // 같은 칸 범위 두 개 = 색인 필요 없음, 빈 조치일은 안 읽음
+  const gone = LO.photoGone(old.docs.map(d => Object.assign({ id: d.id }, d.data())), day);
+  for (const x of gone) {
+    await db().doc('lost_img/' + x.id).delete().catch(() => {});
+    await db().doc('lost/' + x.id).update({ imgGone: true }).catch(() => {});
+  }
+  await db().doc('meta/lost_sum').set(Object.assign(s, { day, at: admin.firestore.FieldValue.serverTimestamp(), photosGone: gone.length }));
+  logger.info('습득물 정리', Object.assign({ day, photosGone: gone.length }, s));
 });
