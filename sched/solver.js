@@ -3,7 +3,7 @@
 // 하우스맨 근무 스케줄 자동 편성 엔진 (규칙 기반 + 담금질 탐색)
 // 코드: A 주간, E 주간(11:30~22:00), C 야간, O 휴무, B 09~22, 연 연차(휴무 취급, O 집계 제외)
 (function (root) {
-  const WORK = { A: 1, E: 1, C: 1, B: 1 };
+  const WORK = { A: 1, E: 1, C: 1, B: 1, D: 1 };   // D = 14:00~22:00 (지난 달 기록에만 나옴, E 인원으로 셈)
   const HARD = 1000;
 
   function allowedFor(s) {
@@ -28,6 +28,7 @@
     const lock = inp.staff.map(s => {
       const a = new Array(nd).fill(null);
       s.forced.forEach(d => { if (d >= 1 && d <= nd) a[d - 1] = 'O'; });
+      ((inp.autoOff || {})[s.name] || []).forEach(d => { if (d >= 1 && d <= nd && !a[d - 1]) a[d - 1] = 'O'; });   // 국공휴 자동 휴무 지정
       if (s.locks) for (const k in s.locks) a[k - 1] = s.locks[k];
       return a;
     });
@@ -61,11 +62,14 @@
     const restE = totE - dayIdx.length * tEday;
     const tE = inp.staff.map((s, i) => s.kind === 'day' ? tEday : rot[i] ? restE / nRot + fair * aE[i] : 0);
     let tO = inp.staff.map((s, i) => totO / P + fair * aO[i] + (s.kind === 'ot' ? 0.35 : -0.35 / (P - 1)));
+    // 11/22: 오더테이커 휴무 최소 8일 (휴무가 많은 달은 9까지) — 목표를 8.3 이상으로 올리고 그만큼 다른 사람 목표에서 나눠 뺌
+    const minO = inp.staff.map(s => s.minO != null ? s.minO : s.kind === 'ot' ? 8 : 0);
+    inp.staff.forEach((s, i) => { if (minO[i] && tO[i] < minO[i] + 0.3) { const up = minO[i] + 0.3 - tO[i]; tO[i] += up; tO.forEach((_, j) => { if (j !== i) tO[j] -= up / (P - 1); }); } });
     // 강제휴무가 목표를 넘는 사람은 목표를 올리고 나머지를 깎음
     let excess = 0, under = [];
     tO = tO.map((t, i) => { if (lockedO[i] > t) { excess += lockedO[i] - t; return lockedO[i]; } under.push(i); return t; });
     under.forEach(i => tO[i] -= excess / under.length);
-    return { P, nd, need, lock, forced, allowed, rot, weeks, tC, tE, tO, hol: new Set(inp.holidays || []), w, hw: HARD };
+    return { P, nd, need, lock, forced, allowed, rot, weeks, tC, tE, tO, minO, hol: new Set(inp.holidays || []), w, hw: HARD };
   }
 
   function rowCost(inp, X, p, r) {
@@ -80,7 +84,7 @@
       if (c === 'C' && (b === 'A' || b === 'E' || b === 'B')) cost += X.hw;
       if (b === 'C' && (c === 'A' || c === 'E' || c === 'B')) cost += X.hw;
       if (c === 'C' && i + 1 < nd && fr[i + 1]) cost += X.hw;
-      if (isWork(c) && X.hol.has(i + 1)) cost += 40 * (s.cum && s.cum.holRate != null ? s.cum.holRate : 0.75);
+      if (isWork(c) && X.hol.has(i + 1)) cost += 300 * (s.cum && s.cum.holRate != null ? s.cum.holRate : 0.75);   // 11/22: 40 → 300 (휴무자는 autoHoliday 가 먼저 정함) (누적 출근율 높은 사람이 확실히 휴무)
     }
     // 근무 연속 구간
     let i = 0;
@@ -134,7 +138,7 @@
   function colCost(inp, X, G, d) {
     const cnt = { A: 0, E: 0, C: 0, O: 0 }; let key = false;
     for (let p = 0; p < X.P; p++) {
-      let c = G[p][d]; if (c === '연') { if (inp.leaveMode === 'reduceA') continue; c = 'O'; } if (c === 'B') c = 'E';
+      let c = G[p][d]; if (c === '연') { if (inp.leaveMode === 'reduceA') continue; c = 'O'; } if (c === 'B' || c === 'D') c = 'E';
       cnt[c]++; if (c === 'C' && inp.staff[p].nightKey) key = true;
     }
     const t = X.need[d];
@@ -150,6 +154,7 @@
       const c = cnts[p];
       if (X.rot[p]) cost += 90 * (c.C - X.tC[p]) ** 2;
       cost += 30 * (c.O - X.tO[p]) ** 2;
+      if (X.minO[p] && c.O < X.minO[p]) cost += X.hw * (X.minO[p] - c.O);   // 오더테이커 휴무 최소 8일
       if (X.tE[p]) cost += 18 * (c.E - X.tE[p]) ** 2;
     }
     return cost;
@@ -247,6 +252,7 @@
     function score(p, c, s, d) {
       let v = 0; const tgtO = X.tO[p] * (d + 1) / nd, tgtC = X.tC[p] * (d + 1) / nd, tgtE = X.tE[p] * (d + 1) / nd;
       if (c === 'C') { if (s.last === 'C') v += s.crun < s.blen ? 6 : -2; else v += 2 * (tgtC - s.tC) - 1; }
+      if (X.hol.has(d + 1)) { const hr = inp.staff[p].cum && inp.staff[p].cum.holRate != null ? inp.staff[p].cum.holRate : .75; v += (c === 'O' ? 1 : -1) * 12 * (hr - .75); }
       if (c === 'O') { v += 1.5 * (tgtO - s.tO); if (s.last === 'O') v += s.orun === 1 ? 2 : -4; else if (s.wrun >= 5) v += 3; else if (s.wrun <= 2 && s.last !== 'C') v -= 2; if (s.last === 'C') v += 2; }
       if (c === 'E') { v += 1.2 * (tgtE - s.tE); if (s.last === 'E') v += s.erun >= 3 ? -2 : 1.5; }
       if (c === 'A' && s.last === 'A') v += 1.5;
@@ -257,7 +263,7 @@
       const opts = []; for (let p = 0; p < P; p++) opts.push(options(p, d, S[p]));
       const need = X.need[d]; const res = []; const cur = new Array(P);
       const cnt = { A: 0, E: 0, C: 0, O: 0 };
-      const keyOf = c => c === 'B' ? 'E' : c === '연' ? 'O' : c;
+      const keyOf = c => c === 'B' || c === 'D' ? 'E' : c === '연' ? 'O' : c;
       (function rec(p) {
         if (res.length > 4000) return;
         if (p === P) {
@@ -344,7 +350,7 @@
     const X = prep(inp); const rnd = mulberry(seed);
     let feasibleStart = false, G = null;
     if (startGrid) G = startGrid.map(r => r.slice());
-    else { for (let k = 0; k < 6 && !G; k++) G = dfsInit(inp, X, rnd, 3000); feasibleStart = !!G; if (!G) G = initGrid(inp, X, rnd); }
+    else { for (let k = 0; k < 60 && !G; k++) G = dfsInit(inp, X, rnd, 3000); feasibleStart = !!G; if (!G) G = initGrid(inp, X, rnd); }
     // 잠긴 칸 강제
     for (let p = 0; p < X.P; p++) for (let d = 0; d < X.nd; d++) if (X.lock[p][d]) G[p][d] = X.lock[p][d];
     const rc = G.map((r, p) => rowCost(inp, X, p, r));
@@ -479,15 +485,43 @@
     return G;
   }
 
+  // 11/22: 국공휴 휴무자를 미리 정함 — 그날 휴무 인원(필요 O − 휴무신청)만큼 누적 국공휴 출근율이 높은 사람부터.
+  //   한 달에 국공휴가 여러 날이면 앞 날 결과를 출근/휴무 기록에 더해 가며 다음 날을 정함 (같은 사람만 계속 쉬지 않게)
+  function autoHoliday(inp, ok) {
+    const out = {}, hols = (inp.holidays || []).slice().sort((a, b) => a - b);
+    if (!hols.length) return out;
+    const W = inp.staff.map(s => s.cum && s.cum.holW != null ? s.cum.holW : (s.cum && s.cum.holRate != null ? s.cum.holRate * 10 : 7.5));
+    const T = inp.staff.map(s => s.cum && s.cum.holT != null ? s.cum.holT : 10);
+    const rate = i => (W[i] + 1.5) / (T[i] + 2);   // 기록이 적은 사람은 평균 쪽으로 (0/0 방지)
+    hols.forEach(d => {
+      const busy = i => { const s = inp.staff[i], L = (s.locks || {})[d]; return s.forced.includes(d) || (L && L !== 'O'); };
+      const already = inp.staff.filter((s, i) => s.forced.includes(d) || (s.locks || {})[d] === 'O').length;
+      let need = inp.need.O - (inp.extraDays.includes(d) ? 1 : 0) - already;
+      const cand = inp.staff.map((s, i) => i).filter(i => !busy(i) && (inp.staff[i].locks || {})[d] !== 'O').sort((a, b) => rate(b) - rate(a) || T[b] - T[a]);
+      const pick = [];
+      for (const i of cand) {   // 편성이 가능한 사람만 (ok 가 있으면 넣어 보고 확인)
+        if (pick.length >= need) break;
+        const nm = inp.staff[i].name; (out[nm] = out[nm] || []).push(d);
+        if (ok && !ok(out)) { out[nm].pop(); if (!out[nm].length) delete out[nm]; continue; }
+        pick.push(i);
+      }
+      inp.staff.forEach((s, i) => { T[i]++; if (!pick.includes(i) && !s.forced.includes(d) && (s.locks || {})[d] !== 'O') W[i]++; });
+    });
+    return out;
+  }
+
   // 연차일 처리 방식 결정: 기본은 연차를 휴무 인원에 포함, 불가능하면 근무 인원에서 차감
   function chooseMode(inp, seed) {
     const rnd = mulberry(seed || 99);
-    for (const mode of ['inO', 'reduceA']) {
-      const I = Object.assign({}, inp, { leaveMode: mode }); const X = prep(I);
-      for (let k = 0; k < 6; k++) if (dfsInit(I, X, rnd, 3000)) return I;
-      if (!inp.staff.some(s => s.locks && Object.values(s.locks).includes('연'))) break;
+    const hasLeave = inp.staff.some(s => s.locks && Object.values(s.locks).includes('연'));
+    const feas = (mode, auto, tries) => { const I = Object.assign({}, inp, { leaveMode: mode, autoOff: auto }); const X = prep(I); for (let k = 0; k < tries; k++) if (dfsInit(I, X, rnd, 3000)) return I; return null; };
+    for (const mode of hasLeave ? ['inO', 'reduceA'] : ['inO']) {
+      if (!feas(mode, {}, 60)) continue;
+      // 국공휴 휴무자: 출근율 높은 순 + 편성 가능한 사람 (탐색 한 번 성공률이 30% 안팎이라 여러 번 시도 — 11/22 60번, 성공하면 바로 멈춤)
+      const ah = autoHoliday(inp, auto => !!feas(mode, JSON.parse(JSON.stringify(auto)), 60));
+      return feas(mode, ah, 60) || Object.assign({}, inp, { leaveMode: mode, autoOff: {} });
     }
-    return Object.assign({}, inp, { leaveMode: 'inO' });
+    return Object.assign({}, inp, { leaveMode: 'inO', autoOff: {} });
   }
 
   function solve(inp, opts) {
@@ -512,7 +546,7 @@
     const nm = p => inp.staff[p].name;
     for (let d = 0; d < X.nd; d++) {
       const cnt = { A: 0, E: 0, C: 0, O: 0 }; let key = false;
-      for (let p = 0; p < X.P; p++) { let c = G[p][d] || 'O'; if (c === '연') { if (inp.leaveMode === 'reduceA') continue; c = 'O'; } if (c === 'B') c = 'E'; cnt[c]++; if (c === 'C' && inp.staff[p].nightKey) key = true; }
+      for (let p = 0; p < X.P; p++) { let c = G[p][d] || 'O'; if (c === '연') { if (inp.leaveMode === 'reduceA') continue; c = 'O'; } if (c === 'B' || c === 'D') c = 'E'; cnt[c]++; if (c === 'C' && inp.staff[p].nightKey) key = true; }
       const t = X.need[d];
       const bad = ['A', 'E', 'C', 'O'].filter(k => cnt[k] !== t[k]);
       if (bad.length) out.push({ lv: 'hard', d: d + 1, msg: `${d + 1}일 인원 불일치: ` + bad.map(k => `${k} ${cnt[k]}/${t[k]}`).join(', ') });
@@ -548,8 +582,24 @@
         i = j;
       }
       if (cBlocks > 2) out.push({ lv: 'soft', p, msg: `${nm(p)} 야간 블록 ${cBlocks}회 (기준 2회)` });
+      const oN = r.filter(c => c === 'O').length;
+      if (X.minO[p] && oN < X.minO[p]) out.push({ lv: 'hard', p, msg: `${nm(p)} 휴무 ${oN}일 (오더테이커 최소 ${X.minO[p]}일)` });
       for (const ws of X.weeks) { let wk = 0; for (let k = ws; k < ws + 7; k++) if (isWork(r[k])) wk++; if (wk > 5) out.push({ lv: 'info', p, d: ws + 1, msg: `${nm(p)} ${ws + 1}일 주간(월~일) ${wk}일 근무` }); }
     }
+    // 국공휴: 그날 근무자 중 누적 출근율(앞 국공휴 결과 반영)이 휴무자보다 높은 사람 알림 (휴무신청으로 쉰 사람은 비교 제외)
+    const W = inp.staff.map(s => s.cum && s.cum.holW != null ? s.cum.holW : (s.cum && s.cum.holRate != null ? s.cum.holRate * 10 : 7.5));
+    const T = inp.staff.map(s => s.cum && s.cum.holT != null ? s.cum.holT : 10);
+    const rt = i => (W[i] + 1.5) / (T[i] + 2);
+    [...X.hol].sort((a, b) => a - b).forEach(d => {
+      if (d > X.nd) return;
+      const offs = inp.staff.map((q, j) => j).filter(j => G[j][d - 1] === 'O' && !X.forced[j][d - 1]);
+      inp.staff.forEach((q, p) => {
+        if (!isWork(G[p][d - 1])) return;
+        const low = offs.filter(j => rt(j) < rt(p) - .05);
+        if (low.length) out.push({ lv: 'soft', p, d, msg: `${nm(p)} ${d}일 국공휴 근무 — 누적 출근율 ${Math.round(rt(p) * 100)}%로 휴무자(${low.map(j => nm(j) + ' ' + Math.round(rt(j) * 100) + '%').join(', ')})보다 높음` });
+      });
+      inp.staff.forEach((q, i) => { T[i]++; if (isWork(G[i][d - 1])) W[i]++; });
+    });
     return out;
   }
 
@@ -561,6 +611,6 @@
     return { type: t, n };
   }
 
-  const api = { chooseMode, dfsInit, solve, polish, pairLNS, validate, createRun, prep, totalCost, nextCarry, allowedFor };
+  const api = { autoHoliday, chooseMode, dfsInit, solve, polish, pairLNS, validate, createRun, prep, totalCost, nextCarry, allowedFor };
   if (typeof module !== 'undefined') module.exports = api; else root.HKSolver = api;
 })(this);

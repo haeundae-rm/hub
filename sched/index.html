@@ -31,7 +31,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Noto Sans KR"
 .top .lo{background:transparent;color:#fff;border-color:rgba(255,255,255,.35);min-height:36px;padding:4px 12px}
 .ttlrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 12px}.ttlrow h2{margin:0;font-size:clamp(20px,2.6vw,26px);font-weight:800}
 .stc{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:800;background:#F2F5FA;color:var(--mut)}.stc.ok{background:#1D3A6E;color:#fff}
-body.ro .edit{display:none!important}body.ro td.c{cursor:default}body.ro .g thead th.day{cursor:default}
+[hidden]{display:none!important}body.ro .edit{display:none!important}body.ro td.c{cursor:default}body.ro .g thead th.day{cursor:default}
 .wrap{padding:16px max(4vw,16px) 40px;max-width:1500px;margin:0 auto}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .bar .sp{flex:1}
@@ -57,7 +57,7 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;width:max-conte
 .g thead th.ext{background:light-dark(#fff6dd,#3a3114)}
 td.c{width:34px;min-width:34px;cursor:pointer;font-weight:700;position:relative;border-left:1px solid light-dark(#f0f2f6,#1d283c)}
 td.c.A{background:var(--A);color:var(--Af)}td.c.C{background:var(--C);color:var(--Cf)}td.c.E{background:var(--E);color:var(--Ef)}
-td.c.B{background:var(--B);color:var(--Bf)}td.c.L{background:var(--L);color:var(--Lf);font-size:11px}td.c.O{color:var(--Of);font-weight:500}
+td.c.B{background:var(--B);color:var(--Bf)}td.c.D{background:#DDF0EA;color:#1F7A5C}td.c.ho{box-shadow:inset 0 -3px 0 #8B2E3F}td.c.nt::before{content:"";position:absolute;left:3px;top:3px;width:5px;height:5px;border-radius:50%;background:#B4650B}td.c.L{background:var(--L);color:var(--Lf);font-size:11px}td.c.O{color:var(--Of);font-weight:500}
 td.c.f{box-shadow:inset 0 0 0 2px var(--red)}td.c.f.O{color:var(--red)}
 td.c.lk::after{content:"";position:absolute;right:3px;top:3px;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
 td.c.bad{outline:2px solid var(--amber);outline-offset:-3px}
@@ -130,9 +130,11 @@ table.st{border-collapse:collapse;font-size:14px;width:100%;min-width:820px}
     <button id="gen" class="pri edit">자동 편성</button>
     <button id="unlock" class="edit">고정 해제</button>
     <button id="xls">엑셀 저장</button>
+    <button id="prt">인쇄 · PDF</button>
     <button id="conf" class="edit">확정하기</button>
     <button id="next" class="edit">확정하고 다음 달로</button>
   </div>
+  <div class="card edit" id="pastBox" hidden style="margin:0 0 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:240px">📂 <b>2026년 2~11월 지난 스케줄</b>을 아직 앱에 안 넣었어요. 한 번 넣으면 연·월을 바꿔 지난 달을 보고, 하우스키퍼 보기 화면에서도 열람돼요.</span><button id="pastBtn" class="pri">지난 스케줄 넣기</button></div>
   <div class="chips" id="chips"></div>
   <div class="board"><div class="prog" id="prog"></div><table class="g" id="grid"></table></div>
   <div class="legend">
@@ -180,7 +182,7 @@ table.st{border-collapse:collapse;font-size:14px;width:100%;min-width:820px}
 <div class="pop" id="pop"></div>
 <div class="toast" id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-<script src="./solver.js?v=2026.11.22-3"></script>
-<script type="module" src="./sched.js?v=2026.11.22-3"></script>
+<script src="./solver.js?v=2026.11.22-6"></script>
+<script type="module" src="./sched.js?v=2026.11.22-6"></script>
 </body>
 </html>

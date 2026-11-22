@@ -42,7 +42,7 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;width:max-conte
 .g .nm small{display:block;font-weight:400;color:var(--muted);font-size:11px;line-height:1.1}
 .g .sat{color:#2f62c8}.g .sun{color:var(--red)}.g th.today{background:#FFF6D6;color:var(--ink);font-weight:900}
 td.c{font-weight:800}td.c.A{background:var(--A);color:var(--Af)}td.c.C{background:var(--C);color:var(--Cf)}td.c.E{background:var(--E);color:var(--Ef)}
-td.c.B{background:var(--B);color:var(--Bf)}td.c.L{background:var(--L);color:var(--Lf);font-size:11px}td.c.O{color:var(--Of);font-weight:500}
+td.c.B{background:var(--B);color:var(--Bf)}td.c.D{background:#DDF0EA;color:#1F7A5C}td.c{position:relative}td.c.ho{box-shadow:inset 0 -3px 0 #8B2E3F}td.c.nt::before{content:"";position:absolute;left:3px;top:3px;width:5px;height:5px;border-radius:50%;background:#B4650B}td.c.L{background:var(--L);color:var(--Lf);font-size:11px}td.c.O{color:var(--Of);font-weight:500}
 td.c.f{box-shadow:inset 0 0 0 2px var(--red)}td.c.f.O{color:var(--red)}td.c.today{outline:2px solid #E0B43C;outline-offset:-2px}
 td.s{padding:0 8px;color:var(--muted);font-variant-numeric:tabular-nums}td.s b{color:var(--ink)}
 tr.sep td{height:22px;font-size:11.5px;color:var(--muted);text-align:left;padding-left:8px;background:var(--tile);font-weight:800}
@@ -62,6 +62,8 @@ table.ht{border-collapse:collapse;font-size:13px;width:max-content;min-width:100
 .ht td.on{background:var(--A);color:var(--Af);font-weight:800}.ht td.off{color:var(--Of)}.ht tr.top2 td{border-top:2px solid var(--line)}
 input.t{display:block;width:100%;min-height:46px;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;margin:10px 0;font-size:16px}
 .big{display:block;width:100%;min-height:52px;border-radius:14px;border:0;background:var(--brand);color:#fff;font-weight:900;font-size:16px;cursor:pointer}
+.prow{display:flex;justify-content:flex-end;margin:0 0 10px}.prow .big{width:auto;padding:0 18px;min-height:44px}.big.sec{background:var(--tile);color:var(--ink);border:1.5px solid var(--line)}
+.memo{margin-top:12px;font-size:13px}.memo ul{list-style:none;margin:6px 0 0;padding:0}.memo li{padding:4px 0;border-bottom:1px dashed var(--line)}.memo li span{display:inline-block;min-width:70px;color:var(--muted)}.memo li b{margin-right:4px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none}.toast.on{opacity:1}
 </style>
 </head>
@@ -69,6 +71,6 @@ input.t{display:block;width:100%;min-height:46px;border:1.5px solid var(--line);
 <header class="top"><a class="back" href="../#hk" aria-label="허브로">‹</a><h1>🗓️ 근무 스케줄<small id="who"></small></h1></header>
 <main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
 <div class="toast" id="toast"></div>
-<script type="module" src="./view.js?v=2026.11.22-3"></script>
+<script type="module" src="./view.js?v=2026.11.22-5"></script>
 </body>
 </html>
