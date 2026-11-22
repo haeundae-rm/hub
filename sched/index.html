@@ -155,7 +155,7 @@ table.st{border-collapse:collapse;font-size:14px;width:100%;min-width:820px}
   <div class="card" style="margin-top:16px">
     <div class="bar" style="margin:0 0 8px"><h2 style="margin:0;font-size:17px;font-weight:800">누적 현황</h2>
       <div class="seg" role="group" aria-label="현황 종류"><button id="hEC" class="on">E조·C조 월별</button><button id="hHol">국공휴 출근</button></div>
-      <select id="hY" aria-label="현황 연도"></select><span class="sp"></span><span class="note">이번 달 편성안은 흐린 열로 미리 보여주고, "확정하고 다음 달로" 때 기록됩니다</span></div>
+      <select id="hY" aria-label="현황 연도"></select><button id="hSnap">🖼️ 이미지로 공유</button><span class="sp"></span><span class="note">확정하면 그 달이 자동으로 기록돼요 · 확정 전 편성안은 흐린 (안) 열로 미리 보기</span></div>
     <div class="scroll"><table class="ht" id="histT"></table></div>
   </div>
   <details class="set edit" id="setBox">
@@ -183,7 +183,7 @@ table.st{border-collapse:collapse;font-size:14px;width:100%;min-width:820px}
 <div class="pop" id="pop"></div>
 <div class="toast" id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-<script src="./solver.js?v=2026.11.22-13"></script>
-<script type="module" src="./sched.js?v=2026.11.22-13"></script>
+<script src="./solver.js?v=2026.11.22-14"></script>
+<script type="module" src="./sched.js?v=2026.11.22-14"></script>
 </body>
 </html>
