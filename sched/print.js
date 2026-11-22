@@ -1,6 +1,6 @@
-// hub/sched/print.js — 🖨️ 근무 스케줄 인쇄 · PDF (2026-11-22, 2판: 머리 · 요약 · 결재란 · 타일형 칸)
+// hub/sched/print.js — 🖨️ 근무 스케줄 인쇄 · PDF (2026-11-22, 2판: 머리 · 요약 · 타일형 칸 — 결재란 없음, 소장이 직접 편성)
 // A4 가로 한 장. 옛 엑셀 근무스케줄 내용(관리자 → 하우스맨, 전월, 일자별 코드, 신청 휴무 빨간 테두리, 개인 합계, 일자별 인원)을 그대로 담고
-// 보고서처럼 보이게: 머리(제목 · 요약 · 결재란) → 표(주 단위 구분선, 둥근 칸) → 범례 · 메모 → 바닥글
+// 보고서처럼 보이게: 머리(제목 · 요약 · 확정 표시) → 표(주 단위 구분선, 둥근 칸) → 범례 · 메모 → 바닥글
 // 인쇄 창에서 'PDF로 저장' → 글자가 깨지지 않는 벡터 PDF
 // 쓰는 곳: sched/sched.js · sched/view.js — printSchedule({ year, month, staff, managers, codeOf, mgr, mgrDefault, forced, notes, holidays, extra, state, leaveMode, autoOff })
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
@@ -29,12 +29,9 @@ const CSS = `
 #schPrint .kpi b{display:block;font-size:11pt;font-weight:900;color:#10233F;line-height:1.1}
 #schPrint .kpi span{font-size:6.2pt;color:#6B7688;font-weight:600}
 #schPrint .kpi div.hl{background:#10233F;border-color:#10233F}#schPrint .kpi div.hl b{color:#fff}#schPrint .kpi div.hl span{color:#C8A96A}
-#schPrint .sign{border-collapse:collapse;table-layout:fixed}
-#schPrint .sign th{width:15mm;height:4.2mm;font-size:6.8pt;font-weight:700;color:#fff;background:#1F3864;border:.6pt solid #1F3864}
-#schPrint .sign td{height:11mm;border:.6pt solid #B9C3D1;background:#fff}
-#schPrint .sign caption{caption-side:bottom;text-align:right;font-size:6.2pt;color:#7A869A;padding-top:.8mm}
-#schPrint .sign caption i{font-style:normal;display:inline-block;padding:.2mm 1.8mm;border-radius:1mm;font-weight:800;margin-right:1.2mm}
-#schPrint .sign caption i.ok{background:#10233F;color:#fff}#schPrint .sign caption i.no{background:#FDEDEF;color:#B23A48}
+#schPrint .meta{text-align:right;font-size:6.4pt;color:#7A869A;line-height:1.6}
+#schPrint .meta i{font-style:normal;display:block;margin:0 0 .6mm auto;width:max-content;padding:.6mm 3mm;border-radius:1.2mm;font-weight:900;font-size:8pt}
+#schPrint .meta i.ok{background:#10233F;color:#fff}#schPrint .meta i.no{background:#FDEDEF;color:#B23A48}
 #schPrint .frame{border:.9pt solid #10233F;border-radius:2mm;overflow:hidden}
 #schPrint table.pgt{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
 #schPrint .pgt th,#schPrint .pgt td{text-align:center;vertical-align:middle;padding:0;overflow:hidden;white-space:nowrap;border-right:.4pt solid #E1E6EE;border-bottom:.4pt solid #E1E6EE}
@@ -101,14 +98,13 @@ function html(o) {
   const holOff = hol.slice().sort((a, b) => a - b).map(d => o.staff.filter((s, p) => G[p][d - 1] === 'O').map(s => s.name).join('·')).filter(Boolean);
   const dcls = d => { const w = dow(d); return (hol.includes(d) ? 'hol' : ext.includes(d) ? 'ext' : w === 6 ? 'sat' : w === 0 ? 'sun' : '') + (w === 1 && d > 1 ? ' mon' : ''); };
 
-  // ---- 머리: 제목 · 요약 · 결재란
+  // ---- 머리: 제목 · 요약 · 확정 여부
   let h = '<div class="ptop"><div><p class="brand">한화리조트 해운대 · 객실 하우스키핑</p><h1>' + o.month + '월 근무 스케줄<span>' + o.year + '</span></h1>' +
     '<p class="sub">하우스맨 ' + o.staff.length + '명' + (o.managers && o.managers.length ? ' · 관리자 ' + o.managers.length + '명' : '') +
     ' · 토·일 ' + wkEnd + '일' + (hol.length ? ' · 국공휴 ' + hol.slice().sort((a, b) => a - b).map(d => o.month + '/' + d + '(' + WD[dow(d)] + ')').join(', ') : '') + '</p></div>';
   h += '<div class="kpi"><div class="hl"><b>' + rng(offs) + '일</b><span>1인 휴무</span></div><div><b>' + rng(rotC) + '일</b><span>야간(로테이션)</span></div>' +
     (holOff.length ? '<div><b style="font-size:8.4pt">' + esc(holOff.join(' / ')) + '</b><span>국공휴 휴무</span></div>' : '') + '</div>';
-  h += '<table class="sign"><tr><th>담당</th><th>부소장</th><th>소장</th></tr><tr><td></td><td></td><td></td></tr>' +
-    '<caption><i class="' + (o.state === '확정' ? 'ok">확정' : 'no">미확정') + '</i>출력 ' + stamp() + '</caption></table></div>';
+  h += '<div class="meta"><i class="' + (o.state === '확정' ? 'ok">확정' : 'no">미확정') + '</i><span>출력 ' + stamp() + '</span></div></div>';
 
   // ---- 표
   const dayW = nd === 31 ? 6.2 : 6.45;
