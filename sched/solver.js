@@ -350,7 +350,7 @@
     const X = prep(inp); const rnd = mulberry(seed);
     let feasibleStart = false, G = null;
     if (startGrid) G = startGrid.map(r => r.slice());
-    else { for (let k = 0; k < 6 && !G; k++) G = dfsInit(inp, X, rnd, 3000); feasibleStart = !!G; if (!G) G = initGrid(inp, X, rnd); }
+    else { for (let k = 0; k < 60 && !G; k++) G = dfsInit(inp, X, rnd, 3000); feasibleStart = !!G; if (!G) G = initGrid(inp, X, rnd); }
     // 잠긴 칸 강제
     for (let p = 0; p < X.P; p++) for (let d = 0; d < X.nd; d++) if (X.lock[p][d]) G[p][d] = X.lock[p][d];
     const rc = G.map((r, p) => rowCost(inp, X, p, r));
@@ -516,9 +516,10 @@
     const hasLeave = inp.staff.some(s => s.locks && Object.values(s.locks).includes('연'));
     const feas = (mode, auto, tries) => { const I = Object.assign({}, inp, { leaveMode: mode, autoOff: auto }); const X = prep(I); for (let k = 0; k < tries; k++) if (dfsInit(I, X, rnd, 3000)) return I; return null; };
     for (const mode of hasLeave ? ['inO', 'reduceA'] : ['inO']) {
-      if (!feas(mode, {}, 6)) continue;
-      const ah = autoHoliday(inp, auto => !!feas(mode, JSON.parse(JSON.stringify(auto)), 3));   // 국공휴 휴무자: 출근율 높은 순 + 편성 가능한 사람
-      return feas(mode, ah, 6) || Object.assign({}, inp, { leaveMode: mode, autoOff: {} });
+      if (!feas(mode, {}, 60)) continue;
+      // 국공휴 휴무자: 출근율 높은 순 + 편성 가능한 사람 (탐색 한 번 성공률이 30% 안팎이라 여러 번 시도 — 11/22 60번, 성공하면 바로 멈춤)
+      const ah = autoHoliday(inp, auto => !!feas(mode, JSON.parse(JSON.stringify(auto)), 60));
+      return feas(mode, ah, 60) || Object.assign({}, inp, { leaveMode: mode, autoOff: {} });
     }
     return Object.assign({}, inp, { leaveMode: 'inO', autoOff: {} });
   }
