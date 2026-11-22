@@ -86,7 +86,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('① 휴대폰 첫 화면 (할 일 있음)');
   let p = await open(b, phone, 'busy');
   const tiles = await p.locator('.hm-tile').allInnerTexts();
-  ok(tiles.length === 11, '업무 버튼 11개 (🔑 플로어 키 · 🧳 습득물 더함): ' + tiles.map(t => t.split('\n').find(x => /[가-힣]/.test(x) && !/^(승인|입사|퇴사일|확인|\d)/.test(x))).join(', '));
+  ok(tiles.length === 12, '업무 버튼 12개 (🔑 플로어 키 · 🧳 습득물 · 🗓️ 근무 스케줄 편성 더함): ' + tiles.map(t => t.split('\n').find(x => /[가-힣]/.test(x) && !/^(승인|입사|퇴사일|확인|\d)/.test(x))).join(', '));
   const todo = await p.locator('.hm-todo li').allInnerTexts();
   ok(todo.some(t => /승인 대기 2건/.test(t)), '할 일: 휴가신청서 승인 대기 2건 (지운 것·승인된 것 빼고)');
   ok(todo.some(t => /퇴사일 지난 분 1명/.test(t)), '할 일: 퇴사일 지난 분 1명');
@@ -119,7 +119,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await shot(p, '3_오늘정비_더티활동.png');
   console.log('③ 휴대폰 뒤로 → 첫 화면');
   await p.goBack(); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 11 && !/#/.test(p.url().replace(BASE + 'hub/', '')), '뒤로 한 번에 첫 화면 (탭 이동은 기록 안 쌓임)');
+  ok(await p.locator('.hm-tile').count() === 12 && !/#/.test(p.url().replace(BASE + 'hub/', '')), '뒤로 한 번에 첫 화면 (탭 이동은 기록 안 쌓임)');
   await p.click('[data-go="people"]'); await sleep(300);
   ok(await p.locator('.pn-bg').count() === 1 && /비밀번호 정하기/.test(await p.innerText('.pn-bg')), '🔒 처음: 화면 비밀번호 정하기');
   await pin(p, ['1234', '1235']); ok(/달라요/.test(await p.innerText('.pn-bg')), '두 번 다르면 다시');
@@ -138,7 +138,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(ro && !ro.hide.includes('새보조') && ro.hide.includes('퇴보조'), '숨겨 있던 이름 다시 보이고, 퇴사는 뺌 ' + JSON.stringify(ro && ro.hide));
   await p.click('[data-sb="close"]').catch(() => {}); await sleep(300);
   await p.click('[data-home]'); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 11, '‹ 버튼 → 첫 화면');
+  ok(await p.locator('.hm-tile').count() === 12, '‹ 버튼 → 첫 화면');
   for (const [g, re] of [['quality', /인스펙션[\s\S]*VOC/], ['field', /공지 확인[\s\S]*휴대폰 오류[\s\S]*오늘 1건/], ['apps', /정비 레포트[\s\S]*정비 지원[\s\S]*입퇴사 서류/]]) {
     await p.click('[data-go="' + g + '"]'); await sleep(250);
     ok(re.test(await p.innerText('main')), g + ' 안쪽 내용');
@@ -240,7 +240,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(/인사 화면 비밀번호/.test(await p.innerText('.pn-bg')), '30분 지나면 다시 물음');
   await pin(p, ['9999']); await p.waitForFunction(() => /맞지/.test(document.querySelector('.pn-err').innerText), null, { timeout: 3000 }).catch(() => {}); ok(/맞지 않아요\. \(1\/5\)/.test(await p.innerText('.pn-bg')), '틀리면 막음 (1/5)');
   await p.click('.pn-no'); await sleep(200);
-  ok(!/#people/.test(p.url()) && await p.locator('.hm-tile').count() === 11, '취소하면 첫 화면 그대로');
+  ok(!/#people/.test(p.url()) && await p.locator('.hm-tile').count() === 12, '취소하면 첫 화면 그대로');
   const [req] = await Promise.all([p.waitForSelector('.pn-bg'), p.click('.hm-tile[href="./leave/"]')]);
   ok(/연차 · 근무 화면 비밀번호/.test(await p.innerText('.pn-bg')) && /hub\/(#.*)?$/.test(p.url()), '연차·근무 버튼도 물음 (넘어가기 전)');
   await p.click('.pn-no'); await sleep(200);
@@ -273,7 +273,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.click('[data-actclose]'); await sleep(300);
   ok(await p.locator('#actp').count() === 0, '✕ 로 닫힘');
   await p.click('[data-home]'); await sleep(300);
-  ok(await p.locator('.hm-tile').count() === 11, '첫 화면으로');
+  ok(await p.locator('.hm-tile').count() === 12, '첫 화면으로');
   ok(/모두 정상/.test(await p.innerText('main')), '할 일 없으면 "모두 정상" 한 줄');
   await shot(p, '6_첫화면_모두정상.png');
   ok(p.errs.length === 0, '화면 오류 없음 ' + p.errs.join(' | '));
@@ -414,7 +414,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   console.log('⑨ 하우스키퍼 공용 계정 (허브)');
   p = await open(b, phone, 'busy', '', 2);
   const ht = await p.locator('.hm-tile').allInnerTexts();
-  ok(ht.length === 8 && !ht.some(t => /인사|연차 · 근무|결산/.test(t)), '하우스키퍼: 인사 · 연차 · 결산 버튼 없음 (' + ht.length + '개)');
+  ok(ht.length === 8 && !ht.some(t => /인사|연차 · 근무|결산|스케줄 편성/.test(t)), '하우스키퍼: 인사 · 연차 · 결산 · 스케줄 편성 버튼 없음 (' + ht.length + '개)');
   ok(/하우스키퍼/.test(await p.innerText('#today')), '머리 줄에 하우스키퍼');
   const htodo = await p.innerText('main');
   ok(!/승인 대기|퇴사일/.test(htodo), '할 일에 연차 · 퇴사 줄 없음');

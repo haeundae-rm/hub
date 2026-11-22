@@ -3,7 +3,7 @@
 // 편성 엔진은 solver.js (window.HKSolver, 순수 계산·Firebase 모름). 규칙 명세는 claude 프로젝트 '하우스맨 스케줄 편성' 문서
 // 저장: hksched/cfg = 명단(구분·방편성·이월·누적) · 관리자 · 필요인원 · 누적 현황(hist: E조·C조 월별, 국공휴 출근)
 //       hksched/{YYYY-MM} = 그 달 휴무신청 · 직접 고정 · 관리자 칸 · 편성 결과 · 상태(작성중/확정)
-// 쓰는 사람: 소장·부소장(편성·수정) / 하우스키퍼·파트장 계정(확정된 달 보기만)
+// 쓰는 사람: 소장·부소장만 (허브 첫 화면 '근무 스케줄 편성' 칸). 하우스키퍼·파트장 계정이 열면 보기 화면(view.html)으로 보냄 (11/22 기능 분리)
 import * as DB from '../../rm/app/store.js';
 const $ = id => document.getElementById(id);
 const HOL = {2026:{1:[1],2:[16,17,18],3:[1],5:[1,5,24],6:[3,6],7:[17],8:[15],9:[24,25,26],10:[3,9],12:[25]},
@@ -433,7 +433,7 @@ function drawLogin(){
     '<input type="password" id="pw" autocomplete="current-password" placeholder="비밀번호" style="display:block;width:100%;margin:10px 0">' +
     (login.err ? `<p style="color:var(--red);font-weight:700;margin:0 0 8px">${esc(login.err)}</p>` : '') +
     `<button class="pri" id="doLogin" style="width:100%" ${login.busy?'disabled':''}>${login.busy?'확인 중…':'들어가기'}</button>` +
-    '<p class="note">편성·수정은 소장·부소장 계정, 하우스키퍼·파트장 계정은 확정된 스케줄 보기만 돼요.</p>';
+    '<p class="note">소장·부소장 전용 편성 화면이에요. 하우스키퍼·파트장 계정은 스케줄 보기 화면으로 넘어가요.</p>';
 }
 $('loginBox').addEventListener('click', e => { const w = e.target.closest('[data-who]'); if (w) { login.who = +w.dataset.who; drawLogin(); } if (e.target.id === 'doLogin') doLogin(); });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pw') doLogin(); });
@@ -449,6 +449,7 @@ DB.onUser(u => {
   user = u || null; role = roleOf(u);
   document.body.classList.toggle('ro', !canEdit());
   $('who').textContent = role ? role.label + (canEdit() ? '' : ' · 보기 전용') : '';
+  if (role && !canEdit()) { location.replace('./view.html' + location.hash); return; }   // 11/22: 편성은 소장 · 부소장만 — 하우스키퍼 · 파트장은 보기 화면으로
   if (u && !u.anon && !role) login.err = '지금 로그인된 계정은 이 화면을 쓸 수 없어요. 아래에서 다시 들어가 주세요.';
   if (role) open(); else drawLogin();
 });

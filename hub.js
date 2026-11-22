@@ -670,12 +670,12 @@ function hrHtml(v) {
   if (r.past.length) h += '<h3 class="hrh" style="color:var(--wait)">퇴사일 지남 <small>아직 재직으로 남아 있어요</small></h3><ul class="hrl">' + r.past.map(p => row(p, '퇴사 ' + md(p.left) + ' (' + dd(p.left) + ')')).join('') + '</ul><p class="note" style="margin-top:6px">입퇴사 서류 앱에서 퇴사 처리를 마치면 다음 갱신 때 빠져요.</p>';
   return h + open + '</div>';
 }
-// 🛎️ 하우스키퍼 (11/21): 첫 화면 칸 → 안쪽에서 야간 업무 보고서 · 근무 스케줄(11/22, sched/) · 연차 현황 고르기 (다른 칸과 같은 방식)
+// 🛎️ 하우스키퍼 (11/21): 첫 화면 칸 → 안쪽에서 야간 업무 보고서 · 근무 스케줄 보기(11/22, sched/view.html — 편성은 첫 화면 '근무 스케줄 편성' 칸, 소장·부소장만) · 연차 현황 고르기 (다른 칸과 같은 방식)
 function hkSecHtml() {
   const n = view.st ? nightWait(view.st).length : 0;
   return '<div class="card"><h2>무엇을 열까요?</h2><div class="go-grid">' +
     '<a class="go" href="./night/"><span class="ic">🌙</span><b>야간 업무 보고서' + (n ? ' <i class="hm-bd wait" style="position:static;margin-left:4px">확인 ' + n + '</i>' : '') + '</b><span>야간 근무 보고 · 확인 · 인쇄</span></a>' +
-    '<a class="go" href="./sched/"><span class="ic">🗓️</span><b>근무 스케줄</b><span>' + (admin && !isHk() ? '월 스케줄 자동 편성 · 확정 · 엑셀' : '확정된 이번 달 · 다음 달 근무표') + '</span></a>' +
+    '<a class="go" href="./sched/view.html"><span class="ic">🗓️</span><b>근무 스케줄</b><span>확정된 스케줄표 · 휴무신청 · 누적 현황 (보기)</span></a>' +
     '<button class="go" data-hkleave="1"><span class="ic">📅</span><b>연차 현황</b><span>이름 고르고 본인 비밀번호 4자리 → 내 연차</span></button></div></div>';
 }
 function linksHtml() {
@@ -708,6 +708,7 @@ const TILES = [
   { go: 'hk', ic: '🛎️', t: '하우스키퍼', s: '야간 업무 보고서 · 근무 스케줄 · 연차 현황' },
   { href: './keys/', ic: '🔑', t: '플로어 키', s: '키 서명 현황 · 오후 대조 · 미반납 · 대장 인쇄' },
   { href: './lost/', ic: '🧳', t: '습득물', s: '습득물 관리대장 · 확인 · 조치 · 귀중품 · 엑셀' },
+  { href: './sched/', ic: '🗓️', t: '근무 스케줄 편성', s: '하우스맨 월 스케줄 자동 편성 · 확정 · 엑셀 (소장 · 부소장)' },
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
   { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
   { go: 'close', ic: '📊', t: '결산', s: '결산 특이사항 · 입퇴사 현황 · 출역표 · 연차 대장' },
@@ -835,7 +836,7 @@ function homeHtml() {
     } else h += '<div class="card hm-ok"><b>✅ 모두 정상</b><span>' + hm(view.at) + ' 기준</span><button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></div>';
   }
   if (v && v.bd) h += BD.html(v.bd, esc);
-  h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.go === 'close' || t.href === './leave/'))).map(t => {
+  h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.go === 'close' || t.href === './leave/' || t.href === './sched/'))).map(t => {
     const inner = badgeOf(t, v) + '<span class="hm-ic">' + t.ic + '</span><span class="hm-tx"><b>' + esc(t.t) + '</b><small>' + esc(t.s) + '</small></span>';
     return t.href ? '<a class="hm-tile' + (t.wide ? ' wide' : '') + '" href="' + t.href + '">' + inner + '</a>'
       : '<button class="hm-tile' + (t.wide ? ' wide' : '') + '" data-go="' + t.go + '">' + inner + '</button>';
