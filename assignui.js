@@ -3,7 +3,7 @@
 // 2단계 (11/13): 객실 옮기기(고치기) · 2901 바꾸기 → ✅ 확정 → 앱에 올리기 (초안일 때만: 이름 넣은 정비보고서로 engine makeRows → 허브 '정비보고서 올리기'와 같은 길 → 메이드 휴대폰·더티 배분)
 // 정비보고서 xlsx(오더테이커용) 채우기는 다음 단계
 // 저장: meta/assign { quota, lastHo, hist2901:[{date, names}], log:[{date, pct, ...}] } — 관리자만 씀 (규칙 meta: 읽기 로그인, 쓰기 관리자)
-import { DEF_CFG, compare } from './assign.js?v=2026.11.19-15';
+import { DEF_CFG, compare } from './assign.js?v=2026.11.25-1';
 import { FLOORS, parseMsg, blockedOn, releasedPrio, newId, prune, COLORS } from './blocks.js?v=2026.11.18-1';
 
 const VER = '2026.11.19-15';   // 11/19 엔진(assign.js)·worker 새로 받게
@@ -200,7 +200,24 @@ function gapInfo() {
 function byName(R) { const o = {}; Object.keys((R && R.workers) || {}).forEach(n => { o[n] = R.workers[n].rooms.slice(); }); return o; }
 function hkByName() { const o = {}; (A.done || []).forEach(x => { String(x.name || '').split(',').map(s => s.replace(/ /g, '')).filter(Boolean).forEach(n => { (o[n] = o[n] || []).push(String(x.room)); }); }); return o; }
 function cmpLite() { const C = A.cmp; return C ? { pct: C.pct, same: C.same, total: C.total, hkAvg: Math.round(C.hkAvg * 100) / 100, hkThree: C.hkThree.length } : null; }
+// 11/25: Firestore 는 '배열 안의 배열'과 undefined 를 못 받음(invalid-argument) — 2인 1조 teams [[a,b]] 때문에 의견 저장 · asg_days 가 실패했음
+//   → 안쪽 배열은 'a,b' 글자로 (엔진 opts.teams 는 글자도 받음), undefined 는 빼고, NaN · Infinity 는 null
+export function fsSafe(v, inArr) {
+  if (v === undefined) return undefined;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (Array.isArray(v)) {
+    if (inArr) return v.every(x => x == null || typeof x !== 'object') ? v.map(x => x == null ? '' : String(x)).join(',') : JSON.stringify(v);
+    return v.map(x => fsSafe(x, true)).map(x => x === undefined ? null : x);
+  }
+  if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
+    const o = {}; Object.keys(v).forEach(k => { const x = fsSafe(v[k], false); if (x !== undefined) o[k] = x; }); return o;
+  }
+  return v;
+}
 export function snapshot() {
+  const s0 = snapshotRaw(); return s0 ? fsSafe(s0) : null;
+}
+function snapshotRaw() {
   if (!A || !A.res) return null;
   const s = A.res.stats || {};
   return { date: A.date, file: A.file || '', kind: A.done ? '완성본 대조' : '초안', engine: A.res0 || byName(A.res), final: byName(A.res), edits: (A.edits || []).slice(), left: (A.res.left || []).slice(),
