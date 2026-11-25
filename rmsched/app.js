@@ -305,21 +305,26 @@ function setDaily(fn) {
 function hkHtml() {
   const V = C.dailyView(S.w, S.di), s = V.sum, t = md(V.date) + ' (' + DAYS[S.di] + ')';
   const n = Math.max(V.rm.length, 14);
-  let h = dayChips() + `<div class="tools"><button class="pri" data-share="hkPaper" data-fn="HK전파_${V.date}" data-ttl="${t} HK 전파">카톡으로 공유</button><button id="saveImg" data-el="hkPaper" data-fn="HK전파_${V.date}">이미지로 저장</button><button id="copyHk">카톡용 글 복사</button><span class="lbl">빨간 숫자 = 일일 스케줄 '유닛 수정'으로 기본보다 늘어난 유닛</span></div>`;
-  h += `<div class="scroll" style="border:0;background:none"><div class="paper hk" id="hkPaper">
-    <div><div class="ttl">${t} RM 방배정표</div><table><tr><th>순번</th><th>성함</th><th>정비유닛</th></tr>
+  // 보낼 것 고르기 (11/25): 전체 = HK 전파 · 방배정표만 = 룸메이드 출근자 공지 · 정비보조 명단만 = 정비보조 공지 — 화면에 보이는 그대로 이미지가 됨
+  const P = S.hkPart || 'all', PL = { all: ['HK 전파 (전체)', 'HK전파'], rm: ['룸메이드 방배정표', '방배정표'], sup: ['정비보조 명단', '정비보조명단'] };
+  let h = dayChips() + `<div class="tools"><span class="lbl">보낼 것</span><div class="seg">${Object.keys(PL).map(k => `<button data-hkp="${k}" class="${P === k ? 'on' : ''}">${PL[k][0]}</button>`).join('')}</div></div>
+    <div class="tools"><button class="pri" data-share="hkPaper" data-fn="${PL[P][1]}_${V.date}" data-ttl="${t} ${PL[P][0]}">카톡으로 공유</button><button id="saveImg" data-el="hkPaper" data-fn="${PL[P][1]}_${V.date}">이미지로 저장</button><button id="copyHk">카톡용 글 복사</button><span class="lbl">${P === 'sup' ? '정비보조 출근은 주간 스케줄 → 정비보조 출근에서 표시해요' : '빨간 숫자 = 일일 스케줄 \'유닛 수정\'으로 기본보다 늘어난 유닛'}</span></div>`;
+  h += `<div class="scroll" style="border:0;background:none"><div class="paper hk ${P !== 'all' ? 'one' : ''}" id="hkPaper">
+    ${P === 'sup' ? '' : `<div><div class="ttl">${t} RM 방배정표</div><table><tr><th>순번</th><th>성함</th><th>정비유닛</th></tr>
       ${Array.from({ length: n }, (_, i) => { const x = V.rm[i]; return `<tr><td>${x ? i + 1 : ''}</td><td class="nmc">${x ? esc(x.r.name) : ''}</td><td class="uc ${x && x.up ? 'up' : ''}">${x ? x.u : ''}</td></tr>`; }).join('')}
-      <tr><td colspan="2" style="font-weight:700">출근 인원 · 정비유닛</td><td class="uc">${V.rm.length} · ${s.jb}</td></tr></table></div>
-    <div><div class="ttl">정비 예상 요약</div><table style="width:100%">
+      <tr><td colspan="2" style="font-weight:700">출근 인원 · 정비유닛</td><td class="uc">${V.rm.length} · ${s.jb}</td></tr></table></div>`}
+    ${P !== 'all' ? '' : `<div><div class="ttl">정비 예상 요약</div><table style="width:100%">
       ${[['예약', nv(s.res)], ['체크아웃', nv(s.co)], ['정비수', s.jb], ['출근인원', s.ppl], ['C/O - 필요재입', nv(s.coRe)], ['인당정비수', f1(s.per)], ['재입 예상', f1(s.reent)]].map(([a, b]) => `<tr><td style="text-align:left;font-weight:700;background:#F2F5FA;min-width:120px">${a}</td><td style="font-weight:800;font-size:16px;min-width:80px">${b}</td></tr>`).join('')}</table>
-      <div class="ttl" style="margin-top:16px;text-align:left;border-radius:4px">■ 야간조 인계사항</div><div class="note">${esc(V.D.note) || '<span style="color:#9aa6b8;font-weight:500">일일 스케줄에서 적어요</span>'}</div></div>
-    <div><div class="ttl">${t} 정비보조 출근자 명단</div><table><tr><th>순번</th><th>성함</th><th>비고</th></tr>
-      ${Array.from({ length: Math.max(V.helpers.length, 8) }, (_, i) => { const x = V.helpers[i]; return `<tr><td>${x ? i + 1 : ''}</td><td class="nmc">${x ? esc(x.name) : ''}</td><td>${x ? 'HK지원' : ''}</td></tr>`; }).join('')}</table></div>
+      <div class="ttl" style="margin-top:16px;text-align:left;border-radius:4px">■ 야간조 인계사항</div><div class="note">${esc(V.D.note) || '<span style="color:#9aa6b8;font-weight:500">일일 스케줄에서 적어요</span>'}</div></div>`}
+    ${P === 'rm' ? '' : `<div><div class="ttl">${t} 정비보조 출근자 명단</div><table><tr><th>순번</th><th>성함</th><th>비고</th></tr>
+      ${Array.from({ length: Math.max(V.helpers.length, 8) }, (_, i) => { const x = V.helpers[i]; return `<tr><td>${x ? i + 1 : ''}</td><td class="nmc">${x ? esc(x.name) : ''}</td><td>${x ? 'HK지원' : ''}</td></tr>`; }).join('')}</table></div>`}
   </div></div>`;
   return h;
 }
 function hkText() {
-  const V = C.dailyView(S.w, S.di), s = V.sum;
+  const V = C.dailyView(S.w, S.di), s = V.sum, P = S.hkPart || 'all', t = `${md(V.date)} (${DAYS[S.di]})`;
+  if (P === 'rm') return [`■ ${t} RM 방배정표`, ...V.rm.map((x, i) => `${i + 1}. ${x.r.name} ${x.u}${x.up ? ' (+)' : ''}`), `출근 ${V.rm.length}명 · 정비 ${s.jb}`].join('\n');
+  if (P === 'sup') return [`■ ${t} 정비보조 출근자 명단`, ...(V.helpers.length ? V.helpers.map((x, i) => `${i + 1}. ${x.name} (HK지원)`) : ['없음'])].join('\n');
   return [`■ ${md(V.date)} (${DAYS[S.di]}) RM 방배정표`, ...V.rm.map((x, i) => `${i + 1}. ${x.r.name} ${x.u}${x.up ? ' (+)' : ''}`), `출근 ${V.rm.length}명 · 정비 ${s.jb}`, '',
     '■ 정비 예상 요약', `예약 ${nv(s.res)} / 체크아웃 ${nv(s.co)} / 정비수 ${s.jb} / 출근인원 ${s.ppl}`, `C/O-필요재입 ${nv(s.coRe)} / 인당정비수 ${f1(s.per)} / 재입 예상 ${f1(s.reent)}`, '',
     '■ 정비보조 출근자', V.helpers.length ? V.helpers.map(x => x.name).join(', ') : '없음', '', '■ 야간조 인계사항', V.D.note || ''].join('\n');
@@ -392,6 +397,7 @@ $('view').addEventListener('click', e => {
     if (b.id === 'hpAll') { change(w => w.helpers.forEach(x => { if (x.can) x.d = DAYS.map(d => x.can.includes(d)); })); return; }
     if (b.id === 'hpClr') { ask('이번 주 정비보조 출근 표시를 모두 지울까요?', '모두 지우기').then(ok => ok && change(w => w.helpers.forEach(x => { x.d = Array(7).fill(false); }))); return; }
     if (b.dataset.di != null) { S.di = +b.dataset.di; draw(); return; }
+    if (b.dataset.hkp) { S.hkPart = b.dataset.hkp; draw(); return; }
     if (b.id === 'saveImg') { saveImg(b.dataset.el, b.dataset.fn); return; }
     if (b.dataset.share) { shareImg(b.dataset.share, b.dataset.fn, b.dataset.ttl); return; }
     if (b.id === 'copyHk') { copy(hkText()); return; }
