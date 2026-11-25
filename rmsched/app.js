@@ -211,10 +211,10 @@ function helperHtml() {
   return `<div class="card"><h3>정비보조 출근 <small>날짜 칸을 누르면 출근 ↔ 빈칸 · 이름 · 가능요일은 바로 고쳐요</small></h3><div class="scroll"><table class="sum hp"><tr><th class="rh">성명</th><th>가능요일</th>${DAYS.map((d, i) => `<th class="${i === 5 ? 'sat' : i === 6 ? 'sun' : ''}">${d}<br>${md(addDays(w.mon, i))}</th>`).join('')}<th>계</th><th></th></tr>
     ${w.helpers.map((x, i) => `<tr><td class="rh"><input type="text" data-hpn="${i}" data-f="name" value="${esc(x.name)}" placeholder="이름" style="min-width:96px;text-align:left" aria-label="정비보조 이름"></td>
       <td><input type="text" data-hpn="${i}" data-f="can" value="${esc(x.can)}" placeholder="예: 월화수" style="min-width:110px" aria-label="${esc(x.name)} 가능요일"></td>
-      ${x.d.map((v, d) => `<td data-hp="${i}" data-d="${d}" style="cursor:pointer;min-width:58px;white-space:nowrap;${v ? 'background:#C6E7B4;color:#2E6B1E;font-weight:700' : x.can && !x.can.includes(DAYS[d]) ? 'background:#FCE4E4' : ''}">${v ? '출근' : ''}</td>`).join('')}
+      ${x.d.map((v, d) => `<td data-hp="${i}" data-d="${d}" style="cursor:pointer;min-width:58px;white-space:nowrap;${v ? 'background:#C6E7B4;color:#2E6B1E;font-weight:700' : x.can && x.can.includes(DAYS[d]) ? 'background:#FCE4E4' : ''}">${v ? '출근' : ''}</td>`).join('')}
       <td class="calc">${x.d.filter(Boolean).length}</td><td><button class="dan" data-hpdel="${i}" style="min-height:32px;padding:2px 8px" aria-label="${esc(x.name)} 빼기">✕</button></td></tr>`).join('')}
     <tr><td class="rh">출근 인원수</td><td></td>${DAYS.map((_, d) => `<td class="calc">${w.helpers.filter(x => x.d[d]).length}</td>`).join('')}<td class="calc">${w.helpers.reduce((a, x) => a + x.d.filter(Boolean).length, 0)}</td><td></td></tr>
-    </table></div><div class="tools" style="margin:8px 0 0"><button id="hpAdd">＋ 정비보조 추가</button><button id="hpAll">가능요일 모두 출근</button><button id="hpClr" class="dan">출근 모두 지우기</button><span class="lbl">분홍 칸 = 가능요일이 아닌 날 · 이름 · 가능요일은 다음 주차에도 이어져요</span></div></div>`;
+    </table></div><div class="tools" style="margin:8px 0 0"><button id="hpAdd">＋ 정비보조 추가</button><button id="hpAll">가능요일 모두 출근</button><button id="hpClr" class="dan">출근 모두 지우기</button><span class="lbl">분홍 칸 = 가능요일 (엑셀과 같음) · 이름 · 가능요일은 다음 주차에도 이어져요</span></div></div>`;
 }
 
 // =============== 일일 스케줄 ===============
