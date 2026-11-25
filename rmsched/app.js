@@ -2,6 +2,7 @@
 // 엑셀 '룸메이드 스케줄표'(주간 스케줄 · 일일 스케줄 · HK 전파 · 공지용)를 그대로 옮긴 편성판. 계산은 core.js(RMCore — 화면·저장소 모름)
 // 저장: rmsched/cfg = 기본값(월 만근 · 총 객실 · 기본유닛 · 기본휴무 · 정비보조 명단) · rmsched/{월요일 YYYY-MM-DD} = 그 주 (규칙 v28: 소장 · 부소장만)
 // 로그인: 소장 · 부소장 (허브 · 재고조사와 같은 계정 — 이 기기에서 한 번 들어가면 계속 열림)
+// 하우스키퍼 공용 계정 (11/25): HK 전파 (전체)만 봄. 원본(rmsched/…)은 못 읽고, 소장 · 부소장이 저장할 때 같이 쓰는 rmsched_hk/{날짜}(그날 HK 전파 내용만)를 읽음
 import * as DB from '../../rm/app/store.js';
 import { openBlockPick } from './blockpick.js?v=2026.11.25-8';   // 🗺 작업객실 도면 (11/25)
 import { prune as bkPrune, newId as bkNewId } from '../blocks.js?v=2026.11.18-1';
@@ -30,7 +31,7 @@ const Store = {
 };
 
 // ---------- 상태
-const S = { cfg: null, weeks: [], w: null, tab: 'week', di: 0, brush: 'edit', ordMode: false, undo: [], showChk: false, blocks: null, by: '' };
+const S = { cfg: null, weeks: [], w: null, tab: 'week', di: 0, brush: 'edit', ordMode: false, undo: [], showChk: false, blocks: null, by: '', snaps: [], si: 0 };
 
 // ---------- 🗺 작업객실 ↔ 자동 배정 🚧 장기 미정비 블럭 (11/25 소장님: 두 곳에 같이 쓰이게)
 //   작업객실 줄에서 도면으로 고르면 meta/blocks 에 블럭으로 저장 → 그 기간 자동 배정에서 빠짐 · 이 표의 날짜별 객실 수는 블럭에서 자동 계산
@@ -80,11 +81,29 @@ async function flush(k) {
   const Q = q[k]; if (Q.busy) { Q.again = true; return; }
   Q.busy = true; setSave('저장 중…');
   try {
-    if (k === 'w' && S.w) { S.w.at = Date.now(); await Store.setWeek(clone(S.w)); if (!S.weeks.includes(S.w.mon)) { S.weeks.push(S.w.mon); S.weeks.sort(); drawBar(); } }
+    if (k === 'w' && S.w) { S.w.at = Date.now(); await Store.setWeek(clone(S.w)); pushHk(clone(S.w)); if (!S.weeks.includes(S.w.mon)) { S.weeks.push(S.w.mon); S.weeks.sort(); drawBar(); } }
     if (k === 'c') await Store.setCfg(clone(S.cfg));
     const t = new Date(Date.now() + 9 * 3600e3); setSave('저장됨 ' + t.toISOString().slice(11, 16));
   } catch (e) { setSave('저장 실패'); toast('저장하지 못했어요: ' + (e && (e.code || e.message) || e)); }
   Q.busy = false; if (Q.again) { Q.again = false; flush(k); }
+}
+// ---------- HK 전파용 사본: rmsched_hk/{YYYY-MM-DD} — 하우스키퍼(야간 · 오더테이커)가 읽는 그날 HK 전파 (전체) 내용만
+//   주차를 저장할 때 · 주차를 열 때 그 주 7일을 다시 씀 (바뀐 날만). 규칙에 rmsched_hk 가 아직 없으면 조용히 건너뜀
+const hkSent = {};
+function hkSnap(w, di) {
+  const V = C.dailyView(w, di), s = V.sum, r1 = v => v == null ? null : Math.round(v * 10) / 10;
+  return { date: V.date, rm: V.rm.map(x => ({ n: x.r.name, u: isNum(x.u) ? x.u : null, up: !!x.up })),
+    sum: { res: nv(s.res) === '' ? null : s.res, co: nv(s.co) === '' ? null : s.co, jb: s.jb, ppl: s.ppl, coRe: nv(s.coRe) === '' ? null : s.coRe, per: r1(s.per), reent: r1(s.reent) },
+    note: V.D.note || '', helpers: V.helpers.map(x => x.name) };
+}
+async function pushHk(w) {
+  if (!w || Store.local) return;
+  for (let di = 0; di < 7; di++) {
+    let o; try { o = hkSnap(w, di); } catch (e) { continue; }
+    const key = JSON.stringify(o); if (hkSent[o.date] === key) continue;
+    try { await DB.set('rmsched_hk/' + o.date, Object.assign(o, { at: DB.SERVER_TIME, by: S.by || '' })); hkSent[o.date] = key; }
+    catch (e) { if (/permission/i.test(String(e && (e.code || e.message)))) return; }   // 규칙 v29 에 rmsched_hk 가 붙기 전
+  }
 }
 // 고치기: 되돌리기용으로 앞 상태를 남김
 function change(fn, opt = {}) {
@@ -108,6 +127,17 @@ async function start() {
     setSave(Store.local ? '저장 준비됨' : '불러옴');
   } catch (e) { S.started = false; setSave('불러오기 실패'); $('view').innerHTML = '<div class="empty"><b>불러오지 못했어요</b>' + esc(/permission/i.test(String(e && (e.code || e.message))) ? '권한이 없어요 — Firestore 규칙 v28(rmsched)이 게시됐는지 확인해 주세요' : (e && (e.code || e.message) || e)) + '</div>'; }
 }
+// 하우스키퍼: 어제부터 올라온 HK 전파 사본만 읽음 (주차 · 탭 · 위 띠 숨김)
+async function startHk() {
+  if (S.started) return; S.started = true; S.hkOnly = true; S.tab = 'hk';
+  $('weekBar').hidden = true; $('tabs').hidden = true;
+  try {
+    const from = addDays(today(), -1);
+    S.snaps = (await DB.getQuery('rmsched_hk', [['date', '>=', from]])).map(d => d.data).filter(x => x && x.date).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 8);
+    const i = S.snaps.findIndex(x => x.date === today()); S.si = i >= 0 ? i : 0;
+    setSave('보기 전용'); draw();
+  } catch (e) { S.started = false; setSave('불러오기 실패'); $('view').innerHTML = '<div class="empty"><b>불러오지 못했어요</b>' + esc(/permission/i.test(String(e && (e.code || e.message))) ? '아직 HK 전파 보기 권한이 없어요 — Firestore 규칙에 rmsched_hk(하우스키퍼 읽기)를 붙여야 해요' : (e && (e.code || e.message) || e)) + '</div>'; }
+}
 async function openWeek(mon) {
   if (S.w) await flushNow();
   const w = await Store.getWeek(mon); if (!w) return toast('그 주차를 찾지 못했어요');
@@ -115,6 +145,7 @@ async function openWeek(mon) {
   if (!Array.isArray(S.w.work)) S.w.work = [];
   await loadBlocks(); syncWork();
   await loadHol(Number(mon.slice(0, 4)));
+  pushHk(clone(S.w));
   const t = today(); S.di = (t >= mon && t <= addDays(mon, 6)) ? C.dowIdx(t) : 0;
   drawBar(); draw();
 }
@@ -150,6 +181,7 @@ function draw() {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
   drawUndo();
   const v = $('view');
+  if (S.hkOnly) { v.innerHTML = hkHtml(); return; }
   if (S.tab === 'set') { v.innerHTML = setHtml(); return; }
   if (S.tab === 'hol') { v.innerHTML = holHtml(); return; }
   if (!S.w) { v.innerHTML = '<div class="empty"><b>아직 주차가 없어요</b>지금 쓰는 엑셀 스케줄표를 가져오거나 빈 주차를 만들어 시작하세요.<br><br><button class="pri" id="impX2">엑셀 가져오기</button> <button id="blankW">이번 주 빈 주차 만들기</button></div>'; return; }
@@ -301,30 +333,41 @@ function setDaily(fn) {
 }
 
 // =============== HK 전파 ===============
+function hkV() {
+  if (!S.hkOnly) return C.dailyView(S.w, S.di);
+  const x = S.snaps[S.si];
+  return { date: x.date, rm: (x.rm || []).map(r => ({ r: { name: r.n }, u: r.u == null ? '' : r.u, up: r.up })), sum: x.sum || {}, D: { note: x.note || '' }, helpers: (x.helpers || []).map(n => ({ name: n })) };
+}
+function snapChips() {
+  const t = today();
+  return `<div class="daychips" id="dayChips">${S.snaps.map((x, i) => `<button data-si="${i}" class="${S.si === i ? 'on' : ''}">${DAYS[C.dowIdx(x.date)]}${x.date === t ? ' · 오늘' : ''}<small>${md(x.date)}</small></button>`).join('')}</div>`;
+}
 function hkHtml() {
-  const V = C.dailyView(S.w, S.di), s = V.sum, t = md(V.date) + ' (' + DAYS[S.di] + ')';
+  if (S.hkOnly && !S.snaps.length) return '<div class="empty"><b>아직 올라온 HK 전파가 없어요</b>소장 · 부소장님이 스케줄을 저장하면 여기에 보여요.</div>';
+  const V = hkV(), s = V.sum, t = md(V.date) + ' (' + DAYS[C.dowIdx(V.date)] + ')';
   const n = Math.max(V.rm.length, 14);
   // 보낼 것 고르기 (11/25): 전체 = HK 전파 · 방배정표만 = 룸메이드 출근자 공지 · 정비보조 명단만 = 정비보조 공지 — 화면에 보이는 그대로 이미지가 됨
-  const P = S.hkPart || 'all', PL = { all: ['HK 전파 (전체)', 'HK전파'], rm: ['룸메이드 방배정표', '방배정표'], sup: ['정비보조 명단', '정비보조명단'] };
-  let h = dayChips() + `<div class="tools"><span class="lbl">보낼 것</span><div class="seg">${Object.keys(PL).map(k => `<button data-hkp="${k}" class="${P === k ? 'on' : ''}">${PL[k][0]}</button>`).join('')}</div></div>
-    <div class="tools"><button class="pri" data-share="hkPaper" data-fn="${PL[P][1]}_${V.date}" data-ttl="${t} ${PL[P][0]}">카톡으로 공유</button><button id="saveImg" data-el="hkPaper" data-fn="${PL[P][1]}_${V.date}">이미지로 저장</button><button id="copyHk">카톡용 글 복사</button><span class="lbl">${P === 'sup' ? '정비보조 출근은 주간 스케줄 → 정비보조 출근에서 표시해요' : P === 'rm' ? '룸메이드 공지용 — 정비유닛 없이 순번 · 성함만 나가요' : '빨간 숫자 = 일일 스케줄 \'유닛 수정\'으로 기본보다 늘어난 유닛'}</span></div>`;
+  //   하우스키퍼 계정은 HK 전파 (전체)만
+  const P = S.hkOnly ? 'all' : (S.hkPart || 'all'), PL = { all: ['HK 전파 (전체)', 'HK전파'], rm: ['룸메이드 방배정표', '방배정표'], sup: ['정비보조 명단', '정비보조명단'] };
+  let h = (S.hkOnly ? snapChips() : dayChips() + `<div class="tools"><span class="lbl">보낼 것</span><div class="seg">${Object.keys(PL).map(k => `<button data-hkp="${k}" class="${P === k ? 'on' : ''}">${PL[k][0]}</button>`).join('')}</div></div>`) + `
+    <div class="tools"><button class="pri" data-share="hkPaper" data-fn="${PL[P][1]}_${V.date}" data-ttl="${t} ${PL[P][0]}">카톡으로 공유</button><button id="saveImg" data-el="hkPaper" data-fn="${PL[P][1]}_${V.date}">이미지로 저장</button><button id="copyHk">카톡용 글 복사</button><span class="lbl">${S.hkOnly ? '보기 전용 · 소장 · 부소장님이 저장한 내용이에요' : P === 'sup' ? '정비보조 출근은 주간 스케줄 → 정비보조 출근에서 표시해요' : P === 'rm' ? '룸메이드 공지용 — 정비유닛 없이 순번 · 성함만 나가요' : '빨간 숫자 = 일일 스케줄 \'유닛 수정\'으로 기본보다 늘어난 유닛'}</span></div>`;
   h += `<div class="scroll" style="border:0;background:none"><div class="paper hk ${P !== 'all' ? 'one' : ''}" id="hkPaper">
     ${P === 'sup' ? '' : `<div><div class="ttl">${t} RM 방배정표</div><table><tr><th>순번</th><th>성함</th>${P === 'rm' ? '' : '<th>정비유닛</th>'}</tr>
       ${Array.from({ length: n }, (_, i) => { const x = V.rm[i]; return `<tr><td>${x ? i + 1 : ''}</td><td class="nmc">${x ? esc(x.r.name) : ''}</td>${P === 'rm' ? '' : `<td class="uc ${x && x.up ? 'up' : ''}">${x ? x.u : ''}</td>`}</tr>`; }).join('')}
       </table></div>`}
     ${P !== 'all' ? '' : `<div><div class="ttl">정비 예상 요약</div><table style="width:100%">
       ${[['예약', nv(s.res)], ['체크아웃', nv(s.co)], ['정비수', s.jb], ['출근인원', s.ppl], ['C/O - 필요재입', nv(s.coRe)], ['인당정비수', f1(s.per)], ['재입 예상', f1(s.reent)]].map(([a, b]) => `<tr><td style="text-align:left;font-weight:700;background:#F2F5FA;min-width:120px">${a}</td><td style="font-weight:800;font-size:16px;min-width:80px">${b}</td></tr>`).join('')}</table>
-      <div class="ttl" style="margin-top:16px;text-align:left;border-radius:4px">■ 야간조 인계사항</div><div class="note">${esc(V.D.note) || '<span style="color:#9aa6b8;font-weight:500">일일 스케줄에서 적어요</span>'}</div></div>`}
+      <div class="ttl" style="margin-top:16px;text-align:left;border-radius:4px">■ 야간조 인계사항</div><div class="note">${esc(V.D.note) || (S.hkOnly ? '' : '<span style="color:#9aa6b8;font-weight:500">일일 스케줄에서 적어요</span>')}</div></div>`}
     ${P === 'rm' ? '' : `<div><div class="ttl">${t} 정비보조 출근자 명단</div><table><tr><th>순번</th><th>성함</th><th>비고</th></tr>
       ${Array.from({ length: Math.max(V.helpers.length, 8) }, (_, i) => { const x = V.helpers[i]; return `<tr><td>${x ? i + 1 : ''}</td><td class="nmc">${x ? esc(x.name) : ''}</td><td>${x ? 'HK지원' : ''}</td></tr>`; }).join('')}</table></div>`}
   </div></div>`;
   return h;
 }
 function hkText() {
-  const V = C.dailyView(S.w, S.di), s = V.sum, P = S.hkPart || 'all', t = `${md(V.date)} (${DAYS[S.di]})`;
+  const V = hkV(), s = V.sum, P = S.hkOnly ? 'all' : (S.hkPart || 'all'), t = `${md(V.date)} (${DAYS[C.dowIdx(V.date)]})`;
   if (P === 'rm') return [`■ ${t} RM 방배정표`, ...V.rm.map((x, i) => `${i + 1}. ${x.r.name}`)].join('\n');   // 룸메이드 공지: 정비유닛 안 보임 (11/25)
   if (P === 'sup') return [`■ ${t} 정비보조 출근자 명단`, ...(V.helpers.length ? V.helpers.map((x, i) => `${i + 1}. ${x.name} (HK지원)`) : ['없음'])].join('\n');
-  return [`■ ${md(V.date)} (${DAYS[S.di]}) RM 방배정표`, ...V.rm.map((x, i) => `${i + 1}. ${x.r.name} ${x.u}${x.up ? ' (+)' : ''}`), `출근 ${V.rm.length}명 · 정비 ${s.jb}`, '',
+  return [`■ ${t} RM 방배정표`, ...V.rm.map((x, i) => `${i + 1}. ${x.r.name} ${x.u}${x.up ? ' (+)' : ''}`), `출근 ${V.rm.length}명 · 정비 ${s.jb}`, '',
     '■ 정비 예상 요약', `예약 ${nv(s.res)} / 체크아웃 ${nv(s.co)} / 정비수 ${s.jb} / 출근인원 ${s.ppl}`, `C/O-필요재입 ${nv(s.coRe)} / 인당정비수 ${f1(s.per)} / 재입 예상 ${f1(s.reent)}`, '',
     '■ 정비보조 출근자', V.helpers.length ? V.helpers.map(x => x.name).join(', ') : '없음', '', '■ 야간조 인계사항', V.D.note || ''].join('\n');
 }
@@ -396,6 +439,7 @@ $('view').addEventListener('click', e => {
     if (b.id === 'hpAll') { change(w => w.helpers.forEach(x => { if (x.can) x.d = DAYS.map(d => x.can.includes(d)); })); return; }
     if (b.id === 'hpClr') { ask('이번 주 정비보조 출근 표시를 모두 지울까요?', '모두 지우기').then(ok => ok && change(w => w.helpers.forEach(x => { x.d = Array(7).fill(false); }))); return; }
     if (b.dataset.di != null) { S.di = +b.dataset.di; draw(); return; }
+    if (b.dataset.si != null) { S.si = +b.dataset.si; draw(); return; }
     if (b.dataset.hkp) { S.hkPart = b.dataset.hkp; draw(); return; }
     if (b.id === 'saveImg') { saveImg(b.dataset.el, b.dataset.fn); return; }
     if (b.dataset.share) { shareImg(b.dataset.share, b.dataset.fn, b.dataset.ttl); return; }
@@ -885,16 +929,17 @@ $('jsonIn').addEventListener('change', async e => {
 // ---------- 로그인 (소장 · 부소장 — 허브와 같은 계정)
 const ROLES = [
   { label: '소장', email: 'unieshaeundae+admin@gmail.com', uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2' },
-  { label: '부소장', email: 'unieshaeundae+sub@gmail.com', uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2' }
+  { label: '부소장', email: 'unieshaeundae+sub@gmail.com', uid: 'Fz4T5ZzIxShOdVkNpF9gzMmOLED2' },
+  { label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2', hk: true }   // 공용 계정 (야간 · 오더테이커) — HK 전파 (전체) 보기만
 ];
 const login = { who: 0, err: '', busy: false };
 const roleOf = u => (!u || u.anon) ? null : ROLES.filter(r => r.uid === u.uid || r.email === u.email)[0] || null;
 function drawLogin() {
   $('appBox').hidden = true; $('loginBox').hidden = false; $('logout').hidden = true; setSave('');
-  $('loginBox').innerHTML = '<h3>관리자 로그인</h3><div class="seg" role="group">' + ROLES.map((r, i) => `<button data-who="${i}" class="${login.who === i ? 'on' : ''}">${r.label}</button>`).join('') + '</div>' +
+  $('loginBox').innerHTML = '<h3>로그인</h3><div class="seg" role="group">' + ROLES.map((r, i) => `<button data-who="${i}" class="${login.who === i ? 'on' : ''}">${r.label}</button>`).join('') + '</div>' +
     '<input type="password" id="pw" autocomplete="current-password" placeholder="비밀번호">' + (login.err ? `<p class="err">${esc(login.err)}</p>` : '') +
     `<button class="pri" id="doLogin" style="width:100%" ${login.busy ? 'disabled' : ''}>${login.busy ? '확인 중…' : '들어가기'}</button>` +
-    '<p class="lbl" style="margin:10px 0 0">허브(객실 통합 관리)와 같은 비밀번호예요. 이 기기에서 한 번 들어가면 다음부터는 바로 열려요.</p>';
+    '<p class="lbl" style="margin:10px 0 0">허브(객실 통합 관리)와 같은 비밀번호예요. 하우스키퍼 계정은 HK 전파만 볼 수 있어요. 이 기기에서 한 번 들어가면 다음부터는 바로 열려요.</p>';
 }
 $('loginBox').addEventListener('click', e => { const w = e.target.closest('[data-who]'); if (w) { login.who = +w.dataset.who; drawLogin(); } if (e.target.id === 'doLogin') doLogin(); });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pw') doLogin(); });
@@ -908,10 +953,10 @@ $('logout').onclick = async () => { await flushNow(); await DB.signOut(); locati
 window.addEventListener('beforeunload', e => { if (q.w.t || q.c.t) { e.preventDefault(); e.returnValue = ''; } });
 DB.onUser(u => {
   const role = roleOf(u);
-  if (u && !u.anon && !role) login.err = '지금 로그인된 계정은 이 화면을 쓸 수 없어요 (소장 · 부소장 전용).';
+  if (u && !u.anon && !role) login.err = '지금 로그인된 계정은 이 화면을 쓸 수 없어요 (소장 · 부소장 · 하우스키퍼만).';
   if (!role) { drawLogin(); return; }
   $('loginBox').hidden = true; $('appBox').hidden = false; $('logout').hidden = false;
   S.by = role.label;
-  start();
+  if (role.hk) startHk(); else start();
 });
 }
