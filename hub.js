@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.25-2';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.25-2';
-import * as PIN from './pin.js?v=2026.11.25-2';
-import { setupClose } from './close.js?v=2026.11.25-2';
-import { setupClosing } from './closing.js?v=2026.11.25-2';
-import { supProgress } from './supcalc.js?v=2026.11.25-2';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.25-2';
-import { setupMeal } from './meal.js?v=2026.11.25-2';
-import * as BD from './bday.js?v=2026.11.25-2';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.25-3';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.25-3';
+import * as PIN from './pin.js?v=2026.11.25-3';
+import { setupClose } from './close.js?v=2026.11.25-3';
+import { setupClosing } from './closing.js?v=2026.11.25-3';
+import { supProgress } from './supcalc.js?v=2026.11.25-3';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.25-3';
+import { setupMeal } from './meal.js?v=2026.11.25-3';
+import * as BD from './bday.js?v=2026.11.25-3';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.25-2';
+const VER = '2026.11.25-3';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -62,6 +62,17 @@ const ago = t => { const m = Math.max(0, Math.round((Date.now() - Number(t)) / 6
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 let user = null, admin = null, view = { st: null, busy: false, err: '', at: 0 }, login = { who: 0, err: '', busy: false };
+// 11/25 안정화: 화면 뒤에서 하는 저장이 실패하면 '휴대폰 오류 기록'(errors)에 한 줄 — 허브 첫 화면 오류 칸에 보임 (asg_days 6일 동안 모르고 실패한 일 재발 방지)
+const errSent = {}; let errN = 0;
+function logErr(where, e) {
+  try {
+    const msg = String((e && (e.code ? e.code + ' ' : '') + (e.message || '')) || e || '').slice(0, 500), k = where + '|' + msg;
+    console.warn('[허브 저장 실패]', where, e);
+    if (!user || errSent[k] || errN >= 5) return;
+    errSent[k] = 1; errN++;
+    S.add('errors', { at: S.SERVER_TIME, day: ymd(), uid: user.uid, name: String((admin && admin.label) || '허브').slice(0, 20), ver: VER, where: ('허브 ' + where).slice(0, 40), msg, ua: navigator.userAgent.slice(0, 200) }).done.catch(() => {});
+  } catch (x) {}
+}
 
 function head() {
   const t = seoul(), d = ymd();
@@ -141,9 +152,9 @@ async function load(force) {
       ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, C), mr: K.maidRooms ? K.maidRooms(P, C) : null, recs: Array.isArray(recs) ? recs : null, mate: (tmz && !tmz.__err && tmz.mate) || {} });
     }
   }
-  const ls = null, lt = await safe(S.getQuery('lost', [['date', '==', d]]));   // 🧳 습득물: 오늘 접수 (11/25: 서버 처리 대기 수는 허브에 안 띄움 — 대장 '처리 대기' 탭에서)
+  const ls = null, [lt, fb, fl] = await Promise.all([safe(S.getQuery('lost', [['date', '==', d]])), safe(S.get('meta/bday_fn')), safe(S.get('meta/lost_fn'))]);   // + 11/25 서버 함수 실행 기록 (문제일 때만 표시)   // 🧳 습득물: 오늘 접수 (11/25: 서버 처리 대기 수는 허브에 안 띄움 — 대장 '처리 대기' 탭에서)
   const bd = isHk() ? null : await BD.load(S, d);   // 🎂 하루 한 번만 연차 명단을 읽음 (소장 · 부소장)
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd, ls, lt, hs };
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd, ls, lt, hs, fb, fl };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -219,6 +230,15 @@ function statusItems(v) {
     const who = Array.from(new Set(e.map(x => x.data && x.data.name).filter(Boolean)));
     add('wait', '휴대폰 오류 오늘 ' + e.length + '건', (who.length ? who.slice(0, 4).join(', ') + (who.length > 4 ? ' 외' : '') + ' · ' : '') + '정비 레포트 → 설정에서 보기');
   } else if (Array.isArray(e)) add('ok', '휴대폰 오류 없음', '');
+  // 11/25 안정화: 매일 아침 서버 함수(생일 06:00 · 습득물 사진 정리 06:10)가 돌았는지 — 문제일 때만 한 줄 (정상이면 안 보임)
+  if (!isHk() && H * 60 + Number(seoul().toISOString().slice(14, 16)) >= 6 * 60 + 40) {
+    [['생일 알림', v.fb], ['습득물 사진 정리', v.fl]].forEach(([nm, f]) => {
+      if (f && f.__err) return;
+      if (!f) add('bad', '서버 함수 ' + nm + ' 기록 없음', '아직 배포가 안 됐을 수 있어요 — Cloud Shell 에서 함수 배포');
+      else if (f.day !== v.d) add('bad', '서버 함수 ' + nm + '이 오늘 안 돌았어요', '마지막 ' + md(f.day) + ' · Firebase 콘솔 → Functions 에서 확인');
+      else if (f.fail) add('wait', '서버 함수 ' + nm + ' 일부 실패 ' + f.fail + '건', 'Firebase 콘솔 → Functions → 로그');
+    });
+  }
   return L;
 }
 function progress(v) {
@@ -352,7 +372,7 @@ function upSend(skipAsk) {
   if (!s || u0.sending) return;
   if (!s.ok && !skipAsk && !confirm('검증에서 다른 점이 있어요. 그래도 올릴까요?')) return;
   u0.sending = true; u0.err = ''; draw();
-  if (r.data) S.set('uploads/rep_' + u0.date, repDoc(u0, r)).catch(() => {});   // 정비 지원 더티 배분용 (실패해도 배정 올리기는 그대로)
+  if (r.data) S.set('uploads/rep_' + u0.date, repDoc(u0, r)).catch(e => logErr('더티배분용 보고서', e));   // 정비 지원 더티 배분용 (실패해도 배정 올리기는 그대로)
   withTimeout(S.set('uploads/latest', { date: u0.date, csv: r.csv, state: 'wait', at: S.SERVER_TIME, by: user.uid, who: admin.label, file: String(u0.file).slice(0, 80),
     sheet: r.sheet, maids: s.maids, rooms: s.rooms, units: s.units, ok: s.ok }), 20000, '인터넷 연결을 확인하고 다시 눌러 주세요.')
     .then(() => { up = { sent: { date: u0.date, at: Date.now() } }; draw(); watchUp(); },
@@ -583,7 +603,7 @@ function closeVoc() {
   const p = document.getElementById('vp'); if (p) p.remove(); document.body.classList.remove('sb-lock');
 }
 async function openAssignUI(view) {
-  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, admin: () => admin, user: () => user, upload: o => { up = { file: o.file, date: o.date, res: o.res, buf: null }; goSec('work', 'up'); draw(); upSend(true); scrollUp(); } }, { view }); }
+  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, logErr, admin: () => admin, user: () => user, upload: o => { up = { file: o.file, date: o.date, res: o.res, buf: null }; goSec('work', 'up'); draw(); upSend(true); scrollUp(); } }, { view }); }
   catch (e) { alert('자동 배정 화면을 못 불러왔어요: ' + (e && e.message || e)); }
 }
 // 📝 배정 의견 (2026-11-19): 하우스맨 의견 → 매일 오전 10시 점검이 답 (asgnote.js · asg_notes)

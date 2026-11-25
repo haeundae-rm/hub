@@ -229,7 +229,7 @@ function saveDay(extra) {
   const d = Object.assign({ date: A.date, at: H.S.SERVER_TIME, by: (H.admin() || {}).label || '' }, extra || {});
   if (!extra || !extra.hk) Object.assign(d, { engine: s.engine, final: s.final, edits: s.edits, nEdits: s.edits.length, stats: s.stats, input: s.input, ver: VER });
   else d.engineHk = s.engine;
-  H.S.merge('asg_days/' + A.date, d).catch(() => {});
+  H.S.merge('asg_days/' + A.date, d).catch(e => H.logErr && H.logErr('자동배정 매일 기록', e));
 }
 function openNote() {
   import(new URL('./asgnote.js?v=' + (new URL(import.meta.url).searchParams.get('v') || VER), import.meta.url).href).then(m => m.openNotes(H, { snap: snapshot() })).catch(e => { A.err = '배정 의견 화면을 못 불러왔어요: ' + (e && e.message || e); draw(); });
@@ -244,7 +244,7 @@ function saveLast(H0) {
     if (hkPlt.length) d.hist2901 = ((A.cfgDoc.hist2901 || []).filter(x => x.date !== A.date)).concat([{ date: A.date, names: hkPlt }]).sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-90);
   }
   A.cfgDoc = d;
-  H.S.set('meta/assign', d).catch(() => {});
+  H.S.set('meta/assign', d).catch(e => H.logErr && H.logErr('자동배정 설정', e));
 }
 
 // ---------- 고치기 (객실 옮기기 · 2901 바꾸기) — 계산은 다시 안 돌리고 숫자만 다시 셈
@@ -312,7 +312,7 @@ async function confirmUpload() {
     H.upload({ date: A.date, file: '자동 배정 · ' + A.file, res: { csv, rows, sheet: A.sheet, summary, data: d2 } });
     saveDay({ sentAt: Date.now() });
     const d = Object.assign({}, A.cfgDoc, { lastSent: { date: A.date, edits: A.edits.length, at: Date.now() } });
-    H.S.set('meta/assign', d).catch(() => {});
+    H.S.set('meta/assign', d).catch(e => H.logErr && H.logErr('자동배정 설정', e));
     close();
   } catch (e) { A.err = '올리지 못했어요: ' + (e && e.message || e); draw(); }
 }
