@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.25-1';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.25-1';
-import * as PIN from './pin.js?v=2026.11.25-1';
-import { setupClose } from './close.js?v=2026.11.25-1';
-import { setupClosing } from './closing.js?v=2026.11.25-1';
-import { supProgress } from './supcalc.js?v=2026.11.25-1';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.25-1';
-import { setupMeal } from './meal.js?v=2026.11.25-1';
-import * as BD from './bday.js?v=2026.11.25-1';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.25-2';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.25-2';
+import * as PIN from './pin.js?v=2026.11.25-2';
+import { setupClose } from './close.js?v=2026.11.25-2';
+import { setupClosing } from './closing.js?v=2026.11.25-2';
+import { supProgress } from './supcalc.js?v=2026.11.25-2';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.25-2';
+import { setupMeal } from './meal.js?v=2026.11.25-2';
+import * as BD from './bday.js?v=2026.11.25-2';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.25-1';
+const VER = '2026.11.25-2';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -141,7 +141,7 @@ async function load(force) {
       ks = K.summary({ keys: kk, chk: Array.isArray(kx) ? kx : [], ret: Array.isArray(kr) ? kr : [], mf: K.maidFloors(P, C), mr: K.maidRooms ? K.maidRooms(P, C) : null, recs: Array.isArray(recs) ? recs : null, mate: (tmz && !tmz.__err && tmz.mate) || {} });
     }
   }
-  const [ls, lt] = await Promise.all([safe(S.get('meta/lost_sum')), safe(S.getQuery('lost', [['date', '==', d]]))]);   // 🧳 습득물: 서버가 매일 아침 센 처리 대기 + 오늘 접수
+  const ls = null, lt = await safe(S.getQuery('lost', [['date', '==', d]]));   // 🧳 습득물: 오늘 접수 (11/25: 서버 처리 대기 수는 허브에 안 띄움 — 대장 '처리 대기' 탭에서)
   const bd = isHk() ? null : await BD.load(S, d);   // 🎂 하루 한 번만 연차 명단을 읽음 (소장 · 부소장)
   view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd, ls, lt, hs };
   view.busy = false; view.at = Date.now(); draw();
