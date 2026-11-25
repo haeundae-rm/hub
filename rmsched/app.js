@@ -3,6 +3,8 @@
 // 저장: rmsched/cfg = 기본값(월 만근 · 총 객실 · 기본유닛 · 기본휴무 · 정비보조 명단) · rmsched/{월요일 YYYY-MM-DD} = 그 주 (규칙 v28: 소장 · 부소장만)
 // 로그인: 소장 · 부소장 (허브 · 재고조사와 같은 계정 — 이 기기에서 한 번 들어가면 계속 열림)
 import * as DB from '../../rm/app/store.js';
+import { openBlockPick } from './blockpick.js?v=2026.11.25-8';   // 🗺 작업객실 도면 (11/25)
+import { prune as bkPrune, newId as bkNewId } from '../blocks.js?v=2026.11.18-1';
 {
 const C = window.RMCore, $ = id => document.getElementById(id);
 const { DAYS, STATUSES, OFF, isNum, num, addDays, md } = C;
@@ -28,7 +30,45 @@ const Store = {
 };
 
 // ---------- 상태
-const S = { cfg: null, weeks: [], w: null, tab: 'week', di: 0, brush: 'edit', ordMode: false, undo: [], showChk: false };
+const S = { cfg: null, weeks: [], w: null, tab: 'week', di: 0, brush: 'edit', ordMode: false, undo: [], showChk: false, blocks: null, by: '' };
+
+// ---------- 🗺 작업객실 ↔ 자동 배정 🚧 장기 미정비 블럭 (11/25 소장님: 두 곳에 같이 쓰이게)
+//   작업객실 줄에서 도면으로 고르면 meta/blocks 에 블럭으로 저장 → 그 기간 자동 배정에서 빠짐 · 이 표의 날짜별 객실 수는 블럭에서 자동 계산
+//   자동 배정 화면에서 넣은 블럭도 이 주에 걸리면 줄로 나타남. 줄 x.bid = 블럭 id (없으면 예전처럼 손으로 적는 줄)
+async function loadBlocks() { try { S.blocks = ((await DB.get('meta/blocks')) || {}).list || []; } catch (e) { S.blocks = S.blocks || []; } }
+const wkDays = () => Array.from({ length: 7 }, (_, i) => addDays(S.w.mon, i));
+function blockRow(b, x) { const ds = wkDays(); x.name = b.name; x.bid = b.id; x.n = b.rooms.length; x.d = ds.map(d => (b.from <= d && d <= b.to ? b.rooms.length : null)); x.resume = md(addDays(b.to, 1)); return x; }
+function syncWork() {
+  if (!S.w || !S.blocks) return false;
+  const before = JSON.stringify(S.w.work), ds = wkDays(), lo = ds[0], hi = ds[6], by = {};
+  S.blocks.forEach(b => { by[b.id] = b; });
+  const on = b => b && b.from <= hi && b.to >= lo;
+  S.w.work = S.w.work.filter(x => !x.bid || on(by[x.bid]) || !by[x.bid]);   // 다른 주로 옮겨진 블럭 줄은 이 주에서 뺌
+  S.w.work.forEach(x => { if (x.bid) { if (by[x.bid]) blockRow(by[x.bid], x); else { delete x.bid; delete x.n; } } });   // 블럭이 지워졌으면 손으로 적는 줄로
+  S.blocks.filter(b => on(b) && !S.w.work.some(x => x.bid === b.id)).forEach(b => S.w.work.push(blockRow(b, { name: '', d: Array(7).fill(null), resume: '' })));
+  const ch = JSON.stringify(S.w.work) !== before; if (ch) saveW(); return ch;
+}
+async function putBlock(blk, del) {
+  const cur = ((await DB.get('meta/blocks')) || {}).list || [];
+  const list = bkPrune(cur.filter(y => y.id !== (blk && blk.id) && y.id !== del).concat(blk ? [blk] : []), today());
+  await DB.set('meta/blocks', { list, at: DB.SERVER_TIME, by: S.by || '' });
+  S.blocks = list;
+}
+async function editWorkMap(i) {
+  await loadBlocks();
+  const x = i >= 0 ? S.w.work[i] : null, b = x && x.bid ? S.blocks.find(y => y.id === x.bid) : null, ds = wkDays();
+  const other = {}; S.blocks.filter(y => !b || y.id !== b.id).forEach(y => y.rooms.forEach(r => { other[r] = y.name + ' ' + md(y.from) + '~' + md(y.to); }));
+  let from = ds[0], to = ds[6];
+  if (x && !b) { const on = x.d.map((v, d) => (isNum(v) && v > 0 ? d : -1)).filter(d => d >= 0); if (on.length) { from = ds[on[0]]; to = ds[on[on.length - 1]]; } }
+  const res = await openBlockPick({ name: (b && b.name) || (x && x.name) || '', rooms: b ? b.rooms : [], from: b ? b.from : from, to: b ? b.to : to, prio: b ? b.prio : false, base: S.w.mon, other });
+  if (!res) return;
+  const blk = Object.assign({}, b || {}, res, { id: b ? b.id : bkNewId(), memo: (b && b.memo) || '룸메이드 스케줄에서', by: S.by || '', at: Date.now() });
+  setSave('저장 중…');
+  try { await putBlock(blk); } catch (e) { setSave('저장 실패'); toast('블럭을 저장하지 못했어요: ' + (e && (e.code || e.message) || e)); return; }
+  change(w => { let row = i >= 0 ? w.work[i] : null; if (!row) { row = { name: '', d: Array(7).fill(null), resume: '' }; w.work.push(row); } row.bid = blk.id; });
+  syncWork(); draw();
+  toast('🗺 ' + blk.name + ' ' + blk.rooms.length + '실 · ' + md(blk.from) + '~' + md(blk.to) + ' — 자동 배정에서도 빠져요');
+}
 const defCfg = () => ({ fullDays: 21, rooms: 417, roster: [], helpers: [] });
 
 // 저장: 고친 뒤 0.8초 모아 한 번 · 문서마다 한 번에 하나씩
@@ -72,6 +112,8 @@ async function openWeek(mon) {
   if (S.w) await flushNow();
   const w = await Store.getWeek(mon); if (!w) return toast('그 주차를 찾지 못했어요');
   S.w = w; S.undo = [];
+  if (!Array.isArray(S.w.work)) S.w.work = [];
+  await loadBlocks(); syncWork();
   await loadHol(Number(mon.slice(0, 4)));
   const t = today(); S.di = (t >= mon && t <= addDays(mon, 6)) ? C.dowIdx(t) : 0;
   drawBar(); draw();
@@ -201,10 +243,15 @@ function sumHtml() {
 }
 function workHtml() {
   const w = S.w;
-  return `<div class="card"><h3>작업객실 미판매 현황 <small>시설작업 · 미정비 객실 수 · 빈칸 = 작업 없음</small></h3><div class="scroll"><table class="sum"><tr><th class="rh">작업 내용</th>${DAYS.map(d => `<th>${d}</th>`).join('')}<th>계</th><th>판매 재개</th><th></th></tr>
-    ${w.work.map((x, i) => `<tr><td class="rh"><input type="text" data-wk="${i}" data-f="name" value="${esc(x.name)}" style="min-width:170px;text-align:left"></td>${x.d.map((v, d) => `<td><input type="number" data-wk="${i}" data-d="${d}" value="${nv(v)}"></td>`).join('')}
-      <td class="calc">${x.d.reduce((a, v) => a + (isNum(v) ? v : 0), 0)}</td><td><input type="text" data-wk="${i}" data-f="resume" value="${esc(x.resume)}" style="min-width:90px"></td><td><button data-wkdel="${i}" class="dan" aria-label="지우기" style="min-height:32px;padding:2px 8px">✕</button></td></tr>`).join('')}
-    </table></div><button id="addWork" style="margin-top:8px">＋ 작업 추가</button></div>`;
+  const row = (x, i) => x.bid
+    ? `<tr class="wkb"><td class="rh"><input type="text" data-wk="${i}" data-f="name" value="${esc(x.name)}" style="min-width:150px;text-align:left" aria-label="작업 내용"><button data-wkmap="${i}" class="wkmap on" title="도면에서 객실 고치기">🗺 ${x.n || 0}실</button></td>${x.d.map(v => `<td class="calc">${nv(v)}</td>`).join('')}
+      <td class="calc">${x.d.reduce((a, v) => a + (isNum(v) ? v : 0), 0)}</td><td class="calc" title="블럭 끝 다음 날">${esc(x.resume)}</td><td><button data-wkdel="${i}" class="dan" aria-label="지우기" style="min-height:32px;padding:2px 8px">✕</button></td></tr>`
+    : `<tr><td class="rh"><input type="text" data-wk="${i}" data-f="name" value="${esc(x.name)}" style="min-width:150px;text-align:left" aria-label="작업 내용"><button data-wkmap="${i}" class="wkmap" title="도면에서 객실 고르기 → 자동 배정에도">🗺 도면</button></td>${x.d.map((v, d) => `<td><input type="number" data-wk="${i}" data-d="${d}" value="${nv(v)}"></td>`).join('')}
+      <td class="calc">${x.d.reduce((a, v) => a + (isNum(v) ? v : 0), 0)}</td><td><input type="text" data-wk="${i}" data-f="resume" value="${esc(x.resume)}" style="min-width:90px"></td><td><button data-wkdel="${i}" class="dan" aria-label="지우기" style="min-height:32px;padding:2px 8px">✕</button></td></tr>`;
+  return `<div class="card"><h3>작업객실 미판매 현황 <small>시설작업 · 미정비 객실 수 · 🗺 도면으로 고른 줄은 자동 배정 🚧 장기 미정비와 같이 쓰여요 (날짜별 수 자동)</small></h3><div class="scroll"><table class="sum wktab"><tr><th class="rh">작업 내용</th>${DAYS.map((d, k) => `<th>${d}<br>${md(addDays(w.mon, k))}</th>`).join('')}<th>계</th><th>판매 재개</th><th></th></tr>
+    ${w.work.map(row).join('')}
+    </table></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button id="addWorkMap" class="pri">🗺 도면으로 작업 추가</button><button id="addWork">＋ 숫자만 적기</button></div>
+    <style>.wkmap{margin-left:6px;min-height:32px;padding:2px 10px;border-radius:8px;border:1.5px solid #F2B48A;background:#FFF4EC;color:#9A3412;font-weight:800;cursor:pointer;white-space:nowrap}.wkmap.on{background:#F97316;border-color:#C2410C;color:#fff}.wkb td.calc{font-weight:800}.wktab td.rh{white-space:nowrap;min-width:250px}.wktab td.rh input{min-width:140px!important;width:150px}</style></div>`;
 }
 function helperHtml() {
   const w = S.w;
@@ -328,7 +375,18 @@ $('view').addEventListener('click', e => {
     if (b.id === 'addRow') { rowDlg(null); return; }
     if (b.id === 'offImg') { offImgDlg(); return; }
     if (b.id === 'addWork') { change(w => w.work.push({ name: '', d: Array(7).fill(null), resume: '' })); return; }
-    if (b.dataset.wkdel != null) { change(w => w.work.splice(+b.dataset.wkdel, 1)); return; }
+    if (b.id === 'addWorkMap') { editWorkMap(-1); return; }
+    if (b.dataset.wkmap != null) { editWorkMap(+b.dataset.wkmap); return; }
+    if (b.dataset.wkdel != null) {
+      const k = +b.dataset.wkdel, x = S.w.work[k];
+      if (!x || !x.bid) { change(w => w.work.splice(k, 1)); return; }
+      ask(`'${x.name}' 작업을 지울까요? 자동 배정의 🚧 장기 미정비 블럭에서도 같이 지워져요 (다른 주에도).`, '지우기').then(async ok => {
+        if (!ok) return;
+        try { await putBlock(null, x.bid); } catch (e) { toast('블럭을 지우지 못했어요: ' + (e && (e.code || e.message) || e)); return; }
+        change(w => { const at = w.work.findIndex(y => y.bid === x.bid); if (at >= 0) w.work.splice(at, 1); }); toast('지웠어요');
+      });
+      return;
+    }
     if (b.id === 'hpAdd') { change(w => w.helpers.push({ name: '', can: '', d: Array(7).fill(false) })); syncHelpers(); return; }
     if (b.dataset.hpdel != null) { const x = S.w.helpers[+b.dataset.hpdel]; ask(`${x.name || '이 줄'}을(를) 정비보조 명단에서 뺄까요?`, '빼기').then(ok => { if (ok) { change(w => w.helpers.splice(+b.dataset.hpdel, 1)); syncHelpers(); } }); return; }
     if (b.id === 'hpAll') { change(w => w.helpers.forEach(x => { if (x.can) x.d = DAYS.map(d => x.can.includes(d)); })); return; }
@@ -377,7 +435,15 @@ $('view').addEventListener('change', e => {
   if (t.id === 'fullDays') { change(w => { w.fullDays = v || 21; }); return; }
   if (t.id === 'rooms') { change(w => { w.rooms = v || 417; }); return; }
   if (ds.hpn != null) { change(w => { w.helpers[+ds.hpn][ds.f] = t.value.trim(); }); syncHelpers(); return; }
-  if (ds.wk != null) { change(w => { const x = w.work[+ds.wk]; if (ds.f) x[ds.f] = t.value.trim(); else x.d[+ds.d] = v; }); return; }
+  if (ds.wk != null) {
+    const x0 = S.w.work[+ds.wk];
+    if (x0 && x0.bid && ds.f === 'name') {   // 도면 줄 이름 = 블럭 이름 (자동 배정 화면에도)
+      const nm = t.value.trim().slice(0, 20), b = (S.blocks || []).find(y => y.id === x0.bid);
+      if (b && nm && nm !== b.name) putBlock(Object.assign({}, b, { name: nm, at: Date.now() })).then(() => { syncWork(); draw(); }).catch(e => toast('블럭 이름을 못 바꿨어요: ' + (e && (e.code || e.message) || e)));
+      return;
+    }
+    change(w => { const x = w.work[+ds.wk]; if (ds.f) x[ds.f] = t.value.trim(); else x.d[+ds.d] = v; }); return;
+  }
   if (ds.edit) { setDaily(D => { if (v == null) delete D.edit[ds.edit]; else D.edit[ds.edit] = v; }); return; }
   if (ds.dirty) { setDaily(D => { if (v == null) delete D.dirty[ds.dirty]; else D.dirty[ds.dirty] = v; }); return; }
   if (ds.dd) { setDaily(D => { D[ds.dd] = ds.dd === 'note' ? t.value : v; }); return; }
@@ -840,6 +906,7 @@ DB.onUser(u => {
   if (u && !u.anon && !role) login.err = '지금 로그인된 계정은 이 화면을 쓸 수 없어요 (소장 · 부소장 전용).';
   if (!role) { drawLogin(); return; }
   $('loginBox').hidden = true; $('appBox').hidden = false; $('logout').hidden = false;
+  S.by = role.label;
   start();
 });
 }
