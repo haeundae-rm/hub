@@ -273,17 +273,16 @@ function dayHtml() {
   const V = C.dailyView(S.w, S.di), s = V.sum;
   let h = dayChips();
   h += `<div class="ban ${V.edits ? 'w' : ''}">${V.edits ? '유닛 수정 ' + V.edits + '건 적용 중 · 이 날짜에만 적용돼요' : '주간 스케줄에서 자동으로 불러와요 · 유닛은 \'유닛 수정\' 칸에 입력하면 바뀌어요 (날짜마다 따로 저장)'}</div>`;
-  h += `<div class="dl"><div class="scroll noin vis"><table class="d g"><thead><tr><th>순번</th><th class="nm">직원성명</th><th>상태</th><th>유닛</th><th>배정순번</th><th>유닛 수정</th><th>더티수량</th></tr></thead><tbody>`;
+  h += `<div class="dl"><div class="scroll noin vis"><table class="d g"><thead><tr><th>순번</th><th class="nm">직원성명</th><th>상태</th><th>유닛</th><th>유닛 수정</th><th>더티수량</th></tr></thead><tbody>`;
   V.rows.forEach(x => {
     const st = x.st, off = OFF.includes(st);
     h += `<tr class="${x.r.group === '고정' ? 'fx' : ''}"><td class="no">${x.no}</td><td class="nm" style="cursor:default">${esc(x.r.name)}</td>
       <td class="${st ? 'st-' + st : ''}" style="font-weight:700">${esc(st)}</td>
       <td style="font-weight:700;${off ? 'color:#A9B0BB;font-weight:500' : ''}${C.WORK.includes(st) && !isNum(x.u) ? ';background:#FFE066' : ''}">${nv(x.u)}</td>
-      <td>${x.order || ''}</td>
       <td class="${x.edit != null ? 'edit' : ''}"><input type="number" inputmode="numeric" data-edit="${x.r.id}" value="${nv(x.edit)}" aria-label="${esc(x.r.name)} 유닛 수정"></td>
       <td class="${x.dirty != null ? 'edit' : ''}"><input type="number" inputmode="numeric" data-dirty="${x.r.id}" value="${nv(x.dirty)}" aria-label="${esc(x.r.name)} 더티수량"></td></tr>`;
   });
-  h += `<tr><td colspan="6" style="text-align:right;font-weight:700">더티수량 합계</td><td style="font-weight:800">${V.dirtyTot}</td></tr></tbody></table></div><div>`;
+  h += `<tr><td colspan="5" style="text-align:right;font-weight:700">더티수량 합계</td><td style="font-weight:800">${V.dirtyTot}</td></tr></tbody></table></div><div>`;
   h += `<div class="card"><h3>정비 예상 요약</h3><div class="kv">
     <b>예약</b><span>${nv(s.res)}</span><b>체크아웃</b><span>${nv(s.co)}</span><b>정비수</b><span>${s.jb}</span><b>출근인원</b><span>${s.ppl}</span>
     <b>C/O - 필요재입</b><span class="${s.coRe < 0 ? 'neg' : ''}">${nv(s.coRe)}</span><b>인당정비수</b><span>${f1(s.per)}</span>
