@@ -59,7 +59,7 @@ exports.bdayNotice = onSchedule({ schedule: '0 6 * * *', timeZone: 'Asia/Seoul',
     const x = B.notice(n, day);
     await db().doc('notices/' + x.id).set(Object.assign(x.doc, { at: admin.firestore.FieldValue.serverTimestamp() }));
   }
-  await db().doc('meta/bday_fn').set({ at: admin.firestore.FieldValue.serverTimestamp(), day, n: names.length }).catch(() => {});
+  await db().doc('meta/bday_fn').set({ at: admin.firestore.FieldValue.serverTimestamp(), day, n: names.length }).catch(e => logger.error('meta/bday_fn 저장 실패', e));
   logger.info('생일 공지', { day, n: names.length });
 });
 
