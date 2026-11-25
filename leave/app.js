@@ -9,6 +9,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 const P = () => window.LVP;
 let imp = null;    // 옮기기 진행 상태
 let pick = {};     // 휴대폰 승인 — 고른 휴대폰
+const justOk = {}; // 11/25 소장님: 방금 승인한 휴대폰은 그 자리에 남기고 버튼을 한 번 더 누르면 승인 취소
 let hki = null;    // 하우스키핑 대장 가져오기 (11/21)
 
 window.LV = {
@@ -20,18 +21,19 @@ window.__lv = { ver: VER };   // 시험·점검용
 // ---------- 휴대폰 승인
 function dt(t) { if (!t) return ''; const d = new Date(Number(t) + 9 * 36e5); return (d.getUTCMonth() + 1) + '/' + d.getUTCDate(); }
 function devHtml(D) {
-  const L = D.devices || [], wait = L.filter(d => !d.ok), ok = L.filter(d => d.ok);
-  const can = wait.filter(d => d.pid);
+  const L = D.devices || [], wait = L.filter(d => !d.ok || justOk[d.uid]), ok = L.filter(d => d.ok && !justOk[d.uid]), nWait = wait.filter(d => !d.ok).length;
+  const can = wait.filter(d => d.pid && !d.ok);
   const row = (d, isOk) => {
     const note = !d.pid ? '<span class="neg">연차 명단에 없는 이름</span>' : !d.target ? '연차 대상 아님 (근무 달력만 보여요)' : (d.person !== d.name ? '명단 ' + esc(d.person) + ' 님' : '') + (d.mate ? (d.person !== d.name ? ' · ' : '') + '2인 1조 짝 ' + esc(d.mate) + (d.matePid ? '' : ' (명단에 없음)') : '');
-    return '<div class="dv">' + (isOk ? '<span></span>' : '<input type="checkbox" data-pick="' + esc(d.uid) + '"' + (pick[d.uid] ? ' checked' : '') + (d.pid ? '' : ' disabled') + ' aria-label="고르기">') +
+    return '<div class="dv">' + (isOk || d.ok ? '<span></span>' : '<input type="checkbox" data-pick="' + esc(d.uid) + '"' + (pick[d.uid] ? ' checked' : '') + (d.pid ? '' : ' disabled') + ' aria-label="고르기">') +
       '<div class="who"><b>' + esc(d.name) + '</b><small>이름 고른 날 ' + esc(d.date || dt(d.at)) + ' · 휴대폰 ' + esc(d.uid.slice(0, 5)) + '</small></div>' +
       '<div class="muted">' + note + '</div>' +
       (isOk ? '<div class="row" style="gap:6px"><span class="st ok">승인 ' + dt(d.okAt) + '</span><button class="btn" data-revoke="' + esc(d.uid) + '">해제</button></div>'
+        : d.ok ? '<button class="btn" data-undo="' + esc(d.uid) + '" style="border-color:var(--green);color:var(--green);font-weight:700">✓ 승인됨 · 누르면 취소</button>'
         : '<button class="btn grn" data-approve="' + esc(d.uid) + '"' + (d.pid ? '' : ' disabled') + '>승인</button>') + '</div>';
   };
   const n = Object.keys(pick).filter(u => pick[u] && can.some(d => d.uid === u)).length;
-  return '<div class="card"><h2>승인 기다리는 휴대폰 ' + wait.length + '대</h2>' +
+  return '<div class="card"><h2>승인 기다리는 휴대폰 ' + nWait + '대</h2>' +
     '<p class="muted" style="margin:0 0 8px">정비 레포트에서 이름을 고른 휴대폰이에요. 승인하면 그 휴대폰의 \'📅 내 근무\'에 그분 연차·신청서가 보여요 (비밀번호 없음). 본인 휴대폰이 맞는지 확인하고 승인해 주세요.<br>2인 1조로 묶인 분은 짝의 연차도 같이 보여요.</p>' +
     (wait.length ? '<div class="row" style="margin-bottom:6px"><button class="btn" id="pickall"' + (can.length ? '' : ' disabled') + '>' + (n === can.length && n ? '모두 풀기' : '승인할 수 있는 ' + can.length + '대 모두 고르기') + '</button><span class="grow"></span><button class="btn pri" id="approve-picked"' + (n ? '' : ' disabled') + '>고른 ' + n + '대 승인</button></div>' + wait.map(d => row(d, false)).join('') : '<div class="empty">기다리는 휴대폰이 없어요.</div>') +
     '</div><div class="card"><h2>승인된 휴대폰 ' + ok.length + '대</h2>' + (ok.length ? ok.map(d => row(d, true)).join('') : '<div class="empty">아직 없어요.</div>') +
@@ -52,7 +54,13 @@ document.addEventListener('click', e => {
     const ids = ap ? [ap.getAttribute('data-approve')] : Object.keys(pick).filter(u => pick[u]);
     if (!ids.length) return;
     t.disabled = true;
-    P().run('devApprove', [null, ids, D.asOf], d => { pick = {}; P().set(d); P().toast(ids.length + '대 승인했어요'); }, m => { P().toast(m); P().render(); });
+    P().run('devApprove', [null, ids, D.asOf], d => { pick = {}; ids.forEach(u => { justOk[u] = 1; }); P().set(d); P().toast(ids.length + '대 승인했어요'); }, m => { P().toast(m); P().render(); });
+    return;
+  }
+  const ud = t.closest('[data-undo]');
+  if (ud) {
+    const u = ud.getAttribute('data-undo'), d0 = (D.devices || []).filter(d => d.uid === u)[0]; ud.disabled = true;
+    P().run('devRevoke', [null, u, D.asOf], d => { delete justOk[u]; P().set(d); P().toast((d0 ? d0.name + ' 님 ' : '') + '승인을 취소했어요'); }, m => { ud.disabled = false; P().toast(m); });
     return;
   }
   const rv = t.closest('[data-revoke]');
