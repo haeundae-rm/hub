@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.25-3';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.25-3';
-import * as PIN from './pin.js?v=2026.11.25-3';
-import { setupClose } from './close.js?v=2026.11.25-3';
-import { setupClosing } from './closing.js?v=2026.11.25-3';
-import { supProgress } from './supcalc.js?v=2026.11.25-3';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.25-3';
-import { setupMeal } from './meal.js?v=2026.11.25-3';
-import * as BD from './bday.js?v=2026.11.25-3';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.25-4';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.25-4';
+import * as PIN from './pin.js?v=2026.11.25-4';
+import { setupClose } from './close.js?v=2026.11.25-4';
+import { setupClosing } from './closing.js?v=2026.11.25-4';
+import { supProgress } from './supcalc.js?v=2026.11.25-4';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.25-4';
+import { setupMeal } from './meal.js?v=2026.11.25-4';
+import * as BD from './bday.js?v=2026.11.25-4';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.25-3';
+const VER = '2026.11.25-4';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -234,8 +234,8 @@ function statusItems(v) {
   if (!isHk() && H * 60 + Number(seoul().toISOString().slice(14, 16)) >= 6 * 60 + 40) {
     [['생일 알림', v.fb], ['습득물 사진 정리', v.fl]].forEach(([nm, f]) => {
       if (f && f.__err) return;
-      if (!f) add('bad', '서버 함수 ' + nm + ' 기록 없음', '아직 배포가 안 됐을 수 있어요 — Cloud Shell 에서 함수 배포');
-      else if (f.day !== v.d) add('bad', '서버 함수 ' + nm + '이 오늘 안 돌았어요', '마지막 ' + md(f.day) + ' · Firebase 콘솔 → Functions 에서 확인');
+      if (!f) return;   // 11/25 소장님 화면: 기록이 아직 없는 건(새로 배포한 날 · 아직 한 번도 안 돈 날) 띄우지 않음 — 한 번이라도 돈 뒤에 멈추면 알림
+      if (f.day !== v.d) add('bad', '서버 함수 ' + nm + '이 오늘 안 돌았어요', '마지막 ' + md(f.day) + ' · Firebase 콘솔 → Functions 에서 확인');
       else if (f.fail) add('wait', '서버 함수 ' + nm + ' 일부 실패 ' + f.fail + '건', 'Firebase 콘솔 → Functions → 로그');
     });
   }
@@ -731,7 +731,7 @@ const SECS = {
 const TILES = [
   { go: 'work', ic: BROOM, t: '오늘 정비', s: '메이드별 현황 · 보고서 올리기 · 더티 배분 · 활동판 · 자동 배정' },
   { go: 'quality', ic: '🔍', t: '품질 관리', s: '인스펙션 · 고객만족도 VOC' },
-  { href: './leave/', ic: '📋', t: '연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
+  { href: './leave/', ic: '📋', t: '룸메이드 연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
   { go: 'hk', ic: '🛎️', t: '하우스키퍼', s: '야간 업무 보고서 · 근무 스케줄 · 연차 현황' },
   { href: './keys/', ic: '🔑', t: '플로어 키', s: '키 서명 현황 · 오후 대조 · 미반납 · 대장 인쇄' },
@@ -943,7 +943,7 @@ document.addEventListener('click', e => {
   if (e.target.closest && e.target.closest('[data-hkleave]')) { import('./hkleave.js?v=' + VER).then(m => m.open()).catch(err => { console.warn(err); alert('연차 현황을 열지 못했어요. 새로 고침 후 다시 해 주세요.'); }); return; }
   const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-sup],[data-actclose],[data-actlogin],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"]');
   if (!t || (t.closest && t.closest('#dz'))) return;
-  if (t.matches('a[href="./leave/"]') && !PIN.passed()) { e.preventDefault(); PIN.gate('연차 · 근무').then(ok => { if (ok) location.href = './leave/'; }); return; }
+  if (t.matches('a[href="./leave/"]') && !PIN.passed()) { e.preventDefault(); PIN.gate('룸메이드 연차 · 근무').then(ok => { if (ok) location.href = './leave/'; }); return; }
   if (t.matches('a[href="./leave/"]')) return;
   if (t.hasAttribute('data-unlock')) { PIN.gate('인사').then(ok => { if (ok) draw(); }); return; }
   if (t.hasAttribute('data-pinchg')) { PIN.change(); return; }
