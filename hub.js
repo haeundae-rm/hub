@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.25-4';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.25-4';
-import * as PIN from './pin.js?v=2026.11.25-4';
-import { setupClose } from './close.js?v=2026.11.25-4';
-import { setupClosing } from './closing.js?v=2026.11.25-4';
-import { supProgress } from './supcalc.js?v=2026.11.25-4';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.25-4';
-import { setupMeal } from './meal.js?v=2026.11.25-4';
-import * as BD from './bday.js?v=2026.11.25-4';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.25-5';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.25-5';
+import * as PIN from './pin.js?v=2026.11.25-5';
+import { setupClose } from './close.js?v=2026.11.25-5';
+import { setupClosing } from './closing.js?v=2026.11.25-5';
+import { supProgress } from './supcalc.js?v=2026.11.25-5';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.25-5';
+import { setupMeal } from './meal.js?v=2026.11.25-5';
+import * as BD from './bday.js?v=2026.11.25-5';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.25-4';
+const VER = '2026.11.25-5';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -732,6 +732,7 @@ const TILES = [
   { go: 'work', ic: BROOM, t: '오늘 정비', s: '메이드별 현황 · 보고서 올리기 · 더티 배분 · 활동판 · 자동 배정' },
   { go: 'quality', ic: '🔍', t: '품질 관리', s: '인스펙션 · 고객만족도 VOC' },
   { href: './leave/', ic: '📋', t: '룸메이드 연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
+  { href: './rmsched/', ic: '🗓️', t: '룸메이드 스케줄', s: '주간 편성 · 기본유닛 · 휴무 · 국공휴 출근' },   // 11/25 부소장 Claude 제작 (rmsched/{cfg | 월요일 | hol-연도}, 규칙 v29 isBoss)
   { go: 'people', ic: '👥', t: '인사', s: '입퇴사 진행 · 전 파트 직원 명단' },
   { go: 'hk', ic: '🛎️', t: '하우스키퍼', s: '야간 업무 보고서 · 근무 스케줄 · 연차 현황' },
   { href: './keys/', ic: '🔑', t: '플로어 키', s: '키 서명 현황 · 오후 대조 · 미반납 · 대장 인쇄' },
@@ -863,7 +864,7 @@ function homeHtml() {
     } else h += '<div class="card hm-ok"><b>✅ 모두 정상</b><span>' + hm(view.at) + ' 기준</span><button class="ref" data-ref="1">' + (view.busy ? '읽는 중…' : '↻ 새로 고침') + '</button></div>';
   }
   if (v && v.bd) h += BD.html(v.bd, esc);
-  h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.go === 'close' || t.href === './leave/'))).map(t => {
+  h += '<div class="hm-grid">' + TILES.filter(t => !(isHk() && (t.go === 'people' || t.go === 'close' || t.href === './leave/' || t.href === './rmsched/'))).map(t => {
     const inner = badgeOf(t, v) + '<span class="hm-ic">' + t.ic + '</span><span class="hm-tx"><b>' + esc(t.t) + '</b><small>' + esc(t.s) + '</small></span>';
     return t.href ? '<a class="hm-tile' + (t.wide ? ' wide' : '') + '" href="' + t.href + '">' + inner + '</a>'
       : '<button class="hm-tile' + (t.wide ? ' wide' : '') + '" data-go="' + t.go + '">' + inner + '</button>';
