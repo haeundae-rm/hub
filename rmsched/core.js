@@ -207,18 +207,21 @@
   }
 
   // ---------- 카톡 공지 글 (요일별 휴무 명단)
+  function noticeDays(w) {   // 요일별 휴무 · 취소 명단 (고정 근무자 제외)
+    return DAYS.map((d, i) => ({ d, date: addDays(w.mon, i),
+      off: w.rows.filter(r => r.name && r.group !== '고정' && OFF.includes(r.st[i] || '')).map(r => r.name),
+      back: w.rows.filter(r => r.name && r.st[i] === '캔슬').map(r => r.name) }));
+  }
   function noticeText(w) {
-    const L = [`📢 ${weekTitle(w)} 룸메이드 휴무 공지 (${md(w.mon)} ~ ${md(addDays(w.mon, 6))})`, ''];
-    for (let d = 0; d < 7; d++) {
-      const off = w.rows.filter(r => r.name && OFF.includes(r.st[d] || '') && r.group !== '고정').map(r => r.name + (r.st[d] === '휴' ? '' : '(' + r.st[d] + ')'));
-      const back = w.rows.filter(r => r.name && r.st[d] === '캔슬').map(r => r.name);
-      L.push(`▪ ${DAYS[d]} ${md(addDays(w.mon, d))} — 휴무 ${off.length}명`);
-      L.push(off.length ? '   ' + off.join(', ') : '   없음');
-      if (back.length) L.push('   ↩ 휴무 취소(출근): ' + back.join(', '));
-    }
-    L.push('', '※ 고정 근무자(주말 등)는 표에서 확인해 주세요.', '문의 · 객실팀 사무실 051-749-5210');
+    const L = [`📢 ${weekTitle(w)} 휴무 (${md(w.mon)}~${md(addDays(w.mon, 6))})`, ''];
+    noticeDays(w).forEach(x => {
+      L.push(`▪ ${x.d} ${md(x.date)} (${x.off.length}명) ${x.off.join(' ') || '없음'}`);
+      if (x.back.length) L.push(`   ↩ 취소(출근) ${x.back.join(' ')}`);
+    });
+    L.push('', '※ 고정 근무자 제외 · 문의 051-749-5210');
     return L.join('\n');
   }
+
 
   // ---------- 카톡 사진으로 휴무 넣기 (사진 → AI 가 읽은 목록 → 주간 스케줄에 '신청' · 신청순)
   // AI 에게 보낼 글: 이번 주 날짜 · 직원 명단 · 돌려줄 모양(JSON)
@@ -332,6 +335,19 @@
     return rows;
   }
 
-  const API = { DAYS, STATUSES, OFF, WORK, GROUPS, isNum, num, rid, addDays, dowIdx, mondayOf, md, weekNoOf, weekTitle, emptyWeek, newRow, rowCalc, dayCalc, issues, dayData, dailyView, newWeekFrom, importXlsx, exportXlsx, noticeText, offPrompt, findRow, applyOff, HOL_ST, holName, importHolXlsx, holAuto, holCalc };
+  // 해마다 기본 공휴일 (허브 '근무 스케줄 편성' sched.js HOL 과 같은 날짜) — 대체 · 임시공휴일은 화면에서 '＋ 공휴일 추가'
+  const HOL_BASE = {
+    2026: { '01-01': '신정', '02-16': '설날', '02-17': '설날', '02-18': '설날', '03-01': '삼일절', '05-01': '근로자의날', '05-05': '어린이날', '05-24': '부처님오신날', '06-03': '지방선거', '06-06': '현충일', '07-17': '제헌절', '08-15': '광복절', '09-24': '추석', '09-25': '추석', '09-26': '추석', '10-03': '개천절', '10-09': '한글날', '12-25': '성탄절' },
+    2027: { '01-01': '신정', '02-06': '설날', '02-07': '설날', '02-08': '설날', '03-01': '삼일절', '05-01': '근로자의날', '05-05': '어린이날', '05-13': '부처님오신날', '06-06': '현충일', '07-17': '제헌절', '08-15': '광복절', '09-14': '추석', '09-15': '추석', '09-16': '추석', '10-03': '개천절', '10-09': '한글날', '12-25': '성탄절' }
+  };
+  function holNewYear(y, prev, roster) {
+    const days = Object.keys(HOL_BASE[y] || {}).sort().map(k => ({ date: y + '-' + k, name: HOL_BASE[y][k] }));
+    const names = [];
+    (prev ? prev.rows : []).forEach(r => { const vs = Object.values(r.v || {}); if (!(vs.length && vs.every(v => v === '퇴사'))) names.push(r.name); });
+    (roster || []).forEach(r => { if (r.name && r.group !== '고정' && !/교육생/.test(r.name) && !names.includes(r.name)) names.push(r.name); });
+    return { year: y, days, rows: names.map(name => ({ name, v: {} })) };
+  }
+
+  const API = { DAYS, STATUSES, OFF, WORK, GROUPS, isNum, num, rid, addDays, dowIdx, mondayOf, md, weekNoOf, weekTitle, emptyWeek, newRow, rowCalc, dayCalc, issues, dayData, dailyView, newWeekFrom, importXlsx, exportXlsx, noticeText, noticeDays, offPrompt, findRow, applyOff, HOL_ST, holName, importHolXlsx, holAuto, holCalc, HOL_BASE, holNewYear };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else G.RMCore = API;
 })(typeof window !== 'undefined' ? window : globalThis);

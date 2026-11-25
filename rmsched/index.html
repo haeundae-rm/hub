@@ -93,7 +93,8 @@ thead th.sat{background:#2f6fd0}thead th.sun{background:#c0392b}thead th.today{b
 .d td input{width:64px;min-height:34px;padding:3px 6px;text-align:center}
 .d td.edit input{background:#FFD59A;color:#7C2D12;font-weight:800}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.kv>*{padding:7px 10px;border-bottom:1px solid var(--line)}.kv>b{background:var(--soft);font-size:13.5px}.kv>span{text-align:right;font-weight:800;font-size:16px;font-variant-numeric:tabular-nums}
+.kv{grid-template-columns:1fr 1fr}.kv>*{padding:7px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;text-align:center}.kv>b{background:var(--soft);font-size:13.5px}.kv>span{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums}
+.sum.re{table-layout:fixed;width:100%}.sum.re th,.sum.re td{width:25%;text-align:center;vertical-align:middle}.sum.re td.calc{font-size:17px}
 .ban{padding:8px 12px;border-radius:9px;background:var(--grn);color:#fff;font-weight:700;margin-bottom:10px;font-size:14px}.ban.w{background:#B45309}
 textarea{width:100%;min-height:150px;resize:vertical;line-height:1.6}
 /* 종이 (HK 전파 · 공지용) — 이미지로 저장하므로 항상 흰 바탕 */
@@ -120,6 +121,13 @@ pre.txt{white-space:pre-wrap;background:var(--soft);border-radius:8px;padding:12
 .tools{margin-bottom:8px}.chk{padding:7px 14px;margin-bottom:8px}.ban{padding:6px 12px;margin-bottom:8px}
 table.wkt{table-layout:fixed}.sumh{margin:16px 0 8px;font-size:16px;font-weight:800}.sumh small{font-weight:500;color:var(--mut);font-size:12.5px}
 .sum.wkt tr:first-child th{background:#1D3A6E;color:#fff}.sum.wkt td input{min-width:0}.sum.wkt .rh{white-space:normal}
+/* 안쪽 세로 스크롤 없앰 — 넓은 화면에선 표 머리줄이 화면 위(상단 띠 아래)에 붙어 따라옴 */
+.scroll.noin{max-height:none}
+@media(min-width:1360px){.scroll.noin.wide{overflow:visible}.scroll.noin.wide thead th{top:64px}}
+@media(min-width:760px){.scroll.noin.vis{overflow:visible}.scroll.noin.vis thead th{top:64px}}
+.nd details{border:1px solid var(--line);border-radius:9px;margin-bottom:6px;background:var(--card)}.nd summary{cursor:pointer;padding:9px 12px;display:flex;gap:14px;align-items:center;list-style:none}
+.nd summary::-webkit-details-marker{display:none}.nd summary::before{content:'▸';color:var(--mut)}.nd details[open] summary::before{content:'▾'}.nd summary b{min-width:70px}.nd summary em{font-style:normal;font-weight:800;color:#1D3A6E}
+.nd .bk{color:#d45d5d;font-size:13px}.nd p{margin:0;padding:0 14px 10px 34px;line-height:1.7;font-size:14.5px}
 /* 국공휴 */
 .hol thead{position:sticky;top:0;z-index:4}.hol thead th{position:static}.hol thead th.nm{position:sticky;left:0;z-index:5}
 .hol th,.hol td{padding:3px 5px}.hol td.hc{min-width:48px;cursor:pointer;font-size:13px;font-weight:600}.hol td.hc:hover{outline:2px solid #3b6fd8;outline-offset:-2px}
@@ -167,7 +175,7 @@ table.wkt{table-layout:fixed}.sumh{margin:16px 0 8px;font-size:16px;font-weight:
 <input type="file" id="fileIn" accept=".xlsx,.xlsm,.xls" hidden>
 <input type="file" id="jsonIn" accept=".json" hidden>
 <input type="file" id="holFile" accept=".xlsx,.xlsm,.xls" hidden>
-<script src="core.js?v=2026.11.25-1"></script>
-<script type="module" src="app.js?v=2026.11.25-1"></script>
+<script src="core.js?v=2026.11.25-6"></script>
+<script type="module" src="app.js?v=2026.11.25-6"></script>
 </body>
 </html>

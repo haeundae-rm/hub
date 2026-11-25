@@ -102,7 +102,7 @@ $('weekBar').addEventListener('click', e => {
   else if (b.id === 'expX') exportX();
 });
 $('weekBar').addEventListener('change', e => { if (e.target.id === 'weekSel') openWeek(e.target.value); });
-$('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.tab = b.dataset.tab; closePop(); draw(); });
+$('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.tab = b.dataset.tab; closePop(); if (S.tab === 'hol') { S.holMsg = ''; holSyncRoster(); } draw(); });
 
 function draw() {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
@@ -145,7 +145,7 @@ function weekHtml() {
     <label class="lbl">월 만근 <input type="number" id="fullDays" value="${w.fullDays}" style="width:64px"></label>
     <label class="lbl">총 객실 <input type="number" id="rooms" value="${w.rooms}" style="width:78px"></label></div>`;
   if (S.ordMode) h += `<div class="ban w">카톡에 올라온 순서대로 이름을 누르세요 (9시 이전 신청은 뒤로). 번호가 있는 이름을 다시 누르면 번호가 빠져요. <button id="ordClear" style="margin-left:8px;min-height:30px;padding:2px 10px">신청순 모두 지우기</button></div>`;
-  h += `<div class="scroll ${S.ordMode ? 'ordmode' : ''}" style="max-height:calc(100vh - 150px)" id="gridScroll"><table class="g wkt" style="width:${COLW.grid}px">${COLG.grid}<thead><tr><th>순번</th><th>그룹</th><th>신청순</th><th class="nm">직원성명</th>`;
+  h += `<div class="scroll noin wide ${S.ordMode ? 'ordmode' : ''}" id="gridScroll"><table class="g wkt" style="width:${COLW.grid}px">${COLG.grid}<thead><tr><th>순번</th><th>그룹</th><th>신청순</th><th class="nm">직원성명</th>`;
   DAYS.forEach((d, i) => { const ds = addDays(w.mon, i), hd = S.hol && S.hol.days.find(x => x.date === ds); h += `<th class="${i === 5 ? 'sat' : i === 6 || hd ? 'sun' : ''} ${ds === t ? 'today' : ''}" title="${hd ? esc(hd.name) : ''}">${d}<br>${md(ds)}${hd ? '<br><small>' + esc(hd.name) + '</small>' : ''}</th>`; });
   h += `<th>지난주<br>누적</th><th>이번주</th><th>합계</th><th>특이사항 메모</th></tr></thead><tbody>`;
   let no = 0, lastG = null;
@@ -226,7 +226,7 @@ function dayHtml() {
   const V = C.dailyView(S.w, S.di), s = V.sum;
   let h = dayChips();
   h += `<div class="ban ${V.edits ? 'w' : ''}">${V.edits ? '유닛 수정 ' + V.edits + '건 적용 중 · 이 날짜에만 적용돼요' : '주간 스케줄에서 자동으로 불러와요 · 유닛은 \'유닛 수정\' 칸에 입력하면 바뀌어요 (날짜마다 따로 저장)'}</div>`;
-  h += `<div class="dl"><div class="scroll" style="max-height:calc(100vh - 230px)"><table class="d g"><thead><tr><th>순번</th><th class="nm">직원성명</th><th>상태</th><th>유닛</th><th>배정순번</th><th>유닛 수정</th><th>더티수량</th></tr></thead><tbody>`;
+  h += `<div class="dl"><div class="scroll noin vis"><table class="d g"><thead><tr><th>순번</th><th class="nm">직원성명</th><th>상태</th><th>유닛</th><th>배정순번</th><th>유닛 수정</th><th>더티수량</th></tr></thead><tbody>`;
   V.rows.forEach(x => {
     const st = x.st, off = OFF.includes(st);
     h += `<tr class="${x.r.group === '고정' ? 'fx' : ''}"><td class="no">${x.no}</td><td class="nm" style="cursor:default">${esc(x.r.name)}</td>
@@ -243,11 +243,11 @@ function dayHtml() {
     <b>미정비 이월</b><span>${nv(s.carry)}</span><b>유숙</b><span>${nv(s.stay)}</span><b>미정비 가능수</b><span>${s.avail == null ? '' : s.avail < 0 ? '-' : s.avail}</span></div>
     <p class="lbl" style="margin:8px 0 0">예약 · 체크아웃 · 이월 · 유숙은 주간 스케줄 '일별 요약'에서 입력해요</p></div>`;
   const D = V.D;
-  h += `<div class="card"><h3>재입실 현황</h3><div class="scroll"><table class="sum"><tr><th>투숙합계</th><th>판매예상</th><th>재입실조회</th><th>재입 예상</th></tr>
+  h += `<div class="card"><h3>재입실 현황</h3><div class="scroll"><table class="sum re"><tr><th>투숙합계</th><th>판매예상</th><th>재입실조회</th><th>재입 예상</th></tr>
     <tr><td><input type="number" data-dd="stayTot" value="${nv(D.stayTot)}"></td><td><input type="number" data-dd="sale" value="${nv(D.sale)}"></td><td><input type="number" data-dd="look" value="${nv(D.look)}"></td><td class="calc" style="font-size:17px">${f1(s.reent)}</td></tr></table></div>
     <p class="lbl" style="margin:8px 0 0">재입 예상 = 판매예상 × 재입실조회 ÷ 투숙합계</p></div>`;
   h += `<div class="card"><h3>야간조 인계사항</h3><textarea data-dd="note" placeholder="1. 미정비없이 전체 배정바랍니다.">${esc(D.note)}</textarea></div>`;
-  h += `<div class="card"><h3>정비보조 출근자 명단 <small>주간 스케줄에서 '출근' 표시한 분</small></h3>${V.helpers.length ? `<div class="kv" style="grid-template-columns:auto 1fr auto">${V.helpers.map((x, i) => `<b>${i + 1}</b><span style="text-align:left;font-size:15px">${esc(x.name)}</span><span style="font-size:13px;color:var(--mut)">HK지원</span>`).join('')}</div>` : '<p class="lbl" style="margin:0">이 날 출근 표시가 없어요</p>'}</div>`;
+  h += `<div class="card"><h3>정비보조 출근자 명단 <small>주간 스케줄에서 '출근' 표시한 분</small></h3>${V.helpers.length ? `<div class="kv" style="grid-template-columns:48px 1fr 90px">${V.helpers.map((x, i) => `<b>${i + 1}</b><span style="font-size:15px">${esc(x.name)}</span><span style="font-size:13px;color:var(--mut)">HK지원</span>`).join('')}</div>` : '<p class="lbl" style="margin:0">이 날 출근 표시가 없어요</p>'}</div>`;
   return h + '</div></div>';
 }
 function setDaily(fn) {
@@ -287,7 +287,9 @@ function noticeHtml() {
     ${w.rows.filter(r => r.name).map(r => `<tr class="${r.group === '고정' ? 'fx' : ''}"><td class="${ordCls(r.ord) || 'nord'}" style="font-weight:700">${isNum(r.ord) ? r.ord : '미신청'}</td><td class="nm">${esc(r.name)}</td>
       ${r.st.map(st => `<td class="${st ? 'st-' + st : ''}" style="font-weight:700;min-width:52px">${esc(st)}</td>`).join('')}<td style="font-weight:700">${C.rowCalc(w, r).cnt}</td></tr>`).join('')}
     </table><div style="margin-top:10px;font-size:12.5px;color:#5d6b80">문의 · 객실팀 사무실 051-749-5210 · 051-749-5211 · 카카오톡 '룸메이드 오더방'</div></div></div>`;
-  h += `<div class="card" style="margin-top:14px"><h3>카톡용 글 <small>요일별 휴무 명단 (고정 근무자 제외)</small></h3><pre class="txt">${esc(C.noticeText(w))}</pre></div>`;
+  h += `<div class="card" style="margin-top:14px"><h3>요일별 휴무 <small>요일을 누르면 명단이 보여요 · 고정 근무자 제외 · '카톡용 글 복사'는 아래 내용 그대로</small></h3><div class="nd">
+    ${C.noticeDays(w).map(x => `<details><summary><b>${x.d} ${md(x.date)}</b><span>휴무 <em>${x.off.length}</em>명</span>${x.back.length ? `<span class="bk">취소 ${x.back.length}명</span>` : ''}</summary>
+      <p>${x.off.length ? x.off.map(esc).join(' · ') : '없음'}</p>${x.back.length ? `<p class="bk">↩ 취소(출근): ${x.back.map(esc).join(' · ')}</p>` : ''}</details>`).join('')}</div></div>`;
   return h;
 }
 
@@ -299,11 +301,11 @@ function setHtml() {
     <label class="lbl">총 객실수 <input type="number" data-cfg="rooms" value="${nv(c.rooms)}" style="width:80px"></label>
     <span class="sp"></span>${S.w ? '<button id="syncRos">이번 주 명단으로 맞추기</button>' : ''}</div>
     <p class="lbl" style="margin:0">새 주차: 기준일 +7일 · 신청순 · 캔슬 · 신청휴무 지움 · <b>아래 기본유닛과 기본휴무</b>로 다시 채움 · 지난주 누적 = 지난 합계 · 메모에 '퇴사'가 있고 7일 모두 휴무면 명단에서 뺌</p></div>`;
-  h += `<div class="card"><h3>룸메이드 기본유닛 · 기본휴무 <small>${c.roster.length}명 · 위 칸은 유닛, 아래 칸은 그 요일 기본 상태</small></h3><div class="scroll" style="max-height:66vh"><table class="ros g"><thead><tr><th class="nm">직원성명</th><th>그룹</th>${DAYS.map(d => `<th>${d}</th>`).join('')}<th></th></tr></thead><tbody>
+  h += `<div class="card"><h3>룸메이드 기본유닛 · 기본휴무 <small>${c.roster.length}명 · 위 칸은 유닛, 아래 칸은 그 요일 기본 상태</small></h3><div class="scroll noin vis"><table class="ros g"><thead><tr><th class="nm">직원성명</th><th>그룹</th>${DAYS.map(d => `<th>${d}</th>`).join('')}<th></th></tr></thead><tbody>
     ${c.roster.map((b, i) => `<tr class="${b.group === '고정' ? 'fx' : ''}"><td class="nm" style="cursor:default"><input type="text" data-ros="${i}" data-f="name" value="${esc(b.name)}"></td>
       <td><select data-ros="${i}" data-f="group">${C.GROUPS.map(g => `<option ${b.group === g ? 'selected' : ''} value="${g}">${g || '-'}</option>`).join('')}</select></td>
       ${DAYS.map((_, d) => `<td style="padding:2px"><input type="number" data-ros="${i}" data-ub="${d}" value="${nv(b.base && b.base[d])}" aria-label="${esc(b.name)} ${DAYS[d]} 유닛"><br><select data-ros="${i}" data-ob="${d}" class="${b.off && b.off[d] ? 'st-' + b.off[d] : ''}" aria-label="${esc(b.name)} ${DAYS[d]} 기본 상태"><option value="">출근</option>${STATUSES.filter(x => x !== '캔슬').map(x => `<option ${b.off && b.off[d] === x ? 'selected' : ''}>${x}</option>`).join('')}</select></td>`).join('')}
-      <td><button class="dan" data-rosdel="${i}" style="min-height:32px;padding:2px 8px" aria-label="명단에서 빼기">✕</button></td></tr>`).join('')}
+      <td style="white-space:nowrap"><button data-rosins="${i}" style="min-height:32px;padding:2px 8px" title="이 아래에 한 줄 넣기" aria-label="이 아래에 추가">＋</button> <button class="dan" data-rosdel="${i}" style="min-height:32px;padding:2px 8px" aria-label="명단에서 빼기">✕</button></td></tr>`).join('')}
     </tbody></table></div><button id="rosAdd" style="margin-top:8px">＋ 직원 추가</button></div>`;
   h += `<div class="card"><h3>정비보조 명단</h3><div class="scroll"><table class="sum"><tr><th class="rh">성명</th><th>가능요일 (예: 월화수)</th><th></th></tr>
     ${c.helpers.map((x, i) => `<tr><td class="rh"><input type="text" data-hl="${i}" data-f="name" value="${esc(x.name)}"></td><td><input type="text" data-hl="${i}" data-f="can" value="${esc(x.can)}"></td><td><button class="dan" data-hldel="${i}" style="min-height:32px;padding:2px 8px" aria-label="빼기">✕</button></td></tr>`).join('')}
@@ -340,6 +342,7 @@ $('view').addEventListener('click', e => {
     if (b.id === 'blankW') { const w = C.emptyWeek(C.mondayOf(today()), S.cfg); fillFromRoster(w); S.w = w; S.weeks.push(w.mon); S.weeks.sort(); S.undo = []; saveW(); drawBar(); draw(); return; }
     // 명단 · 기본값
     if (b.id === 'rosAdd') { S.cfg.roster.push({ name: '', group: '', base: Array(7).fill(8), off: Array(7).fill('') }); saveC(); draw(); return; }
+    if (b.dataset.rosins != null) { const i = +b.dataset.rosins, g = S.cfg.roster[i].group; S.cfg.roster.splice(i + 1, 0, { name: '', group: g, base: Array(7).fill(8), off: Array(7).fill('') }); saveC(); draw(); setTimeout(() => { const el = document.querySelector(`input[data-ros="${i + 1}"][data-f="name"]`); if (el) el.focus(); }); return; }
     if (b.dataset.rosdel != null) { const i = +b.dataset.rosdel; ask(`${S.cfg.roster[i].name || '이 줄'}을(를) 기본 명단에서 뺄까요? (이번 주 표는 그대로예요)`, '빼기').then(ok => { if (ok) { S.cfg.roster.splice(i, 1); saveC(); draw(); } }); return; }
     if (b.id === 'hlAdd') { S.cfg.helpers.push({ name: '', can: '' }); saveC(); draw(); return; }
     if (b.dataset.hldel != null) { S.cfg.helpers.splice(+b.dataset.hldel, 1); saveC(); draw(); return; }
@@ -426,8 +429,9 @@ function ask(msg, ok = '확인') {
     m.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { closeDlg(); res(b.dataset.a === '1'); });
   });
 }
-function rowDlg(r, focus) {
-  const isNew = !r; r = r || C.newRow({ u: Array(7).fill(8) });
+function rowDlg(r, focus, afterId) {
+  const isNew = !r, after = afterId ? S.w.rows.find(x => x.id === afterId) : null;
+  r = r || C.newRow({ u: Array(7).fill(8), group: after ? after.group : '' });
   const m = dlg(`<h3>${isNew ? '직원 추가' : esc(r.name) + ' 정보'}</h3><div class="f">
     <label for="rN">직원성명</label><input type="text" id="rN" value="${esc(r.name)}">
     <label for="rG">그룹</label><select id="rG">${C.GROUPS.map(g => `<option value="${g}" ${r.group === g ? 'selected' : ''}>${g || '없음'}</option>`).join('')}</select>
@@ -435,29 +439,38 @@ function rowDlg(r, focus) {
     <label for="rO">신청순</label><input type="number" id="rO" value="${nv(r.ord)}">
     <label for="rP">지난주 누적</label><input type="number" id="rP" value="${nv(r.prev)}">
     <label for="rU">유닛 (7일 모두)</label><input type="number" id="rU" placeholder="바꿀 때만 입력" value="${isNew ? 8 : ''}">
-    <label for="rM">특이사항 메모</label><textarea id="rM" style="min-height:80px">${esc(r.memo)}</textarea></div>
+    <label for="rM">특이사항 메모</label><textarea id="rM" style="min-height:80px">${esc(r.memo)}</textarea>
+    ${isNew ? `<label for="rPos">넣을 위치</label><select id="rPos"><option value="auto">같은 그룹 맨 끝 (자동)</option><option value="top">맨 위</option>${S.w.rows.filter(x => x.name).map(x => `<option value="${x.id}" ${afterId === x.id ? 'selected' : ''}>${esc(x.name)} 다음</option>`).join('')}<option value="end">맨 아래</option></select>` : ''}</div>
     ${isNew ? '<label class="lbl"><input type="checkbox" id="rRos" checked> 기본 명단에도 추가 (다음 주차부터 계속)</label>' : ''}
-    <div class="acts">${isNew ? '' : '<button data-a="up">▲ 위로</button><button data-a="down">▼ 아래로</button><button data-a="del" class="dan">이 주차에서 빼기</button>'}<span style="flex:1"></span><button data-a="x">취소</button><button class="pri" data-a="ok">저장</button></div>`);
+    <div class="acts">${isNew ? '' : '<button data-a="up">▲ 위로</button><button data-a="down">▼ 아래로</button><button data-a="ins">＋ 이 아래에 추가</button><button data-a="del" class="dan">이 주차에서 빼기</button>'}<span style="flex:1"></span><button data-a="x">취소</button><button class="pri" data-a="ok">저장</button></div>`);
   if (focus === 'memo') m.querySelector('#rM').focus();
   m.querySelector('.acts').onclick = async e => {
     const a = e.target.dataset && e.target.dataset.a; if (!a) return;
     if (a === 'x') return closeDlg();
     if (a === 'up' || a === 'down') { change(w => { const i = w.rows.findIndex(x => x.id === r.id), j = a === 'up' ? i - 1 : i + 1; if (j < 0 || j >= w.rows.length) return; [w.rows[i], w.rows[j]] = [w.rows[j], w.rows[i]]; }); return; }
+    if (a === 'ins') { closeDlg(); rowDlg(null, null, r.id); return; }
     if (a === 'del') { closeDlg(); if (await ask(`${r.name}을(를) 이 주차 표에서 뺄까요? (되돌리기로 다시 살릴 수 있어요)`, '빼기')) change(w => { w.rows = w.rows.filter(x => x.id !== r.id); }); return; }
     const name = m.querySelector('#rN').value.trim(); if (!name) { toast('이름을 적어 주세요'); return; }
     const vals = { name, group: m.querySelector('#rG').value, joined: m.querySelector('#rJ').value, ord: num(m.querySelector('#rO').value), prev: num(m.querySelector('#rP').value), memo: m.querySelector('#rM').value.trim() };
     const u = num(m.querySelector('#rU').value);
-    const addRos = isNew && m.querySelector('#rRos').checked;
+    const addRos = isNew && m.querySelector('#rRos').checked, pos = isNew ? m.querySelector('#rPos').value : '';
     closeDlg();
     change(w => {
       if (isNew) {
         const row = C.newRow(Object.assign(vals, { u: Array(7).fill(u) }));
-        let at = -1; w.rows.forEach((x, i) => { if (x.group === row.group) at = i; });
-        if (at < 0 && row.group !== '고정') at = w.rows.findIndex(x => x.group === '고정') - 1;
-        w.rows.splice(at < 0 ? w.rows.length : at + 1, 0, row);
+        let at;   // 넣을 위치: 자동(같은 그룹 끝) · 맨 위 · 맨 아래 · ○○ 다음
+        if (pos === 'top') at = 0; else if (pos === 'end') at = w.rows.length;
+        else if (pos && pos !== 'auto') { const i = w.rows.findIndex(x => x.id === pos); at = i < 0 ? w.rows.length : i + 1; }
+        else { let g = -1; w.rows.forEach((x, i) => { if (x.group === row.group) g = i; }); if (g < 0 && row.group !== '고정') g = w.rows.findIndex(x => x.group === '고정') - 1; at = g < 0 ? w.rows.length : g + 1; }
+        w.rows.splice(at, 0, row);
       } else { const x = w.rows.find(y => y.id === r.id); Object.assign(x, vals); if (u != null) x.u = Array(7).fill(u); }
     });
-    if (addRos && !S.cfg.roster.some(b => b.name === name)) { S.cfg.roster.push({ name, group: vals.group, base: Array(7).fill(u), off: Array(7).fill('') }); saveC(); }
+    if (addRos && !S.cfg.roster.some(b => b.name === name)) {   // 기본 명단도 이번 주 표와 같은 자리에 (바로 앞 사람 다음)
+      const k = S.w.rows.findIndex(x => x.name === name), prevName = k > 0 ? S.w.rows[k - 1].name : null, j = prevName ? S.cfg.roster.findIndex(b => b.name === prevName) : -1;
+      const nb = { name, group: vals.group, base: Array(7).fill(u), off: Array(7).fill('') };
+      if (k === 0) S.cfg.roster.unshift(nb); else if (j >= 0) S.cfg.roster.splice(j + 1, 0, nb); else S.cfg.roster.push(nb);
+      saveC();
+    }
   };
 }
 
@@ -537,9 +550,26 @@ function syncHelpers() { S.cfg.helpers = S.w.helpers.filter(h => h.name).map(h =
 // =============== 국공휴 출근 현황 ===============
 // 엑셀 '26년 국공휴데이터'를 옮김. 칸 값 = 직접 고친 값, 없으면 그 주 주간 스케줄에서 자동 (점선 밑줄)
 async function loadHol(y) {
-  if (S.hol && S.hol.year === y) return;
-  try { S.hol = (await Store.getHol(y)) || null; } catch (e) { S.hol = null; }
-  if (S.hol) await holWeeks();
+  if (S.hol && S.hol.year === y) { holSyncRoster(); return; }
+  try { S.hol = (await Store.getHol(y)) || null; } catch (e) { S.hol = null; return; }
+  // 새해: 그 해 표가 없으면 기본 공휴일(core.js HOL_BASE)로 자동으로 만듦 — 명단은 지난해 표 + 기본 명단 (고정 근무자 제외)
+  if (!S.hol && C.HOL_BASE[y]) {
+    let prev = null; try { prev = await Store.getHol(y - 1); } catch (e) {}
+    S.hol = C.holNewYear(y, prev, S.cfg.roster); S.holMsg = `'${String(y).slice(2)}년 국공휴 표를 새로 만들었어요 (기본 공휴일 ${S.hol.days.length}일). 대체공휴일 · 임시공휴일은 '＋ 공휴일 추가'로 넣어 주세요.`;
+    try { await Store.setHol(clone(S.hol)); } catch (e) {}
+  }
+  if (S.hol) { holSyncRoster(); await holWeeks(); }
+}
+// 기본 명단에 새로 들어온 룸메이드(고정 근무자 · 교육생 제외)를 국공휴 표에 자동 추가 — 입사일 전 · 오늘 전 공휴일은 '미입사'
+function holSyncRoster() {
+  if (!S.hol) return;
+  const have = new Set(S.hol.rows.map(r => r.name).concat(S.hol.skip || [])), add = [], t = today();
+  S.cfg.roster.filter(r => r.name && r.group !== '고정' && !/교육생/.test(r.name) && !have.has(r.name)).forEach(r => {
+    const wr = S.w && S.w.rows.find(x => x.name === r.name), joined = (wr && wr.joined) || r.joined || '';
+    const v = {}; S.hol.days.forEach(d => { if (joined ? d.date < joined : d.date < t) v[d.date] = '미입사'; });
+    S.hol.rows.push({ name: r.name, v }); add.push(r.name);
+  });
+  if (add.length) { S.holMsg = (S.holMsg ? S.holMsg + ' ' : '') + '새 룸메이드 ' + add.join(', ') + ' 님을 국공휴 표에 추가했어요 (지난 공휴일은 미입사로 — 다르면 칸을 눌러 고쳐 주세요).'; saveH(); }
 }
 async function holWeeks() {   // 공휴일이 든 주의 주간 스케줄만 읽어 둠
   S.hwk = S.hwk || {};
@@ -552,15 +582,15 @@ const HCLS = { 출근: 'h-ok', 휴무: 'h-off', 미입사: 'h-new', 개인사유
 const rankCls = k => k == null ? '' : k <= 10 ? 'r1' : k <= 20 ? 'r2' : 'r3';
 function holHtml() {
   const H = S.hol;
-  if (!H) return `<div class="empty"><b>국공휴 출근 현황이 아직 없어요</b>지금까지 쓰던 '국공휴데이터' 엑셀을 가져오면 그대로 이어서 써요.<br><br><button class="pri" id="holImp">국공휴 엑셀 가져오기</button> <button id="holNew">빈 표로 시작</button></div>`;
+  if (!H) return `<div class="tools"><button data-hy="-1">◀ 지난해</button><button data-hy="1">다음 해 ▶</button></div><div class="empty"><b>국공휴 출근 현황이 아직 없어요</b>지금까지 쓰던 '국공휴데이터' 엑셀을 가져오면 그대로 이어서 써요.<br><br><button class="pri" id="holImp">국공휴 엑셀 가져오기</button> <button id="holNew">빈 표로 시작</button></div>`;
   const R = C.holCalc(H, C.holAuto(H, holWeekMap())), t = today();
   const rows = S.holSort ? R.slice().sort((a, b) => (a.rank == null) - (b.rank == null) || (a.rank || 0) - (b.rank || 0)) : R;
   const months = []; H.days.forEach(d => { const m = Number(d.date.slice(5, 7)); const L = months[months.length - 1]; if (L && L.m === m) L.n++; else months.push({ m, n: 1 }); });
-  let h = `<div class="tools"><h3 style="margin:0;font-size:19px">'${String(H.year).slice(2)}년 R/M 국공휴 출근 현황</h3><span class="sp"></span>
+  let h = (S.holMsg ? `<div class="ban">${esc(S.holMsg)}</div>` : '') + `<div class="tools"><button data-hy="-1" aria-label="지난해">◀</button><h3 style="margin:0;font-size:19px">'${String(H.year).slice(2)}년 R/M 국공휴 출근 현황</h3><button data-hy="1" aria-label="다음 해">▶</button><span class="sp"></span>
     <div class="seg"><button data-hs="0" class="${S.holSort ? '' : 'on'}">명단 순서</button><button data-hs="1" class="${S.holSort ? 'on' : ''}">출근율 높은 순</button></div>
     <button id="holDay">＋ 공휴일 추가</button><button id="holAdd">＋ 직원 추가</button><button id="holImp">엑셀 가져오기</button><button id="holExp">엑셀로 내려받기</button></div>
     <p class="lbl" style="margin:0 0 8px">칸을 누르면 출근 → 휴무 → 개인사유 → 미입사 → 수습 → 퇴사 → 빈칸 · <u style="text-decoration-style:dotted">점선 밑줄</u> = 주간 스케줄에서 자동으로 채운 값 (누르면 직접 값으로 바뀜)</p>
-    <div class="scroll" style="max-height:74vh"><table class="g hol"><thead><tr><th rowspan="3">번호</th><th rowspan="3" class="nm">R/M</th>${months.map(x => `<th colspan="${x.n}">${x.m}월</th>`).join('')}
+    <div class="scroll noin"><table class="g hol"><thead><tr><th rowspan="3">번호</th><th rowspan="3" class="nm">R/M</th>${months.map(x => `<th colspan="${x.n}">${x.m}월</th>`).join('')}
     <th rowspan="3">국공휴<br>개수</th><th rowspan="3">미입사</th><th rowspan="3">휴무</th><th rowspan="3">개인<br>사유</th><th rowspan="3">출근<br>일수</th><th rowspan="3">대상일수<br><small>(출근+휴무)</small></th><th rowspan="3">수습</th><th rowspan="3">퇴사</th><th rowspan="3">출근율</th><th rowspan="3">순위</th></tr>
     <tr>${H.days.map((d, i) => `<th class="hd" data-hd="${i}" title="${esc(d.name)} · 누르면 지우기">${Number(d.date.slice(8))}일</th>`).join('')}</tr>
     <tr>${H.days.map(d => `<th class="hd2 ${d.date > t ? 'fut' : ''}">${['일', '월', '화', '수', '목', '금', '토'][new Date(d.date + 'T12:00:00Z').getUTCDay()]}</th>`).join('')}</tr></thead><tbody>`;
@@ -604,6 +634,7 @@ function holClick(t, b) {
     if (b.id === 'holImp') { $('holFile').click(); return true; }
     if (b.id === 'holNew') { const y = Number((S.w ? S.w.mon : today()).slice(0, 4)); S.hol = { year: y, days: [], rows: S.cfg.roster.filter(r => r.name && r.group !== '고정').map(r => ({ name: r.name, v: {} })) }; saveH(); draw(); return true; }
     if (b.dataset.hs != null) { S.holSort = b.dataset.hs === '1'; draw(); return true; }
+    if (b.dataset.hy) { const y = ((S.hol && S.hol.year) || S.holYear || Number(today().slice(0, 4))) + Number(b.dataset.hy); S.holYear = y; S.hol = null; S.holMsg = ''; loadHol(y).then(draw); return true; }
     if (b.id === 'holExp') { holExport(); return true; }
     if (b.id === 'holAdd') {
       const have = new Set(S.hol.rows.map(r => r.name)), cand = S.cfg.roster.filter(r => r.name && r.group !== '고정' && !have.has(r.name));
@@ -611,7 +642,7 @@ function holClick(t, b) {
         ${cand.length ? `<p class="lbl">기본 명단에 있고 이 표에 없는 분: ${cand.map(r => esc(r.name)).join(', ')}</p>` : ''}<p class="lbl">고정 근무자는 이 표에 넣지 않아요. 입사 전 공휴일은 '미입사'로 채워요.</p>
         <div class="acts"><button data-a="x">취소</button><button class="pri" data-a="ok">추가</button></div>`);
       m.querySelector('.acts').onclick = e => { const a = e.target.dataset && e.target.dataset.a; if (!a) return; const n = m.querySelector('#hN').value.trim(); closeDlg(); if (a !== 'ok' || !n) return;
-        const v = {}; S.hol.days.forEach(d => { if (d.date < today()) v[d.date] = '미입사'; }); S.hol.rows.push({ name: n, v }); saveH(); draw(); };
+        const v = {}; S.hol.days.forEach(d => { if (d.date < today()) v[d.date] = '미입사'; }); S.hol.rows.push({ name: n, v }); S.hol.skip = (S.hol.skip || []).filter(x => x !== n); saveH(); draw(); };
       return true;
     }
     if (b.id === 'holDay') {
@@ -636,7 +667,7 @@ function holClick(t, b) {
       const a = e.target.dataset && e.target.dataset.a; if (!a) return; const L = S.hol.rows;
       if (a === 'up' || a === 'down') { const j = a === 'up' ? i - 1 : i + 1; if (j >= 0 && j < L.length) { [L[i], L[j]] = [L[j], L[i]]; saveH(); } closeDlg(); draw(); return; }
       closeDlg();
-      if (a === 'del') { if (await ask(`${r.name}을(를) 국공휴 표에서 뺄까요? 지금까지 기록도 같이 지워져요.`, '빼기')) { L.splice(i, 1); saveH(); draw(); } return; }
+      if (a === 'del') { if (await ask(`${r.name}을(를) 국공휴 표에서 뺄까요? 지금까지 기록도 같이 지워지고, 다시 자동으로 넣지 않아요.`, '빼기')) { L.splice(i, 1); S.hol.skip = [...new Set([...(S.hol.skip || []), r.name])]; saveH(); draw(); } return; }
       if (a === 'ok') { const n = m.querySelector('#hR').value.trim(); if (n) { r.name = n; saveH(); draw(); } }
     };
     return true;
@@ -729,9 +760,20 @@ async function download(filename, data) {
   if (dl) { try { await dl.save({ filename, data }); toast('내려받았어요'); return true; } catch (e) { if (e && e.code !== 'declined') toast('내려받지 못했어요 (' + (e.code || e.message) + ')'); return false; } }
   try { const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); a.download = filename; a.click(); return true; } catch (e) { toast('이 화면에서는 내려받을 수 없어요'); return false; }
 }
+// 엑셀로 내려받기: 지금 쓰는 '룸메이드 스케줄표' 양식(template.xlsx)에 값만 채움 — 서식 · 수식 · 색 · 시트 그대로 (일일 스케줄 시트는 고른 날짜)
 async function exportX() {
-  try { const X = await XL(); const buf = C.exportXlsx(X, S.w, S.di); download(`룸메이드_스케줄_${S.w.mon.slice(2, 4)}년${Number(S.w.mon.slice(5, 7))}월${S.w.no}주차.xlsx`, new Blob([buf])); }
-  catch (e) { toast('엑셀을 만들지 못했어요: ' + (e.message || e)); }
+  const fn = `룸메이드_스케줄표_${Number(S.w.mon.slice(5, 7))}월${S.w.no}주차.xlsx`;
+  try {
+    toast('엑셀 만드는 중…');
+    const [F, r] = await Promise.all([import('./xlsfill.js'), fetch('./template.xlsx')]);
+    if (!r.ok) throw new Error('양식 파일을 못 읽었어요');
+    const out = await F.fillSchedule(new Uint8Array(await r.arrayBuffer()), S.w, S.di);
+    download(fn, new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  } catch (e) {
+    console.warn('양식 엑셀 실패', e);
+    try { const X = await XL(); download(fn, new Blob([C.exportXlsx(X, S.w, S.di)])); toast('양식을 못 읽어 간단한 표로 내려받았어요: ' + (e.message || e)); }
+    catch (e2) { toast('엑셀을 만들지 못했어요: ' + (e2.message || e2)); }
+  }
 }
 async function makePng(id) {
   const h2c = await lib('html2canvas', 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
