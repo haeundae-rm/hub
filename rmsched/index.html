@@ -86,9 +86,17 @@ thead th.sat{background:#2f6fd0}thead th.sun{background:#c0392b}thead th.today{b
 .grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--mut);margin:8px 2px}
 .legend i{font-style:normal;display:inline-block;padding:1px 7px;border-radius:5px;font-weight:700;margin-right:4px}
-.daychips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.daychips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding-top:9px}
 .daychips button{min-width:74px;line-height:1.2}.daychips button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 .daychips button small{display:block;font-size:11.5px;opacity:.8;font-weight:500}
+/* 11/25 소장님: 인계는 '내일' 방배정 — 내일 칸은 주황으로 숨쉬듯 빛나고, 다른 날은 회색 */
+.daychips button.dim{background:#f1f2f4;color:#9aa0a8;border-color:#e3e5e8}
+.daychips button em.uc{display:block;font-style:normal;font-size:10.5px;font-weight:700;color:#a7adb5;margin-top:1px}
+.daychips button.tmr{position:relative;border:1.5px solid #f08a24;color:#c25e00;background:#fff7ef;font-weight:800;animation:tmrglow 2.2s ease-in-out infinite}
+.daychips button.tmr.on{background:var(--navy);color:#fff;border-color:#f08a24}
+.daychips button.tmr::before{content:'인계';position:absolute;top:-8px;right:-6px;background:#f08a24;color:#fff;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:9px;line-height:1.5}
+@keyframes tmrglow{0%,100%{box-shadow:0 0 0 1px rgba(255,197,138,.5),0 0 6px 1px rgba(255,140,40,.35)}50%{box-shadow:0 0 0 2px rgba(255,214,170,.9),0 0 16px 4px rgba(255,140,40,.6)}}
+@media print{.daychips button.tmr{animation:none}}
 .dl{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
 .d td input{width:64px;min-height:34px;padding:3px 6px;text-align:center}
 .d td.edit input{background:#FFD59A;color:#7C2D12;font-weight:800}
@@ -175,7 +183,7 @@ table.wkt{table-layout:fixed}.sumh{margin:16px 0 8px;font-size:16px;font-weight:
 <input type="file" id="fileIn" accept=".xlsx,.xlsm,.xls" hidden>
 <input type="file" id="jsonIn" accept=".json" hidden>
 <input type="file" id="holFile" accept=".xlsx,.xlsm,.xls" hidden>
-<script src="core.js?v=2026.11.25-12"></script>
-<script type="module" src="app.js?v=2026.11.25-12"></script>
+<script src="core.js?v=2026.11.25-13"></script>
+<script type="module" src="app.js?v=2026.11.25-13"></script>
 </body>
 </html>

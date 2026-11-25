@@ -90,6 +90,8 @@ async function flush(k) {
 // ---------- HK 전파용 사본: rmsched_hk/{YYYY-MM-DD} — 하우스키퍼(야간 · 오더테이커)가 읽는 그날 HK 전파 (전체) 내용만
 //   주차를 저장할 때 · 주차를 열 때 그 주 7일을 다시 씀 (바뀐 날만). 규칙에 rmsched_hk 가 아직 없으면 조용히 건너뜀
 const hkSent = {};
+// 날짜 칸 (11/25): 인계 대상 = 내일 → 주황 강조 · 고른 칸은 남색 · 나머지는 회색
+function chipCls(on, ds, tm) { return [on ? 'on' : '', ds === tm ? 'tmr' : '', !on && ds !== tm ? 'dim' : ''].join(' ').trim(); }
 function hkSnap(w, di) {
   const V = C.dailyView(w, di), s = V.sum, r1 = v => v == null ? null : Math.round(v * 10) / 10;
   return { date: V.date, rm: V.rm.map(x => ({ n: x.r.name, u: isNum(x.u) ? x.u : null, up: !!x.up })),
@@ -138,9 +140,9 @@ async function startHk() {
     await new Promise((res, rej) => {
       let first = true;
       DB.listenQuery('rmsched_hk', [['date', '>=', from]], docs => {
-        const cur = S.snaps && S.snaps[S.si] ? S.snaps[S.si].date : today();
+        const cur = S.snaps && S.snaps[S.si] ? S.snaps[S.si].date : addDays(today(), 1);   // 처음엔 내일(인계 대상)
         S.snaps = docs.map(d => d.data).filter(x => x && x.date).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 8);
-        const i = S.snaps.findIndex(x => x.date === cur), j = S.snaps.findIndex(x => x.date === today()); S.si = i >= 0 ? i : j >= 0 ? j : 0;
+        const i = S.snaps.findIndex(x => x.date === cur), j = S.snaps.findIndex(x => x.date === addDays(today(), 1)) >= 0 ? S.snaps.findIndex(x => x.date === addDays(today(), 1)) : S.snaps.findIndex(x => x.date === today()); S.si = i >= 0 ? i : j >= 0 ? j : 0;
         setSave('보기 전용 · ' + new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 16) + ' 반영'); draw();
         if (first) { first = false; res(); }
       }, e => { if (first) { first = false; rej(e); } });
@@ -155,7 +157,7 @@ async function openWeek(mon) {
   await loadBlocks(); syncWork();
   await loadHol(Number(mon.slice(0, 4)));
   pushHk(clone(S.w));
-  const t = today(); S.di = (t >= mon && t <= addDays(mon, 6)) ? C.dowIdx(t) : 0;
+  const t = today(), tm = addDays(t, 1); S.di = (tm >= mon && tm <= addDays(mon, 6)) ? C.dowIdx(tm) : (t >= mon && t <= addDays(mon, 6)) ? C.dowIdx(t) : 0;   // 11/25: 처음엔 내일(인계 대상) 칸
   drawBar(); draw();
 }
 async function flushNow() { if (q.w.t) { clearTimeout(q.w.t); q.w.t = 0; await flush('w'); } }
@@ -308,7 +310,8 @@ function helperHtml() {
 // =============== 일일 스케줄 ===============
 function dayChips() {
   const t = today();
-  return `<div class="daychips" id="dayChips">${DAYS.map((d, i) => { const ds = addDays(S.w.mon, i); return `<button data-di="${i}" class="${S.di === i ? 'on' : ''}">${d}${ds === t ? ' · 오늘' : ''}<small>${md(ds)}</small></button>`; }).join('')}</div>`;
+  const tm = addDays(t, 1);
+  return `<div class="daychips" id="dayChips">${DAYS.map((d, i) => { const ds = addDays(S.w.mon, i); return `<button data-di="${i}" class="${chipCls(S.di === i, ds, tm)}">${d}${ds === t ? ' · 오늘' : ds === tm ? ' · 내일' : ''}<small>${md(ds)}</small>${!(S.di === i) && ds > tm ? '<em class="uc">미확정</em>' : ''}</button>`; }).join('')}</div>`;
 }
 function dayHtml() {
   const V = C.dailyView(S.w, S.di), s = V.sum;
@@ -349,7 +352,8 @@ function hkV() {
 }
 function snapChips() {
   const t = today();
-  return `<div class="daychips" id="dayChips">${S.snaps.map((x, i) => `<button data-si="${i}" class="${S.si === i ? 'on' : ''}">${DAYS[C.dowIdx(x.date)]}${x.date === t ? ' · 오늘' : ''}<small>${md(x.date)}</small></button>`).join('')}</div>`;
+  const tm = addDays(t, 1);
+  return `<div class="daychips" id="dayChips">${S.snaps.map((x, i) => `<button data-si="${i}" class="${chipCls(S.si === i, x.date, tm)}">${DAYS[C.dowIdx(x.date)]}${x.date === t ? ' · 오늘' : x.date === tm ? ' · 내일' : ''}<small>${md(x.date)}</small>${!(S.si === i) && x.date > tm ? '<em class="uc">미확정</em>' : ''}</button>`).join('')}</div>`;
 }
 function hkHtml() {
   if (S.hkOnly && !S.snaps.length) return '<div class="empty"><b>아직 올라온 HK 전파가 없어요</b>소장 · 부소장님이 스케줄을 저장하면 여기에 보여요.</div>';
