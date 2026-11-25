@@ -232,7 +232,7 @@ function weekHtml() {
   if (S.ordMode) h += `<div class="ban w">카톡에 올라온 순서대로 이름을 누르세요 (9시 이전 신청은 뒤로). 번호가 있는 이름을 다시 누르면 번호가 빠져요. <button id="ordClear" style="margin-left:8px;min-height:30px;padding:2px 10px">신청순 모두 지우기</button></div>`;
   h += `<div class="scroll noin wide ${S.ordMode ? 'ordmode' : ''}" id="gridScroll"><table class="g wkt" style="width:${COLW.grid}px">${COLG.grid}<thead><tr><th>순번</th><th>그룹</th><th>신청순</th><th class="nm">직원성명</th>`;
   DAYS.forEach((d, i) => { const ds = addDays(w.mon, i), hd = S.hol && S.hol.days.find(x => x.date === ds); h += `<th class="${i === 5 ? 'sat' : i === 6 || hd ? 'sun' : ''} ${ds === t ? 'today' : ''}" title="${hd ? esc(hd.name) : ''}">${d}<br>${md(ds)}${hd ? '<br><small>' + esc(hd.name) + '</small>' : ''}</th>`; });
-  h += `<th>지난주<br>누적</th><th>이번주</th><th>합계</th><th>특이사항 메모</th></tr></thead><tbody>`;
+  h += `<th>지난주<br>누적</th><th>이번주</th><th>${[1, 2, 3, 4, 5, 6].some(d => addDays(w.mon, d).slice(8) === '01') ? `합계<br><small>${Number(addDays(w.mon, 6).slice(5, 7))}월 1일부터</small>` : '합계'}</th><th>특이사항 메모</th></tr></thead><tbody>`;
   let no = 0, lastG = null;
   w.rows.forEach(r => {
     const grp = r.group === '고정' ? '고정' : (r.group ? 'ABC' : '기타');
@@ -244,7 +244,7 @@ function weekHtml() {
       const st = r.st[d] || '', u = r.u[d], miss = C.WORK.includes(st) && !isNum(u);
       h += `<td class="c ${st ? 'st-' + st : ''} ${OFF.includes(st) ? 'off' : ''} ${miss ? 'miss' : ''}" data-d="${d}"><span class="s">${esc(st)}</span><span class="u">${nv(u)}</span></td>`;
     }
-    h += `<td class="n">${nv(r.prev)}</td><td class="n ${k.cnt > 5 ? 'hot' : ''}">${k.cnt}</td><td class="n ${k.over ? 'over' : ''}">${isNum(r.prev) || k.cnt ? k.total : ''}</td><td class="memo" data-memo="1" title="${esc(r.memo)}">${esc(r.memo)}</td></tr>`;
+    h += `<td class="n">${nv(r.prev)}</td><td class="n ${k.cnt > 5 ? 'hot' : ''}">${k.cnt}</td><td class="n ${k.over ? 'over' : ''}"${k.cut ? ` title="${k.pm}월 최종 ${k.prevEnd}일 · ${k.pm % 12 + 1}월 1일부터 ${k.total}일"` : ''}>${isNum(r.prev) || k.cnt ? k.total : ''}${k.cut && (isNum(r.prev) || k.cnt) ? `<small class="pmEnd">${k.pm}월 ${k.prevEnd}</small>` : ''}</td><td class="memo" data-memo="1" title="${esc(r.memo)}">${esc(r.memo)}</td></tr>`;
   });
   const Cd = DAYS.map((_, d) => C.dayCalc(w, d));
   h += `</tbody><tfoot><tr><td colspan="4" class="nm">출근인원 · 정비수</td>${Cd.map(x => `<td class="ft">${x.ppl}명 · ${x.jb}</td>`).join('')}<td colspan="4"></td></tr></tfoot></table></div>
@@ -407,7 +407,7 @@ function setHtml() {
     <label class="lbl">월 만근일수 <input type="number" data-cfg="fullDays" value="${nv(c.fullDays)}" style="width:70px"></label>
     <label class="lbl">총 객실수 <input type="number" data-cfg="rooms" value="${nv(c.rooms)}" style="width:80px"></label>
     <span class="sp"></span>${S.w ? '<button id="syncRos">이번 주 명단으로 맞추기</button>' : ''}</div>
-    <p class="lbl" style="margin:0">새 주차: 기준일 +7일 · 신청순 · 캔슬 · 신청휴무 지움 · <b>아래 기본유닛과 기본휴무</b>로 다시 채움 · 지난주 누적 = 지난 합계 · 메모에 '퇴사'가 있고 7일 모두 휴무면 명단에서 뺌</p></div>`;
+    <p class="lbl" style="margin:0">새 주차: 기준일 +7일 · 신청순 · 캔슬 · 신청휴무 지움 · <b>아래 기본유닛과 기본휴무</b>로 다시 채움 · 지난주 누적 = 지난 합계 (매월 1일부터 새로) · 메모에 '퇴사'가 있고 7일 모두 휴무면 명단에서 뺌</p></div>`;
   h += `<div class="card"><h3>룸메이드 기본유닛 · 기본휴무 <small>${c.roster.length}명 · 위 칸은 유닛, 아래 칸은 그 요일 기본 상태</small></h3><div class="scroll noin vis"><table class="ros g"><thead><tr><th class="nm">직원성명</th><th>그룹</th>${DAYS.map(d => `<th>${d}</th>`).join('')}<th></th></tr></thead><tbody>
     ${c.roster.map((b, i) => `<tr class="${b.group === '고정' ? 'fx' : ''}"><td class="nm" style="cursor:default"><input type="text" data-ros="${i}" data-f="name" value="${esc(b.name)}"></td>
       <td><select data-ros="${i}" data-f="group">${C.GROUPS.map(g => `<option ${b.group === g ? 'selected' : ''} value="${g}">${g || '-'}</option>`).join('')}</select></td>
@@ -830,18 +830,17 @@ function newWeekDlg() {
     const base = last === S.w.mon ? S.w : await Store.getWeek(last);
     const pre = C.newWeekFrom(base, S.cfg), nw = pre.week;
     const m = dlg(`<h3>새 주차 만들기</h3><p><b>${esc(C.weekTitle(nw))}</b> · ${md(nw.mon)} ~ ${md(addDays(nw.mon, 6))} (${esc(C.weekTitle(base))} 다음 주)</p>
-      <ul style="margin:0 0 10px;padding-left:20px;line-height:1.8"><li>유닛은 기본유닛, 고정 그룹은 기본휴무로 다시 채워요</li><li>신청순 · 신청휴무 · 사유 · 휴 · 캔슬을 지워요</li><li>지난주 누적 = ${esc(C.weekTitle(base))} 합계</li>
+      <ul style="margin:0 0 10px;padding-left:20px;line-height:1.8"><li>유닛은 기본유닛, 고정 그룹은 기본휴무로 다시 채워요</li><li>신청순 · 신청휴무 · 사유 · 휴 · 캔슬을 지워요</li><li>${nw.mon.slice(8) === '01' ? '월요일이 1일이라 누적을 0부터 새로 세요' : `지난주 누적 = ${esc(C.weekTitle(base))} 합계`}</li>
       <li>예약 · 체크아웃 · 유숙 · 이월 · 정비보조 출근 · 작업객실을 비워요 (다음 월 예약 · 체크아웃은 월요일로)</li>
       ${pre.removed.length ? `<li><b>퇴사 처리로 빠지는 분:</b> ${pre.removed.map(esc).join(', ')}</li>` : ''}</ul>
       <div class="f" style="grid-template-columns:110px minmax(0,1fr)"><label for="nwNo">주차 번호</label><input type="number" id="nwNo" value="${nw.no}"></div>
-      ${pre.monthChange ? '<label class="lbl" style="display:block;margin-bottom:6px"><input type="checkbox" id="nwReset"> 달이 바뀌는 주예요 — 지난주 누적을 0으로 시작</label>' : ''}
+      ${pre.monthChange && nw.mon.slice(8) !== '01' ? '<p class="lbl" style="margin:0 0 8px">📅 달이 바뀌는 주예요 — 1일부터 누적 출근일수를 자동으로 새로 세요 (누적 칸 아래 작은 글씨 = 지난달 최종)</p>' : ''}
       ${S.weeks.includes(nw.mon) ? '<p class="neg"><b>이 주차가 이미 있어요. 만들면 덮어써요.</b></p>' : ''}
       <div class="acts"><button data-a="x">취소</button><button class="pri" data-a="ok">만들기</button></div>`);
     m.querySelector('.acts').onclick = async e => {
       const a = e.target.dataset && e.target.dataset.a; if (!a) return;
       if (a === 'x') return closeDlg();
-      const reset = m.querySelector('#nwReset') && m.querySelector('#nwReset').checked;
-      const w = reset ? C.newWeekFrom(base, S.cfg, { resetCum: true }).week : nw;
+      const w = nw;
       w.no = num(m.querySelector('#nwNo').value) || w.no;
       closeDlg(); await flushNow();
       S.w = w; S.undo = []; S.di = 0; if (!S.weeks.includes(w.mon)) { S.weeks.push(w.mon); S.weeks.sort(); }

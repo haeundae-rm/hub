@@ -35,11 +35,16 @@
   const newRow = (o = {}) => Object.assign({ id: rid(), name: '', group: '', joined: '', ord: null, st: Array(7).fill(''), u: Array(7).fill(null), prev: null, memo: '' }, o);
 
   // ---------- 주간 계산 (엑셀 Y·Z열, 일별 요약 78~82행, 점검 항목 AD열)
+  // 누적 출근일수는 달마다 1일부터 새로 (11/25 소장님): 주 중간에 1일이 끼면 1일 앞은 지난달(전주누적에 더해 끝), 1일부터는 새 달 누적
+  const monthCut = mon => { for (let d = 1; d < 7; d++) if (addDays(mon, d).slice(8) === '01') return d; return -1; };
   function rowCalc(w, r) {
-    let cnt = 0;
-    for (let d = 0; d < 7; d++) if (!OFF.includes(r.st[d] || '') && isNum(r.u[d])) cnt++;
-    const total = (isNum(r.prev) ? r.prev : 0) + cnt;
-    return { cnt, total, over: total > w.fullDays };
+    let cnt = 0, before = 0;
+    const b = monthCut(w.mon);
+    for (let d = 0; d < 7; d++) if (!OFF.includes(r.st[d] || '') && isNum(r.u[d])) { cnt++; if (d < b) before++; }
+    const prev = isNum(r.prev) ? r.prev : 0;
+    if (b < 0) { const total = prev + cnt; return { cnt, total, over: total > w.fullDays }; }
+    const prevEnd = prev + before, total = cnt - before;   // 지난달 최종 · 이번 달(1일부터) 누적
+    return { cnt, total, prevEnd, cut: b, pm: Number(w.mon.slice(5, 7)), over: total > w.fullDays || prevEnd > w.fullDays };
   }
   function dayCalc(w, d) {
     let jb = 0, ppl = 0;
@@ -109,7 +114,7 @@
       const st = b && Array.isArray(b.off) ? b.off.map(s => s || '') : (r.group === '고정' ? r.st.map(s => s === '신청' ? '신청' : '') : r.st.map(s => s === '독립' ? '독립' : ''));
       const u = b && Array.isArray(b.base) ? b.base.map(num) : r.u.slice();
       w.rows.push(newRow({ name: r.name, group: b && b.group != null ? b.group : r.group, joined: r.joined, ord: null, st, u,
-        prev: r.name ? (opt.resetCum ? 0 : rowCalc(prev, r).total) : null, memo: r.memo }));
+        prev: r.name ? (opt.resetCum || mon.slice(8) === '01' ? 0 : rowCalc(prev, r).total) : null, memo: r.memo }));   // 월요일이 1일이면 0부터
     });
     const S = prev.sum;
     w.sum.res[0] = S.res[7]; w.sum.co[0] = S.co[7]; w.sum.spare[0] = S.spare[7];
