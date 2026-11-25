@@ -123,6 +123,7 @@ async function start() {
     S.weeks = await Store.listWeeks();
     const t = today(), mon = C.mondayOf(t);
     const pick = S.weeks.includes(mon) ? mon : S.weeks[S.weeks.length - 1];
+    if (location.hash === '#hk') S.tab = 'hk';   // 허브 하우스키퍼 칸 → 'HK 전파' 탭으로 바로 (11/25)
     if (pick) await openWeek(pick); else { await loadHol(Number(t.slice(0, 4))); drawBar(); draw(); }
     setSave(Store.local ? '저장 준비됨' : '불러옴');
   } catch (e) { S.started = false; setSave('불러오기 실패'); $('view').innerHTML = '<div class="empty"><b>불러오지 못했어요</b>' + esc(/permission/i.test(String(e && (e.code || e.message))) ? '권한이 없어요 — Firestore 규칙 v28(rmsched)이 게시됐는지 확인해 주세요' : (e && (e.code || e.message) || e)) + '</div>'; }
@@ -133,9 +134,17 @@ async function startHk() {
   $('weekBar').hidden = true; $('tabs').hidden = true;
   try {
     const from = addDays(today(), -1);
-    S.snaps = (await DB.getQuery('rmsched_hk', [['date', '>=', from]])).map(d => d.data).filter(x => x && x.date).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 8);
-    const i = S.snaps.findIndex(x => x.date === today()); S.si = i >= 0 ? i : 0;
-    setSave('보기 전용'); draw();
+    // 11/25 소장님: 소장 · 부소장이 고치면 하우스키퍼 화면에 바로 (실시간 구독) — 보고 있던 날짜는 그대로
+    await new Promise((res, rej) => {
+      let first = true;
+      DB.listenQuery('rmsched_hk', [['date', '>=', from]], docs => {
+        const cur = S.snaps && S.snaps[S.si] ? S.snaps[S.si].date : today();
+        S.snaps = docs.map(d => d.data).filter(x => x && x.date).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 8);
+        const i = S.snaps.findIndex(x => x.date === cur), j = S.snaps.findIndex(x => x.date === today()); S.si = i >= 0 ? i : j >= 0 ? j : 0;
+        setSave('보기 전용 · ' + new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 16) + ' 반영'); draw();
+        if (first) { first = false; res(); }
+      }, e => { if (first) { first = false; rej(e); } });
+    });
   } catch (e) { S.started = false; setSave('불러오기 실패'); $('view').innerHTML = '<div class="empty"><b>불러오지 못했어요</b>' + esc(/permission/i.test(String(e && (e.code || e.message))) ? '아직 HK 전파 보기 권한이 없어요 — Firestore 규칙에 rmsched_hk(하우스키퍼 읽기)를 붙여야 해요' : (e && (e.code || e.message) || e)) + '</div>'; }
 }
 async function openWeek(mon) {
