@@ -66,16 +66,17 @@ exports.bdayNotice = onSchedule({ schedule: '0 6 * * *', timeZone: 'Asia/Seoul',
 // 🧳 습득물 매일 정리 (2026-11-22) — 아침 6시 10분(서울): 처리 대기 수 → meta/lost_sum, 조치 끝나고 3개월 지난 사진 지움 (소장님 결정)
 //   읽기: 보관 중인 줄은 최근 1년 날짜 한 조건 / 사진 정리는 조치일 한 조건 (복합 색인 없음)
 exports.lostDaily = onSchedule({ schedule: '10 6 * * *', timeZone: 'Asia/Seoul', retryCount: 1 }, async () => {
+  // 11/25 소장님: 허브 첫 화면 연동(처리 대기 수 meta/lost_sum)은 보류 — 조치 끝나고 90일 지난 사진 지우기만 함
+  //   (처리 대기는 습득물 대장 화면의 '처리 대기' 탭이 직접 셈)
   const day = B.seoulDay(Date.now());
-  const snap = await db().collection('lost').where('date', '>=', LO.addDays(day, -366)).get();
-  const list = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
-  const s = LO.sum(list, day);
   const old = await db().collection('lost').where('actDay', '>=', '2000-01-01').where('actDay', '<', LO.addDays(day, -LO.PHOTO_KEEP)).get();   // 같은 칸 범위 두 개 = 색인 필요 없음, 빈 조치일은 안 읽음
   const gone = LO.photoGone(old.docs.map(d => Object.assign({ id: d.id }, d.data())), day);
+  let fail = 0;
   for (const x of gone) {
-    await db().doc('lost_img/' + x.id).delete().catch(() => {});
-    await db().doc('lost/' + x.id).update({ imgGone: true }).catch(() => {});
+    try { await db().doc('lost_img/' + x.id).delete(); await db().doc('lost/' + x.id).update({ imgGone: true }); }
+    catch (e) { fail++; logger.error('습득물 사진 지우기 실패', { id: x.id, err: String(e && e.message || e) }); }
   }
-  await db().doc('meta/lost_sum').set(Object.assign(s, { day, at: admin.firestore.FieldValue.serverTimestamp(), photosGone: gone.length }));
-  logger.info('습득물 정리', Object.assign({ day, photosGone: gone.length }, s));
+  // 실행 기록 (화면에 안 띄움 · 나중에 아침 점검이 '돌았는지' 확인용)
+  await db().doc('meta/lost_fn').set({ day, at: admin.firestore.FieldValue.serverTimestamp(), photosGone: gone.length - fail, fail });
+  logger.info('습득물 사진 정리', { day, photosGone: gone.length - fail, fail });
 });
