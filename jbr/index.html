@@ -275,7 +275,7 @@ td.x{color:var(--bad);font-weight:800;background:#FDECEC}td.trd{background:#FFF1
 #pv .qs{display:flex;gap:2mm;margin-bottom:2mm}
 #pv .qs span{border:1px solid #ccc;border-radius:2mm;padding:.6mm 2.5mm;font-size:8.5pt}#pv .qs span b{font-size:11pt;margin-left:1.5mm}
 #pv table.qg{width:100%;border-collapse:collapse;table-layout:fixed}
-#pv table.qg td{border:1px solid #bbb;height:12mm;text-align:left;vertical-align:top;padding:.4mm .8mm;position:relative;overflow:hidden}
+#pv table.qg td{border:1px solid #bbb;height:10.6mm;text-align:left;vertical-align:top;padding:.4mm .8mm;position:relative;overflow:hidden}
 #pv table.qg td.qf{width:8mm;text-align:center;vertical-align:middle;font-weight:800;background:#F2F2F2;font-size:8.5pt}
 #pv table.qg td.qe{border:none}
 #pv .qn{font-size:6.8pt;font-weight:700;color:#444}#pv .qm{font-size:8.6pt;font-weight:800;white-space:nowrap;overflow:hidden}
@@ -283,6 +283,7 @@ td.x{color:var(--bad);font-weight:800;background:#FDECEC}td.trd{background:#FFF1
 #pv .qck{position:absolute;right:.6mm;top:.2mm;font-size:8pt;font-weight:900;color:#1E7F4D}
 #pv .qb{position:absolute;left:0;right:0;top:0;height:1.1mm}
 #pv .qn.s1{background:#B6EAB6}#pv .qn.s2{background:#FFB257}#pv .qn.s3{background:#C4C4C4}#pv .qn.s4{background:#A9CDEE}#pv .qn.yl{background:#FFF27A}#pv .qn.q6{background:#E9E4F7}   /* 11/26 인쇄 · PDF = 엑셀처럼 호실 줄만 색 (화면은 칸 전체) */
+#pv .qw{height:10mm;overflow:hidden}   /* 11/26 칸 높이 고정 → 메모가 길어도 쪽이 안 넘어감 */
 #pv table.qg td .qn{margin:-.4mm -.8mm .4mm;padding:.35mm .8mm;color:#222}
 #pv .ql{display:flex;flex-wrap:wrap;gap:3mm;font-size:7.5pt;margin-top:1.5mm;color:#333}#pv .ql i{display:inline-block;width:3.5mm;height:3mm;border:1px solid #999;vertical-align:-.4mm;margin-right:1mm}
 #pv table.qt{width:100%;border-collapse:collapse;font-size:8.5pt}
@@ -845,8 +846,8 @@ function buildReport() {
     const x = d.rooms[i], r = P.rooms[i]; if (!x) return '<td><div class="qn">' + r + '</div></td>';
     const cl = /^[1-4]$/.test(x.st) ? 's' + x.st : /간단/.test(x.st) ? 'q6' : x.yl ? 'yl' : '';
     const memo = [/간단/.test(x.st) ? '간단' : '', x.m1, x.m2].filter(Boolean).join(' · ');
-    return '<td>' + (r in gi ? '<div class="qb" style="background:' + GCOL[gi[r] % 10] + '"></div>' : '') + (x.done ? '<span class="qck">✓</span>' : '') +
-      '<div class="qn' + (cl ? ' ' + cl : '') + '">' + r + '</div><div class="qm">' + esc(nmShort(r, x)) + '</div>' + (memo ? '<div class="qo">' + esc(memo) + '</div>' : '') + '</td>';
+    return '<td><div class="qw">' + (r in gi ? '<div class="qb" style="background:' + GCOL[gi[r] % 10] + '"></div>' : '') + (x.done ? '<span class="qck">✓</span>' : '') +
+      '<div class="qn' + (cl ? ' ' + cl : '') + '">' + r + '</div><div class="qm">' + esc(nmShort(r, x)) + '</div>' + (memo ? '<div class="qo">' + esc(memo) + '</div>' : '') + '</div></td>';
   };
   const grid = fl => '<table class="qg"><tbody>' + fl.map(f => '<tr><td class="qf">' + f + 'F</td>' + Array.from({ length: maxS }, (_, k) => k + 1).map(s => F[f][s] != null ? cell(F[f][s]) : '<td class="qe"></td>').join('') + '</tr>').join('') + '</tbody></table>';
   const legend = '<div class="ql"><span><i style="background:#B6EAB6"></i>1 퇴실</span><span><i style="background:#FFB257"></i>2 재실</span><span><i style="background:#C4C4C4"></i>3 이월</span><span><i style="background:#A9CDEE"></i>4 예정</span><span><i style="background:#FFF27A"></i>5 연박</span><span><i style="background:#E9E4F7"></i>6 간단</span><span><b style="color:#1E7F4D">✓</b> 정비 완료</span>' +
