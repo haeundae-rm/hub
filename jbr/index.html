@@ -58,7 +58,7 @@ main{padding:10px max(2vw,12px) 40px}
 .c .no{font:700 11px Inter,sans-serif;color:#5b6474}
 .c .nm{font-weight:700;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .c .mm{display:flex;flex-wrap:wrap;gap:2px;margin-top:1px}
-.c .mm span{font-size:10px;border-radius:4px;padding:0 3px;background:#eef0f3;color:#333;white-space:nowrap}
+.c .mm span{font-size:10px;border-radius:4px;padding:0 3px;background:#eef0f3;color:#333;white-space:pre-line;word-break:break-all;line-height:1.25}   /* 11/26 말줄임 없이 줄바꿈 · 여러 줄 메모 */
 .c.s1{background:var(--s1)}.c.s2{background:var(--s2)}.c.s3{background:var(--s3)}.c.s4{background:var(--s4)}
 .c .gb{position:absolute;left:0;right:0;top:0;height:4px}
 .c.yl{background:#FFF27A}
@@ -88,7 +88,7 @@ main{padding:10px max(2vw,12px) 40px}
 .plate i.none{color:var(--mute)}
 .plate.s1{border-left-color:#7CCB7C}.plate.s2{border-left-color:#F29A2E}.plate.s3{border-left-color:#A6A6A6}.plate.s4{border-left-color:#7FB2E0}.plate.yl{border-left-color:#E8D44D}
 .plate.empty{border-left-color:var(--line)}.plate.empty b{color:var(--mute)}
-#fmemo{flex:1 1 220px;max-width:340px;min-height:32px;font-size:14px}
+#fmemo{flex:1 1 220px;max-width:340px;min-height:32px;font-size:14px;resize:none;line-height:1.3;padding-top:6px;padding-bottom:6px;font-family:inherit}
 .namebox{position:relative;flex:1 1 220px;max-width:320px}.namebox #cmd{width:100%;min-height:38px;font-size:16px}
 .namebox .sug{position:absolute;left:0;top:calc(100% + 4px);z-index:8;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 8px 24px #0002;min-width:100%;margin:0}
 .namebox .sug:empty{display:none}
@@ -256,7 +256,7 @@ td.x{color:var(--bad);font-weight:800;background:#FDECEC}td.trd{background:#FFF1
 @media (max-width:1100px){.two{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:1000px){.wrap{grid-template-columns:minmax(0,1fr)}.gridbox{overflow-x:auto}.g{min-width:900px}}
 .c{min-height:54px;padding:2px 3px 2px 4px;container-type:inline-size}
-.c .nm{font-size:clamp(10px,29cqw,14px);text-overflow:clip;letter-spacing:-.3px}.c .no{font-size:clamp(9px,18cqw,12px)}.c .mm span{font-size:9.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.c .nm{font-size:clamp(10px,29cqw,14px);text-overflow:clip;letter-spacing:-.3px}.c .no{font-size:clamp(9px,18cqw,12px)}.c .mm span{font-size:9.5px;max-width:100%}
 .gf{display:grid;gap:6px}.gf textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:9px;padding:8px;font:14px/1.4 Inter,'Noto Sans KR',sans-serif}
 #cmd{font-size:17px;font-weight:700;min-height:42px;border:2px solid var(--navy)}#cmd:disabled{border-color:var(--line)}
 .sug{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;min-height:26px}.sug button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:2px 8px;font-size:13px}.sug button.top{background:var(--navy);color:#fff;border-color:var(--navy)}.sug .off{color:var(--mute)}.sug .err{color:var(--bad);font-size:12.5px;font-weight:700}
@@ -264,39 +264,43 @@ td.x{color:var(--bad);font-weight:800;background:#FDECEC}td.trd{background:#FFF1
 .check a{color:var(--bad);font-weight:800;cursor:pointer;text-decoration:underline}
 .glist .grp{cursor:pointer;padding:4px;border-radius:8px}.glist .grp:hover{background:#F3F1EC}
 
-/* 🖨 PDF (11/26): A4 가로 · 인쇄 창에서 「PDF로 저장」. 화면에는 안 보임 */
-#pv{display:none}
+/* 🖨 인쇄 · ⬇ PDF 저장 (11/26): A4 가로. #pv = 출력용 (화면엔 안 보임). PDF 저장은 같은 쪽을 그림으로 떠서 파일로 */
+#pv{display:none;font:9pt/1.25 'Noto Sans KR',sans-serif;color:#111;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#pv.cap{display:block;position:fixed;left:-10000px;top:0;width:283mm}
+#pv.cap .qpg{width:283mm;height:196mm;overflow:hidden;background:#fff;padding:0;box-sizing:border-box}
+#pv .qpg{page-break-after:always;break-after:page}
+#pv .qpg:last-child{page-break-after:auto;break-after:auto}
+#pv .qh{display:flex;align-items:baseline;gap:10px;border-bottom:2px solid #1B2A4A;padding-bottom:2mm;margin-bottom:2mm}
+#pv .qh b{font-size:14pt;color:#1B2A4A}#pv .qh .qp{flex:1}#pv .qh small{color:#555;font-size:8pt}
+#pv .qs{display:flex;gap:2mm;margin-bottom:2mm}
+#pv .qs span{border:1px solid #ccc;border-radius:2mm;padding:.6mm 2.5mm;font-size:8.5pt}#pv .qs span b{font-size:11pt;margin-left:1.5mm}
+#pv table.qg{width:100%;border-collapse:collapse;table-layout:fixed}
+#pv table.qg td{border:1px solid #bbb;height:12mm;text-align:left;vertical-align:top;padding:.4mm .8mm;position:relative;overflow:hidden}
+#pv table.qg td.qf{width:8mm;text-align:center;vertical-align:middle;font-weight:800;background:#F2F2F2;font-size:8.5pt}
+#pv table.qg td.qe{border:none}
+#pv .qn{font-size:6.8pt;font-weight:700;color:#444}#pv .qm{font-size:8.6pt;font-weight:800;white-space:nowrap;overflow:hidden}
+#pv .qo{font-size:6pt;color:#333;white-space:pre-line;word-break:break-all;line-height:1.15}
+#pv .qck{position:absolute;right:.6mm;top:.2mm;font-size:8pt;font-weight:900;color:#1E7F4D}
+#pv .qb{position:absolute;left:0;right:0;top:0;height:1.1mm}
+#pv td.s1{background:#B6EAB6}#pv td.s2{background:#FFB257}#pv td.s3{background:#C4C4C4}#pv td.s4{background:#A9CDEE}#pv td.yl{background:#FFF27A}#pv td.q6{background:#E9E4F7}
+#pv .ql{display:flex;flex-wrap:wrap;gap:3mm;font-size:7.5pt;margin-top:1.5mm;color:#333}#pv .ql i{display:inline-block;width:3.5mm;height:3mm;border:1px solid #999;vertical-align:-.4mm;margin-right:1mm}
+#pv table.qt{width:100%;border-collapse:collapse;font-size:8.5pt}
+#pv table.qt th,#pv table.qt td{border:1px solid #bbb;padding:.8mm 1.5mm;text-align:left;vertical-align:top}
+#pv table.qt th{background:#1B2A4A;color:#fff;font-weight:700}#pv table.qt td.qr{text-align:right;white-space:nowrap;width:12mm}#pv table.qt td{white-space:normal}
+#pv h3{font-size:10.5pt;margin:3mm 0 1.5mm;color:#1B2A4A}
 @media print{
  @page{size:A4 landscape;margin:7mm}
  html,body{background:#fff!important}
  body>*:not(#pv){display:none!important}
- #pv{display:block;font:9pt/1.25 'Noto Sans KR',sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ #pv{display:block!important;position:static!important}
  #pv .qpg{page-break-after:always;break-after:page}
  #pv .qpg:last-child{page-break-after:auto;break-after:auto}
- #pv .qh{display:flex;align-items:baseline;gap:10px;border-bottom:2px solid #1B2A4A;padding-bottom:2mm;margin-bottom:2mm}
- #pv .qh b{font-size:14pt;color:#1B2A4A}#pv .qh .qp{flex:1}#pv .qh small{color:#555;font-size:8pt}
- #pv .qs{display:flex;gap:2mm;margin-bottom:2mm}
- #pv .qs span{border:1px solid #ccc;border-radius:2mm;padding:.6mm 2.5mm;font-size:8.5pt}#pv .qs span b{font-size:11pt;margin-left:1.5mm}
- #pv table.qg{width:100%;border-collapse:collapse;table-layout:fixed}
- #pv table.qg td{border:1px solid #bbb;height:12mm;text-align:left;vertical-align:top;padding:.4mm .8mm;position:relative;overflow:hidden}
- #pv table.qg td.qf{width:8mm;text-align:center;vertical-align:middle;font-weight:800;background:#F2F2F2;font-size:8.5pt}
- #pv table.qg td.qe{border:none}
- #pv .qn{font-size:6.8pt;font-weight:700;color:#444}#pv .qm{font-size:8.6pt;font-weight:800;white-space:nowrap;overflow:hidden}
- #pv .qo{font-size:6pt;color:#333;white-space:nowrap;overflow:hidden}
- #pv .qck{position:absolute;right:.6mm;top:.2mm;font-size:8pt;font-weight:900;color:#1E7F4D}
- #pv .qb{position:absolute;left:0;right:0;top:0;height:1.1mm}
- #pv td.s1{background:#B6EAB6}#pv td.s2{background:#FFB257}#pv td.s3{background:#C4C4C4}#pv td.s4{background:#A9CDEE}#pv td.yl{background:#FFF27A}#pv td.q6{background:#E9E4F7}
- #pv .ql{display:flex;flex-wrap:wrap;gap:3mm;font-size:7.5pt;margin-top:1.5mm;color:#333}#pv .ql i{display:inline-block;width:3.5mm;height:3mm;border:1px solid #999;vertical-align:-.4mm;margin-right:1mm}
- #pv table.qt{width:100%;border-collapse:collapse;font-size:8.5pt}
- #pv table.qt th,#pv table.qt td{border:1px solid #bbb;padding:.8mm 1.5mm;text-align:left;vertical-align:top}
- #pv table.qt th{background:#1B2A4A;color:#fff;font-weight:700}#pv table.qt td.qr{text-align:right;white-space:nowrap;width:12mm}#pv table.qt td{white-space:normal}
- #pv h3{font-size:10.5pt;margin:3mm 0 1.5mm;color:#1B2A4A}
 }
 </style>
 </head>
 <body>
 <header>
-  <div class="hrow"><h1>정비보고서</h1><a class="tag" href="../" style="text-decoration:none">‹ 허브</a><span class="tag" id="liveTag">불러오는 중</span><span class="mons" id="mons"></span><button class="fs" data-pdf="1" title="A4 가로 · 인쇄 창에서 「PDF로 저장」">🖨 PDF</button><button class="fs" id="fsBtn" data-fs="1">⛶ 전체 화면</button>
+  <div class="hrow"><h1>정비보고서</h1><a class="tag" href="../" style="text-decoration:none">‹ 허브</a><span class="tag" id="liveTag">불러오는 중</span><span class="mons" id="mons"></span><button class="fs" data-prt="1" title="A4 가로 인쇄">🖨 인쇄</button><button class="fs" data-pdf="1" title="A4 가로 PDF 파일로 바로 저장">⬇ PDF 저장</button><button class="fs" id="fsBtn" data-fs="1">⛶ 전체 화면</button>
     <div class="tabs" id="tabs"><button data-t="grid" class="on">객실 현황</button><button data-t="close">결산</button></div></div>
   <div class="days" id="days"></div>
 </header>
@@ -449,7 +453,7 @@ function barHtml(d) {
   h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
   h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-drawer="prio"' + (drawer === 'prio' ? ' class="on"' : '') + '>우선정비 ' + prioList().length + '</button></span></div>';
   h += '<div class="eb2"><span class="btns">' + MEMOS.map(m => '<button data-memo="' + m + '"' + (one && (one.m1 === m || one.m2 === m) ? ' class="on"' : '') + dis + '>' + m + '</button>').join('') + '</span>';
-  h += '<input class="inp" id="fmemo" autocomplete="off" placeholder="' + (n ? '메모 직접 쓰기 → Enter (예: 시설 타일 · 14시 이후)' : '메모') + '"' + dis + ' value="' + esc(one ? freeMemo(one) : '') + '">';
+  { const fv = one ? freeMemo(one) : ''; h += '<textarea class="inp" id="fmemo" rows="' + Math.min(3, Math.max(1, fv.split('\n').length)) + '" autocomplete="off" placeholder="' + (n ? '메모 → Enter 저장 · Shift+Enter 다음 줄' : '메모') + '"' + dis + '>' + esc(fv) + '</textarea>'; }   // 11/26 기존 메모 두고 다음 줄에 추가
   h += '<span class="row qk" title="방을 누르지 않고 호실 번호만 쳐서 한 번에 처리 (프런트 퇴실 연락 받을 때)"><select class="inp" id="qst"><option value="1">1 퇴실</option><option value="2">2 재실</option><option value="done">완료</option></select><input class="inp num" id="quick" placeholder="호실 번호로: 1203 1205-1207 → Enter" autocomplete="off"></span></div>';
   return h;
 }
@@ -532,7 +536,7 @@ function unassign(idx) {
   if (!had.length) { toast('배정된 방이 아니에요'); return; }
   apply(had, x => { x.nm = ''; x.done = false; }); toast(had.map(i => P.rooms[i]).slice(0, 4).join(', ') + (had.length > 4 ? ' 외 ' + (had.length - 4) + '실' : '') + ' 배정을 취소했어요 (Ctrl+Z 로 되돌리기)');
 }
-function freeMemo(x) { return [x.m1, x.m2].filter(m => m && !MEMOS.includes(m)).join(' / '); }
+function freeMemo(x) { return [x.m1, x.m2].filter(m => m && !MEMOS.includes(m)).join('\n'); }
 // 완료는 정비할 방에만: 1 금일 퇴실 · 2 재실청소 · 3 미정비 이월 · 4 퇴실 예정 (+ 간단 재정비). 연박(상태 없음) · 공실은 안 됨 (11/26 소장님)
 const canDone = x => !!x && (/^[1-4]$/.test(x.st) || /간단/.test(x.st));
 function toggleDone(idx) {
@@ -699,11 +703,12 @@ function drawClose() {
 function draw() {
   if (!P) return;
   const L = $('#left'), top = L ? L.scrollTop : 0, ae = document.activeElement, aid = ae && ae.id, ss = ae && ae.selectionStart;
+  const keepV = aid === 'fmemo' ? ae.value : null;   // 실시간 갱신 중에도 쓰던 메모가 안 지워지게
   document.body.classList.toggle('gm', tab === 'grid');
   drawHead(); document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight + 'px');
   if (tab === 'grid') drawGrid(); else if (tab === 'prio') drawPrio(); else drawClose();
   const L2 = $('#left'); if (L2) L2.scrollTop = top;
-  if (aid && /^(gname|gtime|grooms|pname|ptime|quick|cmd|fmemo)$/.test(aid)) { const el = document.getElementById(aid); if (el) { el.focus(); try { el.setSelectionRange(ss, ss); } catch (e) {} } }
+  if (aid && /^(gname|gtime|grooms|pname|ptime|quick|cmd|fmemo)$/.test(aid)) { const el = document.getElementById(aid); if (el) { if (keepV != null && aid === 'fmemo') { el.value = keepV; el.rows = Math.min(3, Math.max(1, keepV.split('\n').length)); } el.focus(); try { el.setSelectionRange(ss, ss); } catch (e) {} } }
 }
 document.addEventListener('fullscreenchange', () => { const b = $('#fsBtn'); if (b) b.textContent = document.fullscreenElement ? '⛶ 전체 화면 끄기' : '⛶ 전체 화면'; });
 window.addEventListener('resize', () => document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight + 'px'));
@@ -754,7 +759,8 @@ document.addEventListener('click', e => {
     prioList().push({ name, rooms: idx.map(i => P.rooms[i]), until, rank, note: '' }); toast(idx.length + '실을 「' + name + '」 ' + until + '까지로 지정했어요'); draw(); return;
   }
   if (t.dataset.preset) { preset1125(); draw(); return; }
-  if (t.dataset.pdf) { printReport(); return; }
+  if (t.dataset.prt) { printReport(); return; }
+  if (t.dataset.pdf) { savePdf(t); return; }
   if (t.dataset.reset) { window.JBR.reset(); toast('엑셀 자료로 되돌렸어요'); return; }
   if (t.dataset.clearp) { PRIO[day] = []; LATE[day] = {}; draw(); return; }
   if (t.dataset.delp != null) { prioList().splice(+t.dataset.delp, 1); draw(); return; }
@@ -794,8 +800,9 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Delete') { e.preventDefault(); setSt(idx, ''); return; }   // 공실 (상태 지움)
     return;
   }
-  if (e.target.id === 'fmemo' && e.key === 'Enter') {
-    e.preventDefault(); const txt = e.target.value.trim(), idx = [...sel]; if (!idx.length) return;
+  if (e.target.id === 'fmemo' && e.key === 'Enter' && (e.shiftKey || e.altKey)) { setTimeout(() => { const t = e.target; t.rows = Math.min(3, t.value.split('\n').length); }, 0); return; }   // 다음 줄 (Shift+Enter)
+  if (e.target.id === 'fmemo' && e.key === 'Enter' && !e.isComposing) {
+    e.preventDefault(); const txt = e.target.value.split('\n').map(l => l.trim()).filter(Boolean).join('\n'), idx = [...sel]; if (!idx.length) return;
     let full = 0;
     apply(idx, x => { const kw = [x.m1, x.m2].filter(m => m && MEMOS.includes(m));   // 버튼 메모는 그대로, 나머지 칸에 직접 쓴 메모
       if (kw.length >= 2 && txt) { full++; return; } x.m1 = kw[0] || ''; x.m2 = ''; if (txt) { if (!x.m1) x.m1 = txt; else x.m2 = txt; } if (/룸체|RC/i.test(txt) && x.yl && !/^[1-4]$/.test(x.st)) x.st = '1'; });
@@ -825,7 +832,7 @@ document.addEventListener('keydown', e => {
 
 
 // ---------- 🖨 PDF 출력 (11/26): A4 가로 — 1·2쪽 객실 현황(31~18층 / 17층~), 3쪽 메이드별 배정 · 단체 · 휴무
-function printReport() {
+function buildReport() {
   const d = R(), c = calc(day), gi = gIndex(d), DW = '일월화수목금토'[new Date(day + 'T00:00:00Z').getUTCDay()];
   const F = {}; P.rooms.forEach((r, i) => { const f = +r.slice(0, -2); (F[f] = F[f] || {})[+r.slice(-2)] = i; });
   const floors = Object.keys(F).map(Number).sort((a, b) => b - a), half = Math.ceil(floors.length / 2);
@@ -856,11 +863,37 @@ function printReport() {
   const h = '<div class="qpg">' + head('1/3 · 객실 현황 ' + floors[0] + '~' + floors[half - 1] + '층') + sum + grid(floors.slice(0, half)) + legend + '</div>' +
     '<div class="qpg">' + head('2/3 · 객실 현황 ' + floors[half] + '~' + floors[floors.length - 1] + '층') + grid(floors.slice(half)) + legend + '</div>' + p3;
   let pv = document.getElementById('pv'); if (!pv) { pv = document.createElement('div'); pv.id = 'pv'; document.body.appendChild(pv); }
-  pv.innerHTML = h;
-  const t0 = document.title; document.title = '정비보고서_' + day;   // PDF 파일 이름
+  pv.innerHTML = h; return pv;
+}
+function printReport() {
+  buildReport();
+  const t0 = document.title; document.title = '정비보고서_' + day;   // 「PDF로 저장」 하면 파일 이름
   const back = () => { document.title = t0; window.removeEventListener('afterprint', back); };
   window.addEventListener('afterprint', back);
   setTimeout(() => window.print(), 50);
+}
+// ⬇ PDF 저장: 인쇄 창 없이 바로 파일 (쪽마다 그림으로 떠서 A4 가로에 붙임). 라이브러리는 처음 누를 때만 받음
+const LIBS = { h2c: 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', pdf: 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js' };
+const loadJs = u => new Promise((ok, no) => { if (document.querySelector('script[src="' + u + '"]')) return ok(); const sc = document.createElement('script'); sc.src = u; sc.onload = ok; sc.onerror = () => no(new Error('라이브러리를 받지 못했어요')); document.head.appendChild(sc); });
+let pdfBusy = false;
+async function savePdf(btn) {
+  if (pdfBusy) return; pdfBusy = true; const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
+  try {
+    await Promise.all([loadJs(LIBS.h2c), loadJs(LIBS.pdf)]);
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const pv = buildReport(); pv.classList.add('cap');
+    const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pages = [...pv.querySelectorAll('.qpg')];
+    for (let k = 0; k < pages.length; k++) {
+      const cv = await window.html2canvas(pages[k], { scale: 2.2, backgroundColor: '#ffffff', logging: false });
+      if (k) doc.addPage('a4', 'landscape');
+      doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 7, 7, 283, 196);
+    }
+    pv.classList.remove('cap');
+    { const a = document.createElement('a'), u = URL.createObjectURL(doc.output('blob')); a.href = u; a.download = '정비보고서_' + day + '.pdf'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); } toast('PDF를 저장했어요 (다운로드 폴더)');
+  } catch (e) { toast('PDF 저장 실패: ' + (e && e.message || e) + ' — 🖨 인쇄 → 「PDF로 저장」으로 해 주세요'); }
+  const pv = document.getElementById('pv'); if (pv) pv.classList.remove('cap');
+  btn.textContent = old; btn.disabled = false; pdfBusy = false;
 }
 window.JBR = {
   set(j) {
