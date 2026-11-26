@@ -109,6 +109,21 @@ button,input,textarea,select{font:inherit;color:inherit}
 .err{color:#B23A48;font-weight:700}
 .sync{font-size:12px;opacity:.75;font-weight:600}
 .imp{margin-top:14px;font-size:12.5px;color:var(--muted)}
+/* 11/26 휴대폰(글자 크게 설정한 폰 포함): 위 띠가 두 줄로 밀려 잘리던 것 → 한 줄로 */
+@media (max-width:760px){
+ .top{padding:8px 10px;gap:8px;flex-wrap:nowrap}
+ .top b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+ .top .sp,.top .sync{display:none}
+ .top a.hk{white-space:nowrap;flex:0 0 auto;padding:5px 10px;font-size:12.5px}
+ .top .lg{display:none}
+ .lights-card .k span{display:none}
+ .fi::placeholder{font-size:15px}
+ .wrap{padding:10px 10px 30px}
+ .glance .card{padding:10px 12px;min-width:0}
+ .fi{font-size:17px}
+ .notice h3{flex-wrap:wrap}.notice h3>span{flex-basis:100%;order:3}
+ .card h3{font-size:14.5px}
+}
 @media print{
  @page{size:A4;margin:10mm}
  body{background:#fff;font-size:12px}.top,.daychips,.add,.quick,.foot .sp~span,.imp,.noprint,.nform,.ni .ed{display:none!important}
@@ -121,9 +136,9 @@ button,input,textarea,select{font:inherit;color:inherit}
 </style>
 </head>
 <body>
-<div class="top"><a class="back" href="../" aria-label="허브로">‹</a><b>🛎️ 하우스키핑 인수인계</b><span class="sync" id="sync"></span><span class="sp"></span><a class="hk" href="../rmsched/#hk">📣 HK 배정 · 인계사항</a><a class="pr" href="#" id="printBtn">🖨 인쇄</a></div>
+<div class="top"><a class="back" href="../" aria-label="허브로">‹</a><b>🛎️ <span class="lg">하우스키핑 </span>인수인계</b><span class="sync" id="sync"></span><span class="sp"></span><a class="hk" href="../rmsched/#hk">📣 HK 배정<span class="lg"> · 인계사항</span></a><a class="pr" href="#" id="printBtn">🖨 인쇄</a></div>
 <div class="wrap" id="app"><div class="empty">불러오는 중…</div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="hkho.js?v=2026.11.26-1"></script>
+<script type="module" src="hkho.js?v=2026.11.26-2"></script>
 </body>
 </html>

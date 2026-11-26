@@ -112,6 +112,13 @@ table.st{border-collapse:collapse;font-size:14px;width:100%;min-width:820px}
 .toast.on{opacity:1}
 @media(prefers-reduced-motion:reduce){td.c.flash{animation:none;outline:3px solid #ffd54a}}
 @media(max-width:600px){.g th.nm,.g td.nm{min-width:70px;padding:0 6px;font-size:13px}}
+
+/* 11/26 휴대폰 잘림 정리 — PC 그대로 */
+@media (max-width:760px){
+ .top h1{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .chip{white-space:normal}
+ #pastBox span{min-width:0!important}
+}
 </style>
 </head>
 <body class="ro">

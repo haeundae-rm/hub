@@ -133,6 +133,7 @@ async function start() {
 // 하우스키퍼: 어제부터 올라온 HK 전파 사본만 읽음 (주차 · 탭 · 위 띠 숨김)
 async function startHk() {
   if (S.started) return; S.started = true; S.hkOnly = true; S.tab = 'hk';
+  try { const h = document.querySelector('.top h1'); if (h && h.firstChild) h.firstChild.textContent = '📣 HK 배정 · 인계사항'; document.body.classList.add('hkonly'); } catch (e) {}   // 11/26: 하우스키퍼 화면 제목 (휴대폰에서 '룸메이…'로 잘리던 것)
   $('weekBar').hidden = true; $('tabs').hidden = true;
   try {
     const from = addDays(today(), -1);

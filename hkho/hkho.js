@@ -110,7 +110,7 @@ function glance(c) {
   const L = c.lights || {}, sum = LIGHTS.reduce((a, k) => a + (Number((L[k] || {}).n) || 0), 0);
   const fi = (f, v, ph) => ro() ? '<div class="big">' + (v ? esc(v) : '<span style="color:#B5BCC8">—</span>') + '</div>' : '<input class="fi" data-f="' + f + '" value="' + esc(v || '') + '" placeholder="' + ph + '">';
   let h = '<div class="glance' + (ro() ? ' ro' : '') + '">' +
-    '<div class="card"><div class="k">🔥 객실 난방</div>' + fi('heat', c.heat, '예) 18:00 ~ 07:00') + '</div>' +
+    '<div class="card"><div class="k">🔥 객실 난방</div>' + fi('heat', c.heat, '18:00~07:00') + '</div>' +
     '<div class="card"><div class="k">🌙 당직 객실</div>' + fi('duty', c.duty, '호실') + '</div>' +
     '<div class="card lights-card"><div class="k">🚨 지시등 현황' + (ro() ? '' : ' <span style="font-weight:500">· 누르면 숫자 · 호실을 적어요</span>') + '</div><div class="lights">';
   LIGHTS.forEach(k => { const o = L[k] || {}, n = Number(o.n) || 0; h += '<span class="lt' + (n ? '' : ' z') + '" data-lt="1">' + k + ' <b>' + n + '</b>' + (o.r ? '<i>' + esc(rooms(o.r).join(' · ') || o.r) + '</i>' : '') + '</span>'; });
@@ -168,6 +168,7 @@ function draw() {
     '<span>진행 중인 일은 다음 날 주간 맨 위 \'이어받은 일\'로 자동으로 올라가요</span></div>' +
     (role.k === 'boss' ? '<div class="imp noprint">📥 예전 엑셀 대장 옮기기: <input type="file" id="impFile" accept=".xlsx"> <span id="impMsg"></span></div>' : '');
   if (keep) { const el = document.querySelector('[data-add="' + keep + '"]'); if (el) { el.value = kv; el.focus(); } }
+  { const ch = document.querySelector('.daychips'), on = ch && ch.querySelector('.on'); if (ch && on && ch.scrollWidth > ch.clientWidth) ch.scrollLeft = on.offsetLeft - ch.clientWidth / 2 + on.offsetWidth / 2; }   // 휴대폰: 고른 날 칸이 보이게
   if (ui.edit) { const ta = document.querySelector('[data-et]'); if (ta && document.activeElement !== ta) { ta.focus(); ta.selectionStart = ta.value.length; } }
 }
 function drawLogin() {
