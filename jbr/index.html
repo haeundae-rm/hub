@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>📋 정비보고서</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Inter:wght@600;700;800&display=swap">
+<style>
+/* VOICE: 현장 업무 도구 — 오더테이커 PC 에서 하루 종일 켜 두는 화면. 차분하고 빠르게
+   IDEA: 엑셀 정비보고서의 층×호실 격자를 그대로, 대신 계산·색칠·안내는 앱이 함
+   PICTURE: 첫 화면 = 417실 격자 자체 (위 요약 · 카드, 오른쪽 편집 칸)
+   COLOUR/TYPE: 지금 쓰는 앱들과 같은 네이비 #10233F + 주황 강조, 엑셀 상태색(연두·주황·회색·하늘). Noto Sans KR + Inter 숫자
+   LAYOUT: 위 띠(날짜·탭) / 요약·카드 / 격자 + 오른쪽 편집 칸. 760px 아래는 편집 칸이 아래로 */
+:root{color-scheme:light;--bg:#F3F1EC;--paper:#fff;--ink:#14213A;--mute:#6B7280;--line:#DAD6CC;--navy:#10233F;--org:#E8730C;--orgL:#FFE3C7;
+--s1:#B6EAB6;--s2:#FFB257;--s3:#C4C4C4;--s4:#A9CDEE;--ok:#1E9E5A;--bad:#C62828}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 'Noto Sans KR',system-ui,sans-serif;overflow-x:clip}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.num{font-family:Inter,'Noto Sans KR',sans-serif;font-variant-numeric:tabular-nums}
+header{background:var(--navy);color:#fff;padding:8px max(2vw,12px) 0;position:sticky;top:0;z-index:20}
+.hrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:19px;margin:0;font-weight:900;letter-spacing:-.3px}
+.tag{font-size:12px;background:#ffffff1f;border-radius:6px;padding:2px 8px}
+.days{display:flex;gap:4px;overflow-x:auto;padding:7px 0 8px;scrollbar-width:thin}
+.days button{flex:1 0 auto;border:0;background:#ffffff14;color:#cfd8e6;border-radius:8px;padding:3px 6px;min-height:30px;min-width:34px}
+.days button.on{background:#fff;color:var(--navy);font-weight:800}
+.days button.today{box-shadow:inset 0 0 0 2px var(--org)}.days button.fut{opacity:.45}.mons{display:flex;gap:3px}.mons .mon{border:1px solid #ffffff40;background:transparent;color:#fff;font-weight:800;border-radius:8px;min-height:30px;padding:2px 10px}.mons .mon.on{background:#fff;color:var(--navy)}
+.tabs{display:flex;gap:4px;margin-left:auto}
+.fs{border:1px solid #ffffff40;background:transparent;color:#fff;border-radius:8px;padding:3px 10px;min-height:30px;font-weight:700}
+.tabs button{border:0;background:#ffffff14;color:#cfd8e6;padding:6px 14px;border-radius:9px;font-weight:700;min-height:36px}
+.tabs button.on{background:var(--org);color:#fff}
+main{padding:10px max(2vw,12px) 40px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-bottom:10px}
+.tile{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.tile b{display:block;font:800 24px/1.1 Inter,sans-serif}
+.tile small{color:var(--mute);font-size:12px}
+.tile.ok b::after{content:' ✓';color:var(--ok);font-size:14px}
+.check{font-size:12.5px;margin:-2px 0 10px;color:var(--mute)}
+.check .good{color:var(--ok);font-weight:700}.check .warn{color:var(--org);font-weight:700}
+.cards{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.card{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:5px 9px;display:flex;gap:6px;align-items:center;font-size:13px;min-height:34px}
+.card .u{font:700 13px Inter,sans-serif;color:var(--navy)}
+.card.off{background:#7F8A96;color:#fff;border-color:#7F8A96}.card.off .u{color:#fff}
+.card.quit{background:var(--bad);color:#fff;border-color:var(--bad)}
+.card.in{background:#E3F6EA;border-color:#9ED4B4}
+.card.focus{outline:3px solid var(--org)}
+.card i{font-style:normal;font-size:11px;background:var(--ok);color:#fff;border-radius:5px;padding:0 4px}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) clamp(330px,25vw,400px);gap:12px;align-items:start}
+.left{min-width:0}
+.gridbox{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:6px;overflow:hidden;user-select:none}
+.g{display:grid;grid-template-columns:30px repeat(17,minmax(0,1fr));gap:2px}
+.fl{font:800 13px Inter,sans-serif;color:var(--mute);display:flex;align-items:center;justify-content:center}
+.c{position:relative;border:1px solid #E4E1D8;border-radius:7px;background:#fff;min-height:58px;padding:3px 4px 3px 6px;font-size:11.5px;line-height:1.25;cursor:cell;overflow:hidden}
+.c.e{visibility:hidden}
+.c .no{font:700 11px Inter,sans-serif;color:#5b6474}
+.c .nm{font-weight:700;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c .mm{display:flex;flex-wrap:wrap;gap:2px;margin-top:1px}
+.c .mm span{font-size:10px;border-radius:4px;padding:0 3px;background:#eef0f3;color:#333;white-space:nowrap}
+.c.s1{background:var(--s1)}.c.s2{background:var(--s2)}.c.s3{background:var(--s3)}.c.s4{background:var(--s4)}
+.c .gb{position:absolute;left:0;right:0;top:0;height:4px}
+.c.yl{background:#FFF27A}
+.c .dn{float:right;color:var(--ok);font-weight:900;margin-left:2px}
+.c.done{opacity:.55}
+.c .smp{position:absolute;right:3px;bottom:2px;font-size:10px;font-weight:800;color:#8a4b00}
+.c.sel{outline:2.5px solid var(--navy);outline-offset:-1px;z-index:2}
+.c.cur{outline:3px solid #2563EB;z-index:3}
+.c.dim{opacity:.22}
+.c.pr{box-shadow:0 0 0 2px var(--org),0 0 12px 2px #ff8a1f99;animation:glow 1.6s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 0 2px var(--org),0 0 18px 6px #ff8a1fcc}}
+@media (prefers-reduced-motion:reduce){.c.pr,.ph .pr{animation:none}}
+.side{display:flex;flex-direction:column;gap:8px}
+.stabs{display:flex;gap:4px}.stabs button{flex:1;border:1px solid var(--line);background:#fff;border-radius:9px;min-height:38px;font-weight:700}
+.stabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+@media (max-height:760px){.side .box{padding:6px 9px}.side .btns button{min-height:30px;padding:2px 7px;font-size:13px}.side .inp,#cmd{min-height:34px}.side .box h3{font-size:13px;margin-bottom:4px}.stabs button{min-height:34px}.gf textarea{min-height:54px}}
+
+.wrap.one{grid-template-columns:minmax(0,1fr)}
+.ebar{position:sticky;top:0;z-index:6;background:var(--bg);padding:6px 0 6px;display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.eb1,.eb2{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.ebar .btns{gap:4px}.ebar .btns button{min-height:34px;padding:3px 9px}
+.eb2 .btns button{min-height:30px;padding:2px 8px;font-size:13px}
+.plate{display:flex;align-items:baseline;gap:7px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--navy);border-radius:9px;padding:5px 12px 5px 10px;min-width:150px;min-height:38px}
+.plate b{font:800 20px/1 Inter,sans-serif;color:var(--navy);letter-spacing:.3px}
+.plate small{font:700 11px Inter,sans-serif;color:var(--mute)}
+.plate i{font-style:normal;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.plate i.none{color:var(--mute)}
+.plate.s1{border-left-color:#7CCB7C}.plate.s2{border-left-color:#F29A2E}.plate.s3{border-left-color:#A6A6A6}.plate.s4{border-left-color:#7FB2E0}.plate.yl{border-left-color:#E8D44D}
+.plate.empty{border-left-color:var(--line)}.plate.empty b{color:var(--mute)}
+#fmemo{flex:1 1 220px;max-width:340px;min-height:32px;font-size:14px}
+.namebox{position:relative;flex:1 1 220px;max-width:320px}.namebox #cmd{width:100%;min-height:38px;font-size:16px}
+.namebox .sug{position:absolute;left:0;top:calc(100% + 4px);z-index:8;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 8px 24px #0002;min-width:100%;margin:0}
+.namebox .sug:empty{display:none}
+.drw{margin-left:auto}.qk{flex:0 1 360px;margin-left:auto}.qk #quick{min-height:32px;font-size:14px}.qk select{width:88px;flex:none;min-height:32px;font-size:13px}
+/* 완료 표시 방식 (비교용) */
+.dstyle{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12.5px;color:var(--mute);margin:0 0 8px}.dstyle button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:2px 9px;min-height:28px;font-size:12.5px}.dstyle button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.gridbox:not(.ds-check) .c .dn{display:none}
+.gridbox:not(.ds-check) .c.done{opacity:1}
+/* A 모서리 접기: 오른쪽 위가 초록으로 접힌 종이 */
+.ds-corner .c.done::before{content:'';position:absolute;right:0;top:0;width:22px;height:22px;background:linear-gradient(225deg,#1E9E5A 50%,transparent 50%);border-top-right-radius:6px}
+.ds-corner .c.done .nm,.ds-corner .c.done .no{color:#5f6b5f}
+/* B 도장: 가운데 둥근 '완료' 도장 (레포트 앱 도장과 같은 느낌) */
+.ds-stamp .c.done::after{content:'완료';position:absolute;right:3px;bottom:3px;transform:rotate(-14deg);border:2px solid #1E9E5A;color:#1E9E5A;border-radius:50%;width:clamp(24px,36cqw,32px);height:clamp(24px,36cqw,32px);display:flex;align-items:center;justify-content:center;font:900 clamp(8px,11cqw,10px) 'Noto Sans KR',sans-serif;background:#ffffffd9;pointer-events:none}
+/* C 아래 띠: 칸 아래 굵은 초록 띠 + 글자 차분하게 */
+.ds-bar .c.done{box-shadow:inset 0 -5px 0 #1E9E5A}.ds-bar .c.done .nm{color:#4b5563}
+/* D 진한 채움: 끝난 방은 진한 초록 + 흰 글자 → 층별 진행이 한눈에 */
+.ds-fill .c.done{background:#1E7F4D!important;border-color:#1E7F4D}.ds-fill .c.done .no,.ds-fill .c.done .nm{color:#fff}.ds-fill .c.done .mm span{background:#ffffff33!important;color:#fff}.ds-fill .c.done .smp{color:#d8ffe9}
+/* E 흑백 + 배지: 끝난 방은 색이 빠지고(남은 방만 컬러) 오른쪽 위 초록 원 ✓ */
+.ds-gray .c.done{background:#EDEDEA!important;border-color:#e2e2de}.ds-gray .c.done .no,.ds-gray .c.done .nm,.ds-gray .c.done .smp{color:#9a9fa6}.ds-gray .c.done .mm,.ds-gray .c.done .gb{filter:grayscale(1);opacity:.6}
+.ds-gray .c.done::before,.ds-badge .c.done::before{content:'✓';position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#1E9E5A;color:#fff;font:900 10px/16px Inter,sans-serif;text-align:center;box-shadow:0 1px 3px #0003}
+/* F 원형 배지만: 색은 그대로, 오른쪽 위 초록 원 ✓ */
+.ds-badge .c.done .no{color:#5b6474}
+/* G 사선 무늬: 상태색 위에 옅은 사선 → 종이에 줄 그은 느낌 */
+.ds-hatch .c.done{background-image:repeating-linear-gradient(135deg,#ffffff00 0 6px,#1E9E5A22 6px 8px)!important}.ds-hatch .c.done .nm{color:#2f6b47}
+/* H 초록 테두리: 방 둘레가 초록 링 */
+.ds-ring .c.done{box-shadow:inset 0 0 0 2.5px #1E9E5A}.ds-ring .c.done .nm{color:#1E7F4D}
+/* 조용한 완료 (11/26 확정안): 끝난 방은 색을 빼고 물러나게, 작은 회색 ✓ · 방금 끝난 방만 잠깐 초록 → 서서히 회색 */
+.ds-quiet .c.done{background:#F2F1EE;border-color:#E7E5E0}
+.ds-quiet .c.done .no,.ds-quiet .c.done .nm,.ds-quiet .c.done .smp{color:#A3A8AF}
+.ds-quiet .c.done .mm,.ds-quiet .c.done .gb{filter:grayscale(1);opacity:.5}
+.ds-quiet .c.done::before{content:'✓';position:absolute;right:4px;top:2px;font:800 11px Inter,sans-serif;color:#A3A8AF}
+.ds-quiet .c.done.jd{animation:jd 90s linear forwards}
+.gridbox:not(.ds-quiet) .c.done.jd{animation:jd2 6s ease-out forwards}
+@keyframes jd2{0%{box-shadow:0 0 0 3px #3DAA6B88}100%{box-shadow:0 0 0 0 #3DAA6B00}}
+.ds-quiet .c.done.jd::before{color:#1E9E5A}
+@keyframes jd{0%{background:#C9F0D6;border-color:#7CCB98;box-shadow:0 0 0 2px #7CCB9866}8%{background:#D9F4E2;border-color:#9AD8AF;box-shadow:none}100%{background:#F2F1EE;border-color:#E7E5E0}}
+@media (prefers-reduced-motion:reduce){.ds-quiet .c.done.jd{animation:none}}
+/* 완료 = 연한 푸른색 시안 (조용한 완료 위에 색만 바꿈) */
+.ds-b1 .c.done{background:#E6F0FA;border-color:#D3E3F4}.ds-b1 .c.done .no,.ds-b1 .c.done .nm,.ds-b1 .c.done .smp{color:#7E9BB8}.ds-b1 .c.done::before{color:#4A86C5}
+.ds-b2 .c.done{background:#DCEBFF;border-color:#C2DAFA}.ds-b2 .c.done .no,.ds-b2 .c.done .nm,.ds-b2 .c.done .smp{color:#5D84B5}.ds-b2 .c.done::before{content:'✓';color:#fff;background:#4A86C5;border-radius:50%;width:14px;height:14px;line-height:14px;text-align:center;font-size:9px;top:3px;right:3px}
+.ds-b3 .c.done{background:#E9EEF3;border-color:#DBE2EA}.ds-b3 .c.done .no,.ds-b3 .c.done .nm,.ds-b3 .c.done .smp{color:#8193A6}.ds-b3 .c.done::before{color:#5B7896}
+#ask{position:fixed;inset:0;background:#0f172a55;display:none;align-items:center;justify-content:center;z-index:60}#ask.on{display:flex}
+.askbox{background:#fff;border-radius:14px;padding:18px 20px;max-width:420px;width:90vw;box-shadow:0 20px 50px #0004;border-top:4px solid #A6A6A6}
+.askbox b{font-size:17px}.askbox p{margin:6px 0 14px;color:var(--mute)}.askbox .btns{justify-content:flex-end}.askbox .btns button{min-height:40px;padding:0 14px}
+/* ④ 취소선: 할 일 목록에서 지운 것처럼 — 이름에 가는 줄, 바탕 연한 회색 */
+.ds-s4 .c.done{background:#F6F5F2;border-color:#ECEAE5}.ds-s4 .c.done .nm{color:#9CA3AF;text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#6B7280}.ds-s4 .c.done .no{color:#A3A8AF}.ds-s4 .c.done::before{display:none}
+/* ⑤ 빛바램: 원래 상태색은 남기되 옅게, 오른쪽 위 네이비 ✓ (앱 색과 같은 톤) */
+.ds-s5 .c.done{background:transparent;border-color:#E3E0D9}.ds-s5 .c.done.s1{background:#EEF8EE}.ds-s5 .c.done.s2{background:#FDF0E1}.ds-s5 .c.done.s3{background:#F1F1F1}.ds-s5 .c.done.s4{background:#EEF4FA}
+.ds-s5 .c.done .no,.ds-s5 .c.done .nm{color:#8A93A0}.ds-s5 .c.done::before{color:var(--navy);font-size:12px;right:4px;top:2px}.ds-s5 .c.done .mm,.ds-s5 .c.done .gb{filter:none;opacity:.55}
+/* ⑥ 흰 바탕: 끝난 방은 하얗게 비우고 가는 테두리만 — 색은 할 일에만 */
+.ds-s6 .c.done{background:#fff;border-color:#E5E7EB}.ds-s6 .c.done .no,.ds-s6 .c.done .nm,.ds-s6 .c.done .smp{color:#B0B5BC}.ds-s6 .c.done::before{color:#B0B5BC}.ds-s6 .c.done .mm,.ds-s6 .c.done .gb{opacity:.35}
+/* ⑦ 작은 점: 바탕은 옅게, 호실 번호 앞 초록 점 하나 */
+.ds-s7 .c.done{background:#F7F6F3;border-color:#ECEAE5}.ds-s7 .c.done .no,.ds-s7 .c.done .nm{color:#9CA3AF}.ds-s7 .c.done::before{content:'';right:auto;left:5px;top:6px;width:6px;height:6px;border-radius:50%;background:#1E9E5A}.ds-s7 .c.done .no{padding-left:9px}
+/* 모서리 접힘 시안: 오른쪽 위가 종이처럼 접힘 (잘린 자리 = 화면 바탕색, 접힌 면 = 뒷면 색 + 그림자) */
+.ds-f1 .c.done::before,.ds-f2 .c.done::before,.ds-f3 .c.done::before,.ds-f4 .c.done::before,.ds-f5 .c.done::before{content:'';position:absolute;top:-1px;right:-1px;width:18px;height:18px;border-bottom-left-radius:4px;box-shadow:-2px 2px 3px #0000002a;background:linear-gradient(225deg,#fff 0 50%,var(--fold) 50%);z-index:1}
+.ds-f1 .c.done,.ds-f2 .c.done,.ds-f3 .c.done,.ds-f4 .c.done,.ds-f5 .c.done{border-top-right-radius:0}
+/* A 종이 접힘: 색은 그대로, 접힌 면은 종이 뒷면(연회색) */
+.ds-f1 .c.done{--fold:#DAD7D0}.ds-f1 .c.done .nm{color:#5b6474}
+/* B 초록 접힘: 접힌 면이 초록 */
+.ds-f2 .c.done{--fold:#3DAA6B}
+/* C 네이비 접힘: 접힌 면이 앱 네이비, 글자 조금 흐리게 */
+.ds-f3 .c.done{--fold:#1F3A60}.ds-f3 .c.done .nm,.ds-f3 .c.done .no{color:#6b7584}
+/* D 큰 접힘 + ✓: 접힌 면 안에 작은 ✓ */
+.ds-f4 .c.done{--fold:#2E8B57}.ds-f4 .c.done::before{width:24px;height:24px}
+.ds-f4 .c.done::after{content:'✓';position:absolute;top:11px;right:3px;font:900 9px/1 Inter,sans-serif;color:#fff;z-index:2}
+/* E 접힘 + 빛바램: 바탕 옅게 + 연회색 접힘 */
+.ds-f5 .c.done{--fold:#C9CDD3;background:#F5F4F1}.ds-f5 .c.done.s1{background:#EEF8EE}.ds-f5 .c.done.s2{background:#FDF0E1}.ds-f5 .c.done.s4{background:#EEF4FA}.ds-f5 .c.done .nm,.ds-f5 .c.done .no{color:#8A93A0}.ds-f5 .c.done .mm{opacity:.55}
+/* 접힘 시안에서는 '방금 끝남' 초록 빛은 유지하되 ✓ 글자는 숨김 */
+.ds-f1 .c.done.jd::before,.ds-f2 .c.done.jd::before,.ds-f3 .c.done.jd::before,.ds-f4 .c.done.jd::before,.ds-f5 .c.done.jd::before{color:transparent}
+/* ===== 완료 표시 조합 (d-*) ===== */
+.d-fade .c.done{background:#F5F4F1;border-color:#E6E3DD}.d-fade .c.done.s1{background:#EEF8EE}.d-fade .c.done.s2{background:#FDF0E1}.d-fade .c.done.s4{background:#EEF4FA}
+.d-fade .c.done .no,.d-fade .c.done .nm,.d-fade .c.done .smp{color:#8A93A0}.d-fade .c.done .mm,.d-fade .c.done .gb{opacity:.5}
+.d-fadeg .c.done{background:#F2F1EE;border-color:#E7E5E0}.d-fadeg .c.done .no,.d-fadeg .c.done .nm,.d-fadeg .c.done .smp{color:#A3A8AF}.d-fadeg .c.done .mm,.d-fadeg .c.done .gb{filter:grayscale(1);opacity:.5}
+.d-white .c.done{background:#fff;border-color:#E5E7EB}.d-white .c.done .no,.d-white .c.done .nm,.d-white .c.done .smp{color:#B0B5BC}.d-white .c.done .mm,.d-white .c.done .gb{opacity:.35}
+.d-blue1 .c.done{background:#E6F0FA;border-color:#D3E3F4}.d-blue1 .c.done .no,.d-blue1 .c.done .nm{color:#7E9BB8}
+.d-bgray .c.done{background:#E9EEF3;border-color:#DBE2EA}.d-bgray .c.done .no,.d-bgray .c.done .nm{color:#8193A6}
+.d-fill .c.done{background:#1E7F4D;border-color:#1E7F4D}.d-fill .c.done .no,.d-fill .c.done .nm{color:#fff}.d-fill .c.done .mm span{background:#ffffff33!important;color:#fff}
+.d-strike .c.done .nm{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:#6B7280}
+.d-tick .c.done::before,.d-tickg .c.done::before,.d-tickb .c.done::before{content:'✓';position:absolute;right:4px;top:2px;font:800 12px Inter,sans-serif}
+.d-tick .c.done::before{color:var(--navy)}.d-tickg .c.done::before{color:#A3A8AF}.d-tickb .c.done::before{color:#4A86C5}
+.d-dot .c.done::before{content:'';position:absolute;left:5px;top:6px;width:6px;height:6px;border-radius:50%;background:#1E9E5A}.d-dot .c.done .no{padding-left:9px}
+.d-bar .c.done{box-shadow:inset 0 -5px 0 #1E9E5A}
+.d-ring .c.done{box-shadow:inset 0 0 0 2.5px #1E9E5A}
+.d-badge .c.done::before{content:'✓';position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#1E9E5A;color:#fff;font:900 10px/16px Inter,sans-serif;text-align:center}
+.d-stamp .c.done::after{content:'완료';position:absolute;right:3px;bottom:3px;transform:rotate(-14deg);border:2px solid #1E9E5A;color:#1E9E5A;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font:900 9px 'Noto Sans KR',sans-serif;background:#ffffffd9}
+.d-hatch .c.done{background-image:repeating-linear-gradient(135deg,#ffffff00 0 6px,#1E9E5A22 6px 8px)}
+/* 접힘: 잘린 자리 = 흰색, 접힌 면 = --fold, 크기 --fs */
+.d-fold .c.done{border-top-right-radius:0;--fs:18px}.d-fsm .c.done{--fs:13px}.d-fbig .c.done{--fs:24px}
+.d-fold .c.done::before{content:'';position:absolute;top:-1px;right:-1px;width:var(--fs);height:var(--fs);border-bottom-left-radius:4px;box-shadow:-2px 2px 3px #0000002a;background:linear-gradient(225deg,#fff 0 50%,var(--fold) 50%);z-index:1}
+.d-fnavy .c.done{--fold:#1F3A60}.d-fgray .c.done{--fold:#D2D5DA}.d-fgreen .c.done{--fold:#3DAA6B}
+.d-fpaper .c.done::before{background:linear-gradient(225deg,#fff 0 50%,#E9E6E0 50%,#C9C4BB 100%);box-shadow:-3px 3px 5px #0000003a}
+.d-ftick .c.done::after{content:'✓';position:absolute;top:12px;right:3px;font:900 9px/1 Inter,sans-serif;color:#fff;z-index:2}
+.d-curl .c.done::before{content:'';position:absolute;top:0;right:0;width:20px;height:20px;background:radial-gradient(circle at 0 100%,#fff0 60%,#fff 61%),linear-gradient(225deg,#fff 0 48%,#C7CDD6 52%,#9AA5B4 100%);border-bottom-left-radius:14px;box-shadow:-2px 2px 4px #0000002a;z-index:1}
+/* 처음 버전: 칸 전체를 흐리게 + 오른쪽 위 초록 ✓ */
+.gridbox.d-orig .c.done{opacity:.55}
+.d-orig .c.done::before{content:'✓';position:absolute;right:4px;top:2px;font:900 12px Inter,sans-serif;color:#1E9E5A}
+/* 방금 끝남: 잠깐 초록 테두리 */
+.c.done.jd{animation:jd2 6s ease-out forwards}
+@keyframes jd2{0%{box-shadow:0 0 0 3px #3DAA6B88}100%{box-shadow:0 0 0 0 #3DAA6B00}}
+@media (prefers-reduced-motion:reduce){.c.done.jd{animation:none}}
+/* 모아 보기 */
+.gal{margin-bottom:10px}.galg{font-weight:800;font-size:12.5px;color:var(--mute);margin:8px 0 3px}
+.galrow{display:grid;grid-template-columns:210px minmax(0,1fr);gap:10px;align-items:center;width:100%;text-align:left;border:1px solid transparent;background:none;border-radius:10px;padding:4px 6px;margin:1px 0}
+.galrow:hover{background:#F7F6F2}.galrow.on{border-color:var(--navy);background:#F3F5F9}.galrow .gl{font-size:13px;font-weight:700}
+.gmini{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;padding:3px;border:0;background:transparent}.gmini .c{min-height:46px;cursor:pointer}
+/* PC: 정비보고서(왼쪽)만 위아래로 움직이고 오른쪽 칸은 그대로 */
+@media (min-width:1001px){body.gm{height:100vh;overflow:hidden}body.gm main{height:calc(100vh - var(--hh,130px));padding-bottom:0}
+body.gm .wrap{height:100%}body.gm .left{height:100%;overflow-y:auto;padding:0 4px 24px 0}body.gm .side{height:100%;overflow-y:auto;scrollbar-width:none;padding-bottom:10px}}
+.side{gap:6px}.side .box{padding:8px 10px}.side .box h3{margin-bottom:5px}.side .btns{gap:4px}.side .btns button{min-height:33px;padding:3px 8px}.side .inp{min-height:36px;padding:6px 9px}.side .hint{font-size:11.5px;margin-top:3px}.side .row[style]{margin-top:6px!important}.side .btns[style]{margin-top:6px!important}
+.box{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.box h3{margin:0 0 6px;font-size:14px}
+.box .hint{color:var(--mute);font-size:12px;margin:4px 0 0}
+.btns{display:flex;flex-wrap:wrap;gap:5px}
+.btns button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 9px;min-height:36px;font-weight:600}
+.btns button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.b1{background:var(--s1)!important}.b2{background:var(--s2)!important}.b3{background:var(--s3)!important}.b4{background:var(--s4)!important}
+.inp{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-height:40px;background:#fff;font-size:15px}
+.row{display:flex;gap:6px;align-items:center}
+.lat{font:700 12px Inter,sans-serif;color:var(--ok)}
+.grp{display:grid;grid-template-columns:12px 1fr auto;gap:2px 8px;align-items:center;font-size:12.5px;margin:4px 0}
+.grp .sw{width:12px;height:12px;border-radius:3px}
+.bar{grid-column:2/4;height:6px;background:#eee;border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok)}
+.btns button.pri,.pbtn{background:var(--org);color:#fff;border:0}
+.pbtn,.gbtn{border-radius:9px;min-height:40px;padding:0 12px;font-weight:800;white-space:nowrap;flex:none}.gbtn{border:1px solid var(--line);background:#fff}
+.pbtn:disabled{opacity:.45}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:90vw}
+.toast.on{opacity:1}
+/* 우선정비 탭 */
+.two{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start}
+.plist .it{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:#fff}
+.plist .it h4{margin:0;font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.plist .it .rk{background:var(--org);color:#fff;border-radius:6px;padding:0 7px;font-size:12px}
+.plist .it .late{background:#6B7280}
+.plist .it p{margin:4px 0 0;color:var(--mute);font-size:12.5px}
+.prog{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:13px}
+.ph{width:340px;max-width:100%;border:10px solid #111;border-radius:34px;background:#F4F5F7;overflow:hidden;margin:0 auto}
+.ph .top{background:var(--navy);color:#fff;padding:12px 14px 10px}
+.ph .top b{font-size:16px}
+.ph .note{margin:10px;background:#fff;border-radius:12px;padding:10px 12px;border-left:5px solid var(--org);font-size:13px}
+.ph .rl{padding:0 10px 14px;max-height:520px;overflow:auto}
+.ph .rm{background:#fff;border-radius:12px;padding:9px 11px;margin-top:7px;display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid #e5e7eb}
+.ph .rm b{font:800 18px Inter,sans-serif}
+.ph .rm small{display:block;color:var(--mute);font-size:11.5px}
+.ph .rm .dl{font-weight:800;color:var(--org);font-size:12.5px;text-align:right;white-space:nowrap}
+.ph .rm.wait{background:#EEF0F3;color:#6B7280}
+.ph .rm.fin{opacity:.45}
+.ph .pr{border:2px solid var(--org);box-shadow:0 0 14px #ff8a1f88;animation:glow2 1.6s ease-in-out infinite}
+@keyframes glow2{50%{box-shadow:0 0 22px #ff8a1fcc}}
+input[type=range]{width:100%}
+/* 결산 */
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;font-size:12.5px;background:#fff}
+th,td{border:1px solid var(--line);padding:4px 6px;text-align:right;white-space:nowrap}
+th{background:#F7F6F2;font-weight:700}
+td.n,th.n{text-align:left;position:sticky;left:0;background:#fff}
+tr.tot td{font-weight:800;background:#FBF7EF}
+td.x{color:var(--bad);font-weight:800;background:#FDECEC}td.trd{background:#FFF1DC;color:#9a5200;font-weight:800}td.b{font-weight:800}td.yel{background:#FFF9DB}td.n2,th.n2{text-align:left}tr.gap td{border-bottom:2px solid #c9c4b8}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0 14px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.kpi b{display:block;font:800 26px Inter,sans-serif;color:var(--navy)}
+.kpi small{color:var(--mute)}
+.kpi .v{color:var(--ok);font-weight:700;font-size:12.5px}
+.warnbox{background:#FFF4E5;border:1px solid #F5C58A;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13px}
+.mark{font-size:12px;color:var(--mute);margin-top:12px}
+@media (max-width:1100px){.two{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:1000px){.wrap{grid-template-columns:minmax(0,1fr)}.gridbox{overflow-x:auto}.g{min-width:900px}}
+.c{min-height:54px;padding:2px 3px 2px 4px;container-type:inline-size}
+.c .nm{font-size:clamp(10px,29cqw,14px);text-overflow:clip;letter-spacing:-.3px}.c .no{font-size:clamp(9px,18cqw,12px)}.c .mm span{font-size:9.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.gf{display:grid;gap:6px}.gf textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:9px;padding:8px;font:14px/1.4 Inter,'Noto Sans KR',sans-serif}
+#cmd{font-size:17px;font-weight:700;min-height:42px;border:2px solid var(--navy)}#cmd:disabled{border-color:var(--line)}
+.sug{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;min-height:26px}.sug button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:2px 8px;font-size:13px}.sug button.top{background:var(--navy);color:#fff;border-color:var(--navy)}.sug .off{color:var(--mute)}.sug .err{color:var(--bad);font-size:12.5px;font-weight:700}
+.c.typo{box-shadow:inset 0 0 0 2px var(--bad)}.c.typo .nm{color:var(--bad)}.c.typo::after{content:'명단 없음';position:absolute;right:2px;bottom:1px;font-size:9px;font-weight:800;color:#fff;background:var(--bad);border-radius:3px;padding:0 3px}
+.check a{color:var(--bad);font-weight:800;cursor:pointer;text-decoration:underline}
+.glist .grp{cursor:pointer;padding:4px;border-radius:8px}.glist .grp:hover{background:#F3F1EC}
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow"><h1>정비보고서</h1><a class="tag" href="../" style="text-decoration:none">‹ 허브</a><span class="tag" id="liveTag">불러오는 중</span><span class="mons" id="mons"></span><button class="fs" id="fsBtn" data-fs="1">⛶ 전체 화면</button>
+    <div class="tabs" id="tabs"><button data-t="grid" class="on">객실 현황</button><button data-t="close">결산</button></div></div>
+  <div class="days" id="days"></div>
+</header>
+<main id="main"><p>불러오는 중…</p></main>
+<div class="toast" id="toast"></div>
+<script>
+{
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ROY = ['3001', '3002', '3101', '3102'];
+const MEMOS = ['VIP', '르씨엘', '룸체', '당직', '악취', '조기퇴실', '미정비', '가입력', 'H/U', '시설', '우선'];
+const MCOL = { VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
+const GCOL = ['#E53935', '#1E88E5', '#43A047', '#8E24AA', '#F4511E', '#00897B', '#6D4C41', '#3949AB', '#C0CA33', '#D81B60'];
+const TODAY = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+let P = null, day = TODAY, tab = 'grid', ED = {}, sel = new Set(), cur = -1, undo = [], focus = '', lat = null, drag = null;
+const STYLES = [
+  ['f6', '★ 추천: 네이비 접힘 + 빛바램', 'd-fold d-fade d-fnavy', '접힘'], ['f7', '작은 네이비 접힘 + 빛바램', 'd-fold d-fsm d-fade d-fnavy', '접힘'],
+  ['f9', '네이비 접힘 + 취소선', 'd-fold d-fade d-fnavy d-strike', '접힘'], ['f8', '네이비 접힘 + 흰 바탕', 'd-fold d-white d-fnavy', '접힘'],
+  ['f10', '입체 종이 접힘 + 빛바램', 'd-fold d-fbig d-fade d-fpaper', '접힘'], ['f11', '둥글게 말린 모서리 + 빛바램', 'd-curl d-fade', '접힘'],
+  ['f12', '네이비 접힘 (색 유지)', 'd-fold d-fnavy', '접힘'], ['f1', '종이 접힘 (색 유지)', 'd-fold d-fgray', '접힘'],
+  ['f2', '초록 접힘 (색 유지)', 'd-fold d-fgreen', '접힘'], ['f4', '큰 초록 접힘 + ✓', 'd-fold d-fbig d-fgreen d-ftick', '접힘'], ['f5', '연회색 접힘 + 빛바램', 'd-fold d-fade d-fgray', '접힘'],
+  ['orig', '처음 버전 (흐림 + 초록 ✓)', 'd-orig', '바탕'], ['s5', '빛바램 + 네이비 ✓', 'd-fade d-tick', '바탕'], ['qt', '회색 + 작은 ✓', 'd-fadeg d-tickg', '바탕'], ['s6', '흰 바탕 (비움)', 'd-white', '바탕'],
+  ['b1', '연한 하늘', 'd-blue1 d-tickb', '바탕'], ['b3', '블루그레이', 'd-bgray d-tickb', '바탕'], ['fill', '진한 초록 채움', 'd-fill', '바탕'],
+  ['s4', '이름 취소선', 'd-fadeg d-strike', '표시'], ['s7', '작은 초록 점', 'd-fadeg d-dot', '표시'], ['bar', '아래 초록 띠', 'd-bar', '표시'],
+  ['ring', '초록 테두리', 'd-ring', '표시'], ['badge', '초록 원 배지', 'd-badge', '표시'], ['stamp', '완료 도장', 'd-stamp', '표시'], ['hatch', '사선 무늬', 'd-hatch', '표시']
+];
+let gal = false, doneStyle = 'orig',   // 11/26 소장님 확정: 처음 버전 (흐림 + 초록 ✓)
+ JD = {}, drawer = '', pendEnter = false, cmdVal = '', sideTab = 'edit', gEdit = null, clock = 10 * 60 + 30, PRIO = {}, LATE = {}, phMaid = '', OPT = { rate: 16300, ot: 7400, otMin: 9.5, otBase: 9, trainee: true }, closeTab = 'room';   // trainee: 교육생 방도 청구에 포함 (11/26 소장님: 도급비는 받아야 함)
+const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 2600); };
+const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+const toMin = s => { const m = /(\d{1,2})\s*[:시]\s*(\d{0,2})/.exec(s || ''); return m ? +m[1] * 60 + (+m[2] || (/반/.test(s) ? 30 : 0)) : null; };
+
+// ---------- 자료
+function dayData(ds) {
+  if (!ED[ds]) {
+    const d = P.days[ds];
+    ED[ds] = { rooms: d.r.map(x => x ? { st: x[0], nm: x[1], m1: x[2], m2: x[3], done: !!x[4], yl: !!x[5] } : null),
+      cards: d.cards.map(c => ({ n: c[0], u: c[1], in: !!c[2], no: c[3] })), groups: d.groups.map(g => ({ name: g[0], time: g[1], rooms: g[2] })), xl: d.xl, edited: false };
+  }
+  return ED[ds];
+}
+const R = () => dayData(day);
+const monOf = ds => ds.slice(0, 7), rosterOf = ds => P.months[monOf(ds)].roster;
+const TRAINEE = '교육생';   // 명단 밖이지만 실제로 쓰는 이름 — 청구 포함 여부는 설정
+const unitOf = (room, x) => { const s = /간단/.test(x.st); return ROY.includes(room) ? (s ? 1 : 2) : (s ? 0.5 : 1); };
+const people = (room, x) => room === '2901' ? x.nm.split(',').map(s => s.trim()).filter(Boolean) : [x.nm];
+function calc(ds) {
+  const d = dayData(ds), per = {}; let fam = 0, roy = 0, asg = 0, fin = 0, mij = 0, jae = 0, gan = 0;
+  d.rooms.forEach((x, i) => {
+    if (!x) return; const room = P.rooms[i];
+    if (x.st === '2') jae++; if (/간단/.test(x.st)) gan++;
+    if (!x.nm) { if ((x.st === '1' || x.st === '3') && room !== '2901') mij++; return; }   // 엑셀 미정비 = 퇴실·이월인데 배정 안 된 방 (2901 PLT 는 따로)
+    asg++; if (x.done) fin++;
+    const w = unitOf(room, x), ps = people(room, x);
+    if (ROY.includes(room)) roy++; else fam += room === '2901' ? w * ps.length : w;
+    ps.forEach(p => { per[p] = (per[p] || 0) + w; });
+  });
+  const ros = rosterOf(ds), ppl = Object.keys(per).filter(n => ros.includes(n) && per[n] > 0).length;
+  const total = ros.reduce((a, n) => a + (per[n] || 0), 0) + (OPT.trainee ? per[TRAINEE] || 0 : 0);   // 청구 정비수 (엑셀 E263)
+  // 유닛누계: 패밀리 · 로얄 · PLT × 정비수(배정 방) · 미정비(상태 1~4 인데 배정 없음) · 재실청소(2) · 간단재실
+  const U = {}; ['정비수', '미정비', '재실청소', '간단재실'].forEach(a => ['패밀리', '로얄', 'PLT'].forEach(b => { U[a + ':' + b] = 0; }));
+  d.rooms.forEach((x, i) => { if (!x) return; const r = P.rooms[i], g = ROY.includes(r) ? '로얄' : r === '2901' ? 'PLT' : '패밀리';
+    if (x.nm) U['정비수:' + g]++; else if (/^[1-4]$/.test(x.st)) U['미정비:' + g]++;
+    if (x.st === '2') U['재실청소:' + g]++; if (/간단/.test(x.st)) U['간단재실:' + g]++; });
+  return { fam, roy, ppl, per, asg, fin, mij, jae, gan, total, U, avg: ppl ? (fam + roy * 2) / ppl : 0 };
+}
+// 이름 찾기: 초성(ㄱㅎㄷ) · 앞글자(고해) · 섞어서(고ㅎ) 모두
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+const cho = ch => { const c = ch.charCodeAt(0) - 0xAC00; return c >= 0 && c < 11172 ? CHO[Math.floor(c / 588)] : ch; };
+function nameMatch(q, n) {
+  q = q.replace(/\s/g, ''); if (!q) return 0; if (n === q) return 3;
+  if (q.length <= n.length && [...q].every((ch, i) => ch === n[i] || (CHO.includes(ch) && cho(n[i]) === ch))) return 2;
+  return n.includes(q) ? 1 : 0;
+}
+function dist(a, b) { const m = [...Array(a.length + 1)].map((_, i) => [i]); for (let j = 1; j <= b.length; j++) m[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return m[a.length][b.length]; }
+function suggest(q) {   // 오늘 출근한 분 먼저, 그다음 명단 전체
+  const d = R(), work = d.cards.filter(k => !/휴|퇴사|공란/.test(k.u)).map(k => k.n), all = [...new Set(work.concat(rosterOf(day), [TRAINEE]))];
+  const L = all.map(n => [n, nameMatch(q, n), work.includes(n)]).filter(x => x[1]).sort((a, b) => b[1] - a[1] || b[2] - a[2]);
+  return { L, work };
+}
+const nmShort = (room, x) => { const ps = people(room, x).filter(Boolean); return ps.length > 1 ? ps[0] + ' +' + (ps.length - 1) : (x.nm || ''); };
+const typoOf = (room, x) => x && x.nm ? people(room, x).filter(n => n !== TRAINEE && !rosterOf(day).includes(n)) : [];
+function gIndex(d) { const m = {}; d.groups.forEach((g, k) => g.rooms.forEach(r => { m[r] = k; })); return m; }
+
+// ---------- 위 띠
+function drawHead() {
+  const m = monOf(day), ds = Object.keys(P.days).filter(x => monOf(x) === m);
+  $('#mons').innerHTML = Object.keys(P.months).map(k => '<button data-mon="' + k + '" class="mon' + (k === m ? ' on' : '') + '">' + (+k.slice(5)) + '월</button>').join('');
+  $('#days').innerHTML = ds.map(x => '<button data-d="' + x + '" class="' + (x === day ? 'on ' : '') + (x === TODAY ? 'today ' : '') + (x > TODAY ? 'fut' : '') + '">' + (+x.slice(8)) + '일</button>').join('');
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
+  
+}
+
+// ---------- 객실 현황 · 입력
+function drawGrid() {
+  const d = R(), c = calc(day), gi = gIndex(d), pr = prioRooms();
+  const xl = d.xl || {}, same = [['정비수', c.fam], ['로얄', c.roy], ['인원', c.ppl], ['미정비', c.mij], ['재실', c.jae], ['간단', c.gan * 0.5]].map(([k, v]) => [k, v, xl[k], xl[k] == null || Math.abs(v - xl[k]) < 1e-9]);
+  const okN = same.filter(s => s[3]).length;
+  const typos = d.rooms.map((x, i) => [P.rooms[i], x]).filter(([r, x]) => typoOf(r, x).length);
+  const tiles = [['금일 정비수', c.fam, same[0][3]], ['로얄', c.roy, same[1][3]], ['정비 인원', c.ppl, same[2][3]], ['인당', c.avg.toFixed(1)], ['미정비', c.mij, same[3][3]],
+    ['진행률', c.asg ? Math.round(c.fin / c.asg * 100) + '%' : '—'], ['재실', c.jae, same[4][3]], ['간단(유닛)', c.gan * 0.5, same[5][3]]];
+  let h = '<div class="sum">' + tiles.map(t => '<div class="tile' + (t[2] && !d.edited ? ' ok' : '') + '"><small>' + t[0] + '</small><b class="num">' + t[1] + '</b></div>').join('') + '</div>';
+  if (!c.asg) h += '<div class="check"><span class="warn">아직 입력 전인 날이에요</span> — 배정이 들어오면 엑셀과 같은 계산이 바로 나와요</div>';
+  else h += '<div class="check">' + (typos.length ? '<a data-typos="1">⚠ 명단에 없는 이름 ' + typos.length + '실 (' + esc([...new Set(typos.flatMap(([r, x]) => typoOf(r, x)))].join(', ')) + ') — 눌러서 고르기</a> · ' : '') + (d.edited ? '<span class="warn">연습 중 — 고친 내용은 저장되지 않아요</span> (12/1부터 저장) · <button data-reset="1" style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">엑셀 자료로 되돌리기</button>' :
+    (okN === 6 ? '<span class="good">엑셀 계산값과 같음 ' + okN + '/6</span> (금일 정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단)' : '<span class="warn">엑셀과 다른 칸 ' + (6 - okN) + '개</span> ' + same.filter(s => !s[3]).map(s => s[0] + ' 앱 ' + s[1] + ' / 엑셀 ' + s[2]).join(', '))) + '</div>';
+  h += '<div class="cards">' + d.cards.map((k, i) => {
+    const st = /휴/.test(k.u) ? 'off' : k.u === '퇴사' ? 'quit' : k.in ? 'in' : '';
+    const u = c.per[k.n] || 0;
+    return '<button class="card ' + st + (focus === k.n ? ' focus' : '') + '" data-card="' + i + '"><span>' + esc(k.n) + '</span><span class="u num">' + (st === 'off' ? '휴무' : st === 'quit' ? '퇴사' : u) + '</span>' + (k.in ? '<i>IN</i>' : '') + '</button>';
+  }).join('') + '</div>';
+  // 격자
+  let g = '<div class="g">';
+  for (let f = 31; f >= 4; f--) {
+    g += '<div class="fl">' + f + 'F</div>';
+    for (let s = 1; s <= 17; s++) {
+      const room = String(f * 100 + s), i = P.rooms.indexOf(room);
+      if (i < 0) { g += '<div class="c e"></div>'; continue; }
+      const x = d.rooms[i] || { st: '', nm: '', m1: '', m2: '' };
+      const cls = ['c'];
+      if (/^[1-4]$/.test(x.st)) cls.push('s' + x.st); else if (x.yl) cls.push('yl');   // 연박 = 방 전체 노랑 (재실 2 주황이면 연박이 당연해서 주황만)
+      let jdStyle = '';
+      if (x.done) { cls.push('done'); const t0 = JD[day + room]; if (t0 && Date.now() - t0 < 6000) { cls.push('jd'); jdStyle = ' style="animation-delay:-' + ((Date.now() - t0) / 1000).toFixed(1) + 's"'; } }
+      if (sel.has(i)) cls.push('sel'); if (i === cur) cls.push('cur');
+      if (focus && !people(room, x).includes(focus)) cls.push('dim');
+      if (typoOf(room, x).length) cls.push('typo');
+      if (!x.done && ((pr[room] && pr[room].top) || x.m1 === '우선' || x.m2 === '우선' || /우선/.test(x.m1 + x.m2))) cls.push('pr');   // 우선정비 지정 · '우선' 메모 = 같은 주황 빛
+      const memos = [x.m1, x.m2].filter(Boolean);
+      g += '<div class="' + cls.join(' ') + '" data-i="' + i + '"' + jdStyle + '>' + (room in gi ? '<div class="gb" style="background:' + GCOL[gi[room] % 10] + '"></div>' : '') + 
+        '<div class="no">' + room + (x.done ? '<b class="dn">✓</b>' : '') + '</div><div class="nm">' + esc(nmShort(room, x)) + '</div>' +
+        (memos.length ? '<div class="mm">' + memos.map(m => '<span style="background:' + (MCOL[Object.keys(MCOL).find(k => m.includes(k))] || '#eef0f3') + '">' + esc(m) + '</span>').join('') + '</div>' : '') +
+        (/간단/.test(x.st) ? '<div class="smp">간단</div>' : '') + '</div>';
+    }
+  }
+  g += '</div>';
+  { const st = STYLES.find(x => x[0] === doneStyle) || STYLES[0];
+    if (false) h += '<div class="dstyle">완료 표시: <b style="color:var(--ink)">' + esc(st[1]) + '</b><button data-gal="1"' + (gal ? ' class="on"' : '') + '>' + (gal ? '모아 보기 닫기' : '시안 ' + STYLES.length + '개 한눈에 보기') + '</button></div>';
+    if (gal) h += galHtml(); }
+  h = '<div class="wrap' + (drawer ? '' : ' one') + '"><div class="left" id="left">' + h + '<div class="ebar" id="ebar">' + barHtml(d) + '</div><div class="gridbox ' + (STYLES.find(x => x[0] === doneStyle) || STYLES[0])[2] + '" id="gridbox">' + g + '</div><p class="mark">시험용 화면이에요. 고친 내용은 이 창에만 남고 실제 자료는 바뀌지 않아요. 직원 이름은 모두 가명입니다.</p></div>' + (drawer ? '<div class="side">' + sideHtml(d, c) + '</div>' : '') + '</div>';
+  $('#main').innerHTML = h;
+}
+function barHtml(d) {
+  const n = sel.size, one = n === 1 ? d.rooms[[...sel][0]] : null, room1 = n === 1 ? P.rooms[[...sel][0]] : '';
+  const dis = n ? '' : ' disabled', anyName = [...sel].some(i => d.rooms[i] && d.rooms[i].nm);
+  const pc = one ? (/^[1-4]$/.test(one.st) ? ' s' + one.st : one.yl ? ' yl' : '') : '';
+  let h = '<div class="eb1"><span class="plate' + (n ? pc : ' empty') + '">' + (n === 1 ? '<b class="num">' + room1 + '</b><small>' + room1.slice(0, -2) + 'F</small><i' + (one && one.nm ? '>' + esc(one.nm) : ' class="none">배정 없음') + '</i>' : n ? '<b class="num">' + n + '실</b><i>' + esc(compress([...sel].map(i => P.rooms[i])).slice(0, 18)) + '</i>' : '<b class="num">—</b><i class="none">방을 누르세요</i>') + '</span>';
+  h += '<span class="btns">' + [['1', '1 퇴실', 'b1'], ['2', '2 재실', 'b2'], ['3', '3 이월', 'b3'], ['4', '4 예정', 'b4'], ['간단', '6 간단', ''], ['', '공실', '']].map(b => '<button class="' + b[2] + (one && one.st === b[0] && b[0] ? ' on' : '') + '" data-st="' + b[0] + '"' + dis + '>' + b[1] + '</button>').join('') + '<button data-yl="1"' + dis + (one && one.yl ? ' class="on"' : '') + '>5 연박</button></span>';
+  h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 이름 · 초성 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
+  h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
+  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-drawer="prio"' + (drawer === 'prio' ? ' class="on"' : '') + '>우선정비 ' + prioList().length + '</button></span></div>';
+  h += '<div class="eb2"><span class="btns">' + MEMOS.map(m => '<button data-memo="' + m + '"' + (one && (one.m1 === m || one.m2 === m) ? ' class="on"' : '') + dis + '>' + m + '</button>').join('') + '</span>';
+  h += '<input class="inp" id="fmemo" autocomplete="off" placeholder="' + (n ? '메모 직접 쓰기 → Enter (예: 시설 타일 · 14시 이후)' : '메모') + '"' + dis + ' value="' + esc(one ? freeMemo(one) : '') + '">';
+  h += '<span class="row qk" title="방을 누르지 않고 호실 번호만 쳐서 한 번에 처리 (프런트 퇴실 연락 받을 때)"><select class="inp" id="qst"><option value="1">1 퇴실</option><option value="2">2 재실</option><option value="done">완료</option></select><input class="inp num" id="quick" placeholder="호실 번호로: 1203 1205-1207 → Enter" autocomplete="off"></span></div>';
+  return h;
+}
+function sideHtml(d, c) {
+  const n = sel.size;
+  let h = '<div class="stabs"><button class="on">' + (drawer === 'grp' ? '단체 현황' : '우선정비') + '</button><button data-drawer="" style="flex:none;width:44px" aria-label="닫기">✕</button></div>';
+  if (drawer === 'prio') {
+  h += '<div class="box"><h3>우선정비로 지정</h3><div class="row"><input class="inp" id="pname" placeholder="예: 카이스트 HTL"><input class="inp num" id="ptime" style="width:84px" placeholder="16:00"></div><div class="row" style="margin-top:6px"><select class="inp" id="prank"><option value="1">1순위</option><option value="2">2순위</option><option value="3">3순위</option></select><button class="pbtn" data-mkprio="1"' + (n ? '' : ' disabled') + '>선택한 ' + n + '실 지정</button></div><p class="hint">지정한 방은 주황으로 빛나고, 메이드 휴대폰에 순서대로 떠요 (우선정비 탭)</p></div>';
+    h += '<div class="box">' + (prioList().length ? prioList().map((p, k) => '<div class="grp"><span class="sw" style="background:var(--org)"></span><span><b>' + esc(p.name) + '</b> <small>' + esc(p.until) + '까지 · ' + p.rank + '순위</small></span><span class="num">' + p.rooms.length + '실 <button data-delp="' + k + '" style="border:0;background:none;color:var(--mute)">빼기</button></span></div>').join('') : '<p class="hint">지정된 우선정비가 없어요</p>') + '</div>';
+  } else h += grpHtml(d);
+  return h;
+}
+function sugHtml(q) {
+  if (!q) return '';
+  const parts = q.split(','), last = parts[parts.length - 1].trim(), { L, work } = suggest(last);
+  if (!L.length) { const near = rosterOf(day).map(n => [n, dist(last, n)]).sort((a, b) => a[1] - b[1]).filter(x => x[1] <= 2).slice(0, 3); return '<span class="err">명단에 없는 이름이에요</span>' + near.map(x => '<button data-pick="' + esc(x[0]) + '">혹시 ' + esc(x[0]) + '?</button>').join(''); }
+  return L.slice(0, 6).map((x, k) => '<button data-pick="' + esc(x[0]) + '"' + (k === 0 ? ' class="top"' : '') + '>' + esc(x[0]) + (x[2] ? '' : ' <small class="off">휴무</small>') + '</button>').join('') + (L.length > 6 ? '<span class="off">+' + (L.length - 6) + '</span>' : '');
+}
+function assignTyped(raw) {   // Enter: 맨 앞 후보로 배정. 2901 은 쉼표로 여러 명
+  const idx = [...sel]; if (!idx.length) return;
+  const parts = raw.split(',').map(x => x.trim()).filter(Boolean), out = [];
+  for (const q of parts) { const { L } = suggest(q); if (!L.length) { toast('「' + q + '」 명단에 없는 이름이에요 — 아래 후보를 고르거나 고쳐 주세요'); return; } out.push(L[0][0]); }
+  const many = out.length > 1 && !(idx.length === 1 && P.rooms[idx[0]] === '2901');
+  if (many) { toast('여러 명은 2901호에만 적을 수 있어요'); return; }
+  const work = R().cards.filter(k => !/휴|퇴사|공란/.test(k.u)).map(k => k.n), off = out.filter(n => !work.includes(n));
+  apply(idx, x => { x.nm = out.join(', '); if (!x.st) x.st = '1'; });
+  cmdVal = ''; toast(idx.map(i => P.rooms[i]).slice(0, 4).join(', ') + (idx.length > 4 ? ' 외' : '') + ' → ' + out.join(', ') + (off.length ? ' · ⚠ 오늘 휴무로 되어 있는 분' : ''));
+  if (idx.length === 1) move(1, 0, true);
+  focusCmd();
+}
+function focusCmd() { setTimeout(() => { const c = $('#cmd'); if (c && !c.disabled) c.focus(); }, 0); }
+// 시안 모아 보기: 같은 방 7개를 시안마다 한 줄씩 (완료 · 미완료 섞어서)
+function galHtml() {
+  const nm = rosterOf(day), N = k => nm[k % nm.length];
+  const smp = [['1', N(0), '', '', 1], ['2', N(1), '', '', 1], ['1', N(2), 'VIP', '', 1], ['3', N(3), '시설 완료', '', 1], ['1', N(4), '', '', 0], ['4', N(5), '14시까지', '', 0], ['', '', '', '', 0, 1], ['간단', N(6), '', '', 1]];
+  const cell = (x, k) => { const c = ['c']; if (/^[1-4]$/.test(x[0])) c.push('s' + x[0]); else if (x[5]) c.push('yl'); if (x[4]) c.push('done');
+    return '<div class="' + c.join(' ') + '"><div class="no">' + (1201 + k) + '</div><div class="nm">' + esc(x[1]) + '</div>' + (x[2] ? '<div class="mm"><span style="background:' + (MCOL[Object.keys(MCOL).find(q => x[2].includes(q))] || '#eef0f3') + '">' + esc(x[2]) + '</span></div>' : '') + (/간단/.test(x[0]) ? '<div class="smp">간단</div>' : '') + '</div>'; };
+  let h = '<div class="gal box"><p class="hint" style="margin:0 0 6px">줄을 누르면 그 시안으로 바뀌어요 · 각 줄 = 완료 4 · 미완료 2 · 연박 1 · 간단 완료 1</p>', grp = '';
+  STYLES.forEach(st => { if (st[3] !== grp) { grp = st[3]; h += '<div class="galg">' + grp + '</div>'; }
+    h += '<button class="galrow' + (st[0] === doneStyle ? ' on' : '') + '" data-pickstyle="' + st[0] + '"><span class="gl">' + esc(st[1]) + '</span><span class="gridbox gmini ' + st[2] + '">' + smp.map(cell).join('') + '</span></button>'; });
+  return h + '</div>';
+}
+function compress(rooms) {
+  const L = [...new Set(rooms)].map(Number).sort((a, b) => a - b), out = [];
+  for (let i = 0; i < L.length; i++) { let j = i; while (j + 1 < L.length && L[j + 1] === L[j] + 1 && Math.floor(L[j + 1] / 100) === Math.floor(L[i] / 100)) j++; out.push(j > i ? L[i] + '-' + L[j] : String(L[i])); i = j; }
+  return out.join(',');
+}
+function grpHtml(d) {
+  let h = '<div class="box glist"><h3>단체 현황</h3>' + (d.groups.length ? d.groups.map((g, k) => {
+    const idx = g.rooms.map(r => P.rooms.indexOf(r)).filter(i => i >= 0), a = idx.filter(i => d.rooms[i] && d.rooms[i].nm), f = a.filter(i => d.rooms[i].done);
+    return '<div class="grp" data-gk="' + k + '"><span class="sw" style="background:' + GCOL[k % 10] + '"></span><span><b>' + esc(g.name) + '</b> <small>' + esc(g.time) + '</small></span><span class="num">' + f.length + '/' + a.length + ' · ' + g.rooms.length + '실</span><span class="bar"><i style="width:' + (a.length ? f.length / a.length * 100 : 0) + '%"></i></span></div>';
+  }).join('') : '<p class="hint">이날은 단체가 없어요</p>') + '<div class="btns" style="margin-top:6px"><button data-gnew="1">+ 새 단체</button></div><p class="hint">단체를 누르면 고칠 수 있어요. 격자 위 색 띠는 이 표대로 자동</p></div>';
+  if (gEdit) {
+    h += '<div class="box gf"><h3>' + (gEdit.k < 0 ? '새 단체' : '단체 고치기') + '</h3><input class="inp" id="gname" placeholder="단체명 (예: 카이스트)" value="' + esc(gEdit.name) + '"><input class="inp" id="gtime" placeholder="입실 시간 (예: 16시)" value="' + esc(gEdit.time) + '">' +
+      '<textarea id="grooms" placeholder="호실 — 프런트 명단을 그대로 붙여 넣기 (1512-1517, 1612 …)">' + esc(gEdit.txt) + '</textarea>' +
+      '<div class="btns"><button data-gsel="1"' + (sel.size ? '' : ' disabled') + '>격자에서 고른 ' + sel.size + '실 넣기</button><button class="pri" data-gsave="1">저장</button>' + (gEdit.k >= 0 ? '<button data-gdel="1">지우기</button>' : '') + '<button data-gcancel="1">닫기</button></div>' +
+      '<p class="hint">격자에서 끌어서 고른 뒤 「넣기」 · 붙여 넣은 글에서 호실만 골라 범위로 정리해요</p></div>';
+  }
+  return h;
+}
+function pushUndo(idxs) { const d = R(); undo.push({ ds: day, v: idxs.map(i => [i, JSON.stringify(d.rooms[i])]) }); if (undo.length > 200) undo.shift(); }
+function apply(idxs, fn) {
+  if (!idxs.length) return; const t0 = performance.now(), d = R(); pushUndo(idxs);
+  idxs.forEach(i => { d.rooms[i] = d.rooms[i] || { st: '', nm: '', m1: '', m2: '', done: false, yl: false }; fn(d.rooms[i], i); });
+  d.edited = true; draw(); requestAnimationFrame(() => { lat = performance.now() - t0; const l = document.querySelector('.lat'); if (l) l.textContent = '반영 ' + lat.toFixed(1) + 'ms'; });
+}
+// 상태 바꾸기 (한 곳)
+function setSt(idx, v, after) {
+  apply(idx, x => { x.st = v; }); if (after) after(); focusCmd();   // (11/26 13:57 이월 확인 창은 원복)
+}
+let askCb = null;
+function ask(title, sub, yes) {
+  askCb = yes; let m = $('#ask'); if (!m) { m = document.createElement('div'); m.id = 'ask'; document.body.appendChild(m); }
+  m.innerHTML = '<div class="askbox" role="dialog" aria-modal="true"><b>' + esc(title) + '</b><p>' + esc(sub) + '</p><div class="btns"><button data-ask="no">취소 (Esc)</button><button class="pri" data-ask="yes" id="askYes">변경 (Enter)</button></div></div>';
+  m.classList.add('on'); setTimeout(() => { const y = $('#askYes'); if (y) y.focus(); }, 0);
+}
+function closeAsk(ok) { const m = $('#ask'); if (m) m.classList.remove('on'); const cb = askCb; askCb = null; if (ok && cb) cb(); else focusCmd(); }
+function unassign(idx) {
+  const d = R(), had = idx.filter(i => d.rooms[i] && d.rooms[i].nm);
+  if (!had.length) { toast('배정된 방이 아니에요'); return; }
+  apply(had, x => { x.nm = ''; x.done = false; }); toast(had.map(i => P.rooms[i]).slice(0, 4).join(', ') + (had.length > 4 ? ' 외 ' + (had.length - 4) + '실' : '') + ' 배정을 취소했어요 (Ctrl+Z 로 되돌리기)');
+}
+function freeMemo(x) { return [x.m1, x.m2].filter(m => m && !MEMOS.includes(m)).join(' / '); }
+// 완료는 정비할 방에만: 1 금일 퇴실 · 2 재실청소 · 3 미정비 이월 · 4 퇴실 예정 (+ 간단 재정비). 연박(상태 없음) · 공실은 안 됨 (11/26 소장님)
+const canDone = x => !!x && (/^[1-4]$/.test(x.st) || /간단/.test(x.st));
+function toggleDone(idx) {
+  if (!idx.length) { toast('먼저 방을 눌러 고르세요'); return; }
+  const d = R(), ok = idx.filter(i => canDone(d.rooms[i])), no = idx.filter(i => !canDone(d.rooms[i]));
+  if (!ok.length) { const x = d.rooms[idx[0]]; toast(x && x.yl ? '연박 방은 완료할 수 없어요 — 퇴실했으면 1 을 먼저 누르세요' : '공실 · 상태 없는 방은 완료할 수 없어요 — 1~4 상태를 먼저'); return; }
+  const all = ok.every(i => d.rooms[i].done), noName = ok.filter(i => !d.rooms[i].nm).length;
+  apply(ok, (x, i) => { x.done = !all; if (!all) JD[day + P.rooms[i]] = Date.now(); else delete JD[day + P.rooms[i]]; });
+  toast((all ? '완료를 풀었어요' : '완료 ✓ ' + ok.length + '실') + (no.length ? ' · 연박 · 공실 ' + no.length + '실은 건너뜀' : '') + (noName && !all ? ' · 정비자 없는 방 ' + noName + '실 포함' : ''));
+}
+function doUndo() { const u = undo.pop(); if (!u) { toast('되돌릴 것이 없어요'); return; } day = u.ds; const d = R(); u.v.forEach(([i, s]) => { d.rooms[i] = JSON.parse(s); }); draw(); toast('되돌렸어요'); }
+function parseRooms(t) {   // 붙여 넣은 글에서 호실만: 1203 · 1205-1207 · 1512~17 · 401호
+  const out = [], re = /(\d{3,4})(?:\s*[-~]\s*(\d{1,4}))?/g; let m;
+  while ((m = re.exec(String(t)))) { const a = +m[1]; let b = m[2] ? +m[2] : a; if (b < 100) b = Math.floor(a / 100) * 100 + b; for (let x = a; x <= b && x - a < 40; x++) { const i = P.rooms.indexOf(String(x)); if (i >= 0) out.push(i); } }
+  return out;
+}
+function rect(a, b) {
+  const ra = P.rooms[a], rb = P.rooms[b], f1 = Math.min(+ra.slice(0, -2), +rb.slice(0, -2)), f2 = Math.max(+ra.slice(0, -2), +rb.slice(0, -2)), s1 = Math.min(+ra.slice(-2), +rb.slice(-2)), s2 = Math.max(+ra.slice(-2), +rb.slice(-2));
+  return P.rooms.map((r, i) => [r, i]).filter(([r]) => { const f = +r.slice(0, -2), s = +r.slice(-2); return f >= f1 && f <= f2 && s >= s1 && s <= s2; }).map(x => x[1]);
+}
+function move(dx, dy, keep) {
+  if (cur < 0) { cur = 0; } else {
+    const r = P.rooms[cur], f0 = +r.slice(0, -2), s0 = +r.slice(-2);
+    if (dy) {   // 위·아래: 다음 층으로, 같은 끝번호가 없으면 가장 가까운 방
+      let best = -1;
+      for (let f = f0 + dy; f >= 4 && f <= 31 && best < 0; f += dy) {
+        const L = P.rooms.map((x, i) => [x, i]).filter(([x]) => +x.slice(0, -2) === f);
+        if (L.length) best = L.sort((a, b) => Math.abs(+a[0].slice(-2) - s0) - Math.abs(+b[0].slice(-2) - s0))[0][1];
+      }
+      if (best < 0) return; cur = best;
+    } else {    // 좌·우: 같은 층 안에서 다음 방 (끝이면 그대로)
+      const L = P.rooms.map((x, i) => [x, i]).filter(([x]) => +x.slice(0, -2) === f0).sort((a, b) => +a[0] - +b[0]);
+      const k = L.findIndex(x => x[1] === cur) + dx; if (k < 0 || k >= L.length) return; cur = L[k][1];
+    }
+  }
+  sel = new Set([cur]); draw();
+  const el = document.querySelector('.c.cur'); if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// ---------- 우선정비
+function prioList() { return PRIO[day] || (PRIO[day] = []); }
+function prioRooms() {
+  const m = {}; prioList().forEach(p => p.rooms.forEach(r => { const o = m[r]; if (!o || p.rank < o.rank) m[r] = { rank: p.rank, until: p.until, name: p.name, top: true, first: !!p.first }; }));
+  return m;
+}
+function preset1125() {
+  if (day !== '2026-11-25') { day = '2026-11-25'; }
+  const d = R(), ka = d.groups.find(g => /카이스트/.test(g.name)), ko = d.groups.find(g => /코리아에듀/.test(g.name));
+  const htl = (ka ? ka.rooms : []).filter(r => { const s = +r.slice(-2); return s >= 5 && s <= 11; });
+  PRIO[day] = [];
+  if (ka) PRIO[day].push({ name: '카이스트 중 HTL 객실', rooms: htl, until: '16:00', rank: 1, first: true, note: '퇴실 시 무조건 최우선' });
+  if (ka) PRIO[day].push({ name: '카이스트 단체', rooms: ka.rooms.filter(r => !htl.includes(r)), until: '16:00', rank: 2, first: true, note: '175실 · 다수 입실 예정' });
+  if (ko) PRIO[day].push({ name: '코리아에듀 행사', rooms: ko.rooms, until: '16:00', rank: 2, note: '' });
+  LATE[day] = {}; ['3111', '2701', '2703', '2501', '2503', '2510', '2417', '2101', '2102', '2001', '1907', '1813', '1601', '1610', '1401', '801'].forEach(r => { LATE[day][r] = { at: '', label: '곧 퇴실' }; });
+  LATE[day]['1414'] = { at: '15:00', label: '15시 퇴실' };
+  const order = r => { const s = +r.slice(-2); return s >= 12 ? 1 : s <= 4 ? 2 : 3; }; PRIO[day].order = order;
+  d.rooms.forEach(x => { if (x) x.done = false; }); clock = 10 * 60 + 30;   // 아침 10:30 상황으로 (완료 표시는 시험용으로 지움)
+  toast('11/25 단톡방 안내 3장을 앱 지시로 불러왔어요 · 아침 10:30 상황으로 완료 표시를 지웠어요');
+}
+function maidRooms(name) {
+  const d = R(), pr = prioRooms(), late = LATE[day] || {}, ord = prioList().order;
+  return d.rooms.map((x, i) => [P.rooms[i], x]).filter(([r, x]) => x && x.nm && people(r, x).includes(name)).map(([r, x]) => {
+    const p = pr[r], l = late[r] && !late[r].out ? late[r] : null;
+    let key = (x.done ? 900 : 0) + (l ? 500 : 0) + (p ? p.rank * 10 : 100) + (ord ? ord(r) : 0);
+    return { r, x, p, l, key };
+  }).sort((a, b) => a.key - b.key || +a.r - +b.r);
+}
+function drawPrio() {
+  const d = R(), list = prioList(), c = calc(day);
+  const working = d.cards.filter(k => !/휴|퇴사|공란/.test(k.u) && (c.per[k.n] || 0) > 0);
+  if (!phMaid || !working.some(k => k.n === phMaid)) { const pr = prioRooms(); phMaid = (working.find(k => maidRooms(k.n).some(m => m.p && m.p.rank === 1)) || working.find(k => maidRooms(k.n).some(m => m.p)) || working[0] || {}).n || ''; }
+  let h = '<div class="two"><div>';
+  h += '<div class="box" style="margin-bottom:10px"><h3>오늘의 우선정비 · ' + (+day.slice(5, 7)) + '/' + (+day.slice(8)) + '</h3><div class="btns"><button class="pri" data-preset="1">11/25 단톡방 안내 3장 → 앱으로 불러오기</button><button data-clearp="1">지우기</button></div><p class="hint">포스터 대신: 정비보고서에서 끌어서 고르거나, 단체 표 · 호실 범위 · 끝번호 규칙으로 지정합니다</p>';
+  h += '<div class="row" style="margin-top:8px"><input class="inp num" id="tail" placeholder="끝번호 12-17"><input class="inp" id="tailname" placeholder="오륙도 객실"><button class="gbtn" data-tail="1">모든 층에</button></div></div>';
+  h += '<div class="plist">' + (list.length ? list.map((p, k) => {
+    const idx = p.rooms.map(r => P.rooms.indexOf(r)).filter(i => i >= 0), a = idx.filter(i => d.rooms[i] && d.rooms[i].nm), f = a.filter(i => d.rooms[i].done);
+    const left = toMin(p.until) != null ? toMin(p.until) - clock : null, rate = clock > 540 ? f.length / (clock - 540) : 0, eta = rate > 0 ? Math.round(clock + (a.length - f.length) / rate) : null;
+    const risk = eta != null && toMin(p.until) != null && eta > toMin(p.until);
+    return '<div class="it"><h4><span class="rk">' + p.rank + '순위</span>' + esc(p.name) + ' <small class="num" style="color:var(--org)">' + esc(p.until) + '까지' + (left != null ? (left > 0 ? ' · ' + Math.floor(left / 60) + '시간 ' + left % 60 + '분 남음' : ' · 지남') : '') + '</small><button data-delp="' + k + '" style="margin-left:auto;border:0;background:none;color:var(--mute)">빼기</button></h4>' +
+      '<p>' + p.rooms.length + '실 · 배정 ' + a.length + ' · 완료 ' + f.length + (eta != null && a.length > f.length ? ' · 지금 속도면 <b style="color:' + (risk ? 'var(--bad)' : 'var(--ok)') + '">' + hm(Math.min(eta, 1439)) + ' 끝' + (risk ? ' ⚠ 늦음 — 정비 지원 붙이기' : ' ✓') + '</b>' : '') + (p.note ? ' · ' + esc(p.note) : '') + '</p></div>';
+  }).join('') : '<div class="it"><p>아직 지정된 우선정비가 없어요. 위 버튼으로 11/25 안내를 불러오거나, 객실 현황 탭에서 방을 끌어 고른 뒤 「우선정비로 지정」을 누르세요.</p></div>') + '</div>';
+  const late = LATE[day] || {};
+  if (Object.keys(late).length) h += '<div class="box"><h3>늦은 퇴실 — 프런트가 퇴실을 누르면 그 방 메이드 휴대폰이 울림</h3><div class="btns">' + Object.entries(late).map(([r, l]) => '<button data-out="' + r + '"' + (l.out ? ' class="on"' : '') + '>' + r + (l.at ? ' (' + l.at + ')' : '') + (l.out ? ' 퇴실 ✓' : '') + '</button>').join('') + '</div></div>';
+  h += '<div class="box" style="margin-top:10px"><h3>시험 시계</h3><input type="range" id="clk" min="540" max="1020" step="10" value="' + clock + '"><p class="hint">시계를 움직이면 남은 시간 · 예상 끝 시각이 바뀌어요 (지금 ' + hm(clock) + ')</p></div>';
+  h += '</div><div><div class="box" style="margin-bottom:10px"><h3>메이드 휴대폰 화면 미리 보기</h3><select class="inp" id="phm">' + working.map(k => '<option' + (k.n === phMaid ? ' selected' : '') + '>' + esc(k.n) + '</option>').join('') + '</select></div>' + phoneHtml(phMaid) + '</div></div>';
+  h += '<p class="mark">시험용 화면이에요. 11/25 안내 내용은 소장님이 보내 주신 포스터 3장 기준입니다. 직원 이름은 가명입니다.</p>';
+  $('#main').innerHTML = h;
+}
+function phoneHtml(name) {
+  if (!name) return '<p class="hint">이날 정비한 메이드가 없어요</p>';
+  const L = maidRooms(name), mine = L.filter(m => m.p), lt = L.filter(m => m.l);
+  const groups = {}; mine.forEach(m => { const k = m.p.name; groups[k] = groups[k] || { n: 0, until: m.p.until, rank: m.p.rank }; groups[k].n++; });
+  let note = Object.entries(groups).sort((a, b) => a[1].rank - b[1].rank).map(([k, g]) => '<b>' + esc(k) + '</b> 내 방 ' + g.n + '실 · ' + esc(g.until) + '까지').join('<br>');
+  if (lt.length) note += (note ? '<br>' : '') + '늦은 퇴실 ' + lt.map(m => m.r + (m.l.at ? '(' + m.l.at + ')' : '')).join(', ') + ' — 퇴실되면 알림이 와요';
+  if (prioList().order) note += (note ? '<br>' : '') + '정비 순서: 오륙도(12~17호) → 오션뷰(1~4호) → 호텔형(5~11호)';
+  let h = '<div class="ph"><div class="top"><small>' + (+day.slice(5, 7)) + '/' + (+day.slice(8)) + ' ' + hm(clock) + '</small><br><b>' + esc(name) + ' 님 · 오늘 ' + L.length + '실</b></div>';
+  if (note) h += '<div class="note">📌 오늘 안내<br>' + note + '</div>';
+  h += '<div class="rl">' + L.map((m, k) => {
+    const left = m.p && toMin(m.p.until) != null ? toMin(m.p.until) - clock : null;
+    const cls = ['rm']; if (m.x.done) cls.push('fin'); else if (m.l) cls.push('wait'); else if (m.p && m.p.rank === 1) cls.push('pr');
+    const tags = [m.p ? m.p.name : '', m.x.st === '2' ? '재실' : '', /간단/.test(m.x.st) ? '간단' : '', m.x.m1, m.x.m2].filter(Boolean).join(' · ');
+    return '<div class="' + cls.join(' ') + '"><div><b>' + m.r + '</b><small>' + esc(tags || '일반') + '</small></div><div class="dl">' +
+      (m.x.done ? '완료' : m.l ? (m.l.at ? m.l.at + ' 퇴실' : '곧 퇴실') + '<br><small>손님 계심</small>' : m.p ? esc(m.p.until) + '까지' + (left != null ? '<br><small>' + (left > 0 ? Math.floor(left / 60) + '시간 ' + left % 60 + '분' : '지남') + '</small>' : '') : '') + '</div></div>';
+  }).join('') + '</div></div>';
+  return h;
+}
+
+// ---------- 결산
+function drawClose() {
+  const m = monOf(day), M = P.months[m], X = M.xl, ds = Object.keys(P.days).filter(x => monOf(x) === m), C = ds.map(x => calc(x)), names = M.roster;
+  let dBad = 0, dN = 0; ds.forEach((x, k) => { const xl = P.days[x].xl || {}, c = C[k]; if (!c.asg || xl['정비수'] == null) return; dN++; if ([[c.fam, '정비수'], [c.roy, '로얄'], [c.ppl, '인원'], [c.mij, '미정비'], [c.jae, '재실'], [c.gan * 0.5, '간단']].some(([v, q]) => Math.abs(v - (+xl[q] || 0)) > 1e-9)) dBad++; });
+  const N = ds.length, eq = (a, b) => { const A = (a === '' || a == null) ? 0 : +a, B = (b === '' || b == null || typeof b === 'string') ? 0 : +b; return typeof b === 'string' && b.startsWith('#') ? (a === '' || a == null) : Math.abs(A - B) < 1e-6; };
+  let bad = 0, cells = 0, trd = 0; const td = (v, x, cls, trU) => { cells++; let ok = x === undefined || eq(v, x), tr = false;
+    if (!ok && trU && eq(v - trU, x)) { ok = true; tr = true; trd++; }   // 엑셀이 교육생 방을 뺀 칸
+    if (!ok) bad++; return '<td class="num' + (ok ? '' : ' x') + (tr ? ' trd' : '') + (cls ? ' ' + cls : '') + '"' + (ok && !tr ? '' : ' title="엑셀 ' + esc(x) + (tr ? ' — 엑셀은 교육생 ' + trU + '유닛을 뺐어요' : '') + '"') + '>' + (v === 0 || v === '' ? '' : (typeof v === 'number' ? +v.toFixed(2) : esc(v))) + '</td>'; };
+  const per = n => C.map(c => c.per[n] || 0), tot = C.map(c => c.total), trU = C.map(c => OPT.trainee ? c.per[TRAINEE] || 0 : 0), trS = trU.reduce((a, b) => a + b, 0), cnt = C.map(c => names.filter(n => (c.per[n] || 0) > 0).length + (OPT.trainee && (c.per[TRAINEE] || 0) > 0 ? 0 : 0));
+  const otv = u => u >= OPT.otMin ? u - OPT.otBase : 0, head = '<tr><th class="n">성명</th>' + ds.map(x => '<th>' + (+x.slice(8)) + '</th>').join('');
+  const tabs = [['room', '객실정비현황'], ['bill', '청구금액'], ['ot', '연장근로'], ['unit', '유닛누계']];
+  // 네 표를 모두 계산해서 다른 칸 수를 셈 (보이는 건 고른 표 하나)
+  const html = {}, badOf = {};
+  { let b0 = bad, h = '<table><thead>' + head + '<th>총정비수</th><th>정비일수</th><th>평균</th></tr></thead><tbody>';
+    names.forEach(n => { const u = per(n), s = u.reduce((a, b) => a + b, 0), dn = u.filter(v => v > 0).length, xr = X.room.per[n] || { d: [], tot: 0, days: 0, avg: '' };
+      if (!s && !xr.tot) { u.forEach((v, k) => td(v, xr.d[k])); return; }
+      h += '<tr><td class="n">' + esc(n) + '</td>' + u.map((v, k) => td(v, xr.d[k])).join('') + td(s, xr.tot, 'b') + td(dn, xr.days) + td(dn ? +(s / dn).toFixed(2) : '', typeof xr.avg === 'number' ? +xr.avg.toFixed(2) : xr.avg) + '</tr>'; });
+    if (OPT.trainee) h += '<tr><td class="n">교육생</td>' + per(TRAINEE).map(v => td(v)).join('') + '<td class="num b">' + per(TRAINEE).reduce((a, b) => a + b, 0) + '</td><td></td><td></td></tr>';
+    h += '<tr class="tot"><td class="n">정비수</td>' + tot.map((v, k) => td(v, X.room['정비수'][k], '', trU[k])).join('') + td(tot.reduce((a, b) => a + b, 0), X.room['총'], '', trS) + '<td></td><td></td></tr>';
+    h += '<tr class="tot"><td class="n">인원</td>' + cnt.map((v, k) => td(v, X.room['인원'][k])).join('') + '<td></td><td></td><td></td></tr></tbody></table>';
+    html.room = h; badOf.room = bad - b0; }
+  { let b0 = bad, h = '<table><thead><tr><th class="n">구분</th>' + ds.map(x => '<th>' + (+x.slice(8)) + '</th>').join('') + '<th>' + (+m.slice(5)) + '월 합계</th></tr></thead><tbody>';
+    const S = tot.reduce((a, b) => a + b, 0), P2 = cnt.reduce((a, b) => a + b, 0);
+    h += '<tr><td class="n">정비수</td>' + tot.map((v, k) => td(v, X.bill['정비수'][k], '', trU[k])).join('') + td(S, X.bill['합계'], 'b', trS) + '</tr>';
+    h += '<tr><td class="n">정비인원</td>' + cnt.map((v, k) => td(v, X.bill['인원'][k])).join('') + td(P2, X.bill['인원합']) + '</tr>';
+    h += '<tr><td class="n">정비수/인</td>' + tot.map((v, k) => '<td class="num">' + (cnt[k] ? (v / cnt[k]).toFixed(2) : '') + '</td>').join('') + '<td class="num">' + (P2 ? (S / P2).toFixed(2) : '') + '</td></tr>';
+    h += '<tr class="tot"><td class="n">금액</td>' + tot.map((v, k) => td(v * OPT.rate, X.bill['금액'][k], '', trU[k] * OPT.rate)).join('') + td(S * OPT.rate, X.bill['금액합'], 'b', trS * OPT.rate) + '</tr>';
+    const fam = C.reduce((a, c) => a + c.fam, 0), roy = C.reduce((a, c) => a + c.roy, 0);
+    h += '<tr><td class="n">비고</td><td colspan="' + N + '" style="text-align:left">로얄 ' + roy + '실 ' + (X.has === false ? '' : roy === X.bill['로얄'] ? '✓' : '(엑셀 ' + X.bill['로얄'] + ')') + ' · 패밀리 ' + fam + ' ' + (X.has === false ? '' : fam === X.bill['패밀리'] ? '✓' : '(엑셀 ' + X.bill['패밀리'] + ')') + '</td><td></td></tr>';
+    if (X.has !== false) { if (roy !== X.bill['로얄']) bad++; if (fam !== X.bill['패밀리']) bad++; cells += 2; }
+    html.bill = h + '</tbody></table>'; badOf.bill = bad - b0; }
+  { let b0 = bad, h = '<table><thead>' + head + '<th>합계</th><th>금액</th></tr></thead><tbody>', dayT = ds.map(() => 0);
+    names.forEach(n => { const o = per(n).map(otv), s = o.reduce((a, b) => a + b, 0), xr = X.ot[n] || { d: [], tot: 0, amt: 0 }; o.forEach((v, k) => { dayT[k] += v; });
+      if (!s && !xr.tot) { o.forEach((v, k) => td(v, xr.d[k])); return; }
+      h += '<tr><td class="n">' + esc(n) + '</td>' + o.map((v, k) => td(v, xr.d[k])).join('') + td(s, xr.tot, 'b') + td(s * OPT.ot, xr.amt) + '</tr>'; });
+    const S = dayT.reduce((a, b) => a + b, 0);
+    h += '<tr class="tot"><td class="n">합계</td>' + dayT.map((v, k) => td(v, X.otT.d[k])).join('') + td(S, X.otT.tot, 'b') + td(S * OPT.ot, X.otT.amt) + '</tr></tbody></table>';
+    html.ot = h; badOf.ot = bad - b0; }
+  { let b0 = bad, h = '<table><thead><tr><th class="n">구분</th><th class="n2">형태</th>' + ds.map(x => '<th>' + (+x.slice(8)) + '일</th>').join('') + '<th>합계</th></tr></thead><tbody>';
+    ['정비수', '미정비', '재실청소', '간단재실'].forEach(a => ['패밀리', '로얄', 'PLT'].forEach((b, j) => { const k = a + ':' + b, v = C.map(c => c.U[k]), xr = X.unit[k] || { d: [] };
+      h += '<tr' + (j === 2 ? ' class="gap"' : '') + '><td class="n">' + (j ? '' : a) + '</td><td class="n2">' + b + '</td>' + v.map((x, i) => td(x, xr.d[i], 'yel')).join('') + td(v.reduce((p, q) => p + q, 0), xr.tot, 'b') + '</tr>'; }));
+    html.unit = h + '</tbody></table><p class="hint">노란 칸 = 결산 양식에 그대로 붙여 넣는 칸 (엑셀 유닛누계와 같은 배치)</p>'; badOf.unit = bad - b0; }
+  const S = tot.reduce((a, b) => a + b, 0), OT = names.reduce((a, n) => a + per(n).map(otv).reduce((p, q) => p + q, 0), 0);
+  let h = '<div class="kpis">';
+  h += '<div class="kpi"><small>' + (+m.slice(5)) + '월 정비수 (청구 기준)</small><b class="num">' + S.toLocaleString() + '</b><span class="v">' + (X.has === false ? '앱 계산' : eq(S, X.bill['합계']) ? '엑셀과 같음 ✓' : eq(S - trS, X.bill['합계']) ? '엑셀 ' + X.bill['합계'].toLocaleString() + ' + 교육생 ' + trS + ' (엑셀이 뺌)' : '엑셀 ' + X.bill['합계'].toLocaleString()) + '</span></div>';
+  h += '<div class="kpi"><small>청구 금액 (× ' + OPT.rate.toLocaleString() + '원)</small><b class="num">' + (S * OPT.rate).toLocaleString() + '원</b><span class="v">' + (X.has === false ? '앱 계산' : eq(S * OPT.rate, X.bill['금액합']) ? '엑셀과 같음 ✓' : eq((S - trS) * OPT.rate, X.bill['금액합']) ? '엑셀보다 ' + (trS * OPT.rate).toLocaleString() + '원 많음 (교육생 몫)' : '엑셀 ' + X.bill['금액합'].toLocaleString() + '원') + '</span></div>';
+  h += '<div class="kpi"><small>연장근로 (' + OPT.otMin + ' 이상 − ' + OPT.otBase + ') × ' + OPT.ot.toLocaleString() + '원</small><b class="num">' + OT + '유닛 · ' + (OT * OPT.ot).toLocaleString() + '원</b><span class="v">' + (X.has === false ? '앱 계산' : eq(OT, X.otT.tot) ? '엑셀과 같음 ✓' : '엑셀 ' + X.otT.tot + '유닛') + '</span></div>';
+  h += '<div class="kpi">' + (X.has === false ? '<small>날마다 엑셀 요약 칸과 대조</small><b class="num" style="color:' + (dBad ? 'var(--bad)' : 'var(--ok)') + '">' + (dBad ? '다른 날 ' + dBad : '모두 같음') + '</b><span class="v" style="color:var(--mute)">' + dN + '일 대조 (정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단)</span></div></div>' : '<small>엑셀과 한 칸씩 대조 (네 시트)</small><b class="num" style="color:' + (bad ? 'var(--bad)' : 'var(--ok)') + '">' + (bad ? '다른 칸 ' + bad : '모두 같음') + '</b><span class="v" style="color:var(--mute)">' + cells.toLocaleString() + '칸 대조' + (trd ? ' · <b style="color:var(--org)">교육생 차이 ' + trd + '칸</b>' : '') + '</span></div></div>');
+  const tr = per(TRAINEE).reduce((a, b) => a + b, 0);
+  if (tr) h += '<div class="warnbox">📘 <b>교육생</b> 배정 ' + tr + '유닛 — 청구에 <b>' + (OPT.trainee ? '포함' : '제외') + '</b> (기준: 도급비는 받아야 하므로 포함 · 수당은 나중에 시상금으로 다른 분 이름으로 옮김). 엑셀은 10월 27일만 넣고 나머지 날 · 11월은 빼고 있어서, 그 칸은 <span style="background:#FFF1DC;padding:0 4px;border-radius:4px">주황</span>으로 표시해요. <label style="white-space:nowrap"><input type="checkbox" id="o_tr"' + (OPT.trainee ? ' checked' : '') + '> 교육생도 청구에 포함</label></div>';
+  h += '<div class="stabs" style="max-width:620px;margin-bottom:8px">' + tabs.map(t => '<button data-ctab="' + t[0] + '"' + (closeTab === t[0] ? ' class="on"' : '') + '>' + t[1] + (badOf[t[0]] ? ' <b style="color:var(--bad)">✗' + badOf[t[0]] + '</b>' : ' ✓') + '</button>').join('') + '</div>';
+  h += '<div class="box"><div class="scroll">' + html[closeTab] + '</div><p class="hint">빨간 칸 = 엑셀 값과 다름 (마우스를 올리면 엑셀 값). 날짜를 고치면 이 표도 바로 다시 계산돼요.</p></div>';
+  h += '<div class="box" style="margin-top:10px"><h3>단가 설정</h3><div class="row" style="flex-wrap:wrap"><label>정비 단가 <input class="inp num" id="o_rate" value="' + OPT.rate + '" style="width:110px"></label><label>연장 단가 <input class="inp num" id="o_ot" value="' + OPT.ot + '" style="width:100px"></label><label>연장 기준 <input class="inp num" id="o_min" value="' + OPT.otMin + '" style="width:70px"></label></div></div>';
+  h += '<p class="mark">' + (X.has === false ? '엑셀 결산 시트 값이 없는 달이라 앱 계산만 보여 줘요. 명단 = 정비보고서 「설정」 시트 (' + names.length + '명).' : '') + '</p>';
+  $('#main').innerHTML = h;
+}
+function draw() {
+  if (!P) return;
+  const L = $('#left'), top = L ? L.scrollTop : 0, ae = document.activeElement, aid = ae && ae.id, ss = ae && ae.selectionStart;
+  document.body.classList.toggle('gm', tab === 'grid');
+  drawHead(); document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight + 'px');
+  if (tab === 'grid') drawGrid(); else if (tab === 'prio') drawPrio(); else drawClose();
+  const L2 = $('#left'); if (L2) L2.scrollTop = top;
+  if (aid && /^(gname|gtime|grooms|pname|ptime|quick|cmd|fmemo)$/.test(aid)) { const el = document.getElementById(aid); if (el) { el.focus(); try { el.setSelectionRange(ss, ss); } catch (e) {} } }
+}
+document.addEventListener('fullscreenchange', () => { const b = $('#fsBtn'); if (b) b.textContent = document.fullscreenElement ? '⛶ 전체 화면 끄기' : '⛶ 전체 화면'; });
+window.addEventListener('resize', () => document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight + 'px'));
+
+// ---------- 이벤트
+document.addEventListener('click', e => {
+  const t = e.target.closest('button,[data-i]'); if (!t) return;
+  if (t.dataset.mon) { const k = t.dataset.mon, ds = Object.keys(P.days).filter(x => monOf(x) === k && x <= TODAY); day = ds[ds.length - 1] || Object.keys(P.days).filter(x => monOf(x) === k).sort()[0]; sel.clear(); cur = -1; focus = ''; draw(); return; }
+  if (t.dataset.d) { day = t.dataset.d; sel.clear(); cur = -1; focus = ''; draw(); return; }
+  if (t.dataset.t) { tab = t.dataset.t; draw(); return; }
+  if (t.dataset.typos) { const d = R(); sel = new Set(d.rooms.map((x, i) => typoOf(P.rooms[i], x).length ? i : -1).filter(i => i >= 0)); cur = [...sel][0]; draw(); focusCmd(); return; }
+  if (t.dataset.pick) { const parts = cmdVal.split(','); parts[parts.length - 1] = t.dataset.pick; assignTyped(parts.join(',')); return; }
+  if (t.dataset.fs) {   // 전체 화면 (F11 과 같음). 채팅 안 미리 보기에선 막힐 수 있음 → 새 탭에서 열고 F11
+    const el = document.documentElement;
+    if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+    (el.requestFullscreen ? el.requestFullscreen() : Promise.reject()).catch(() => toast('이 창에선 전체 화면이 막혀 있어요 — 주소를 새 탭에서 열고 F11 을 눌러 주세요'));
+    return;
+  }
+  if (t.dataset.gal) { gal = !gal; draw(); return; }
+  if (t.dataset.pickstyle) { doneStyle = t.dataset.pickstyle; gal = false; draw(); toast('완료 표시: ' + STYLES.find(x => x[0] === doneStyle)[1]); return; }
+  if (t.dataset.unasg) { unassign([...sel]); focusCmd(); return; }
+  if (t.dataset.ctab) { closeTab = t.dataset.ctab; draw(); return; }
+  if (t.dataset.drawer != null) { drawer = drawer === t.dataset.drawer ? '' : t.dataset.drawer; gEdit = null; draw(); return; }
+  if (t.dataset.gk != null) { const g = R().groups[+t.dataset.gk]; gEdit = { k: +t.dataset.gk, name: g.name, time: g.time, txt: compress(g.rooms) }; sel = new Set(g.rooms.map(r => P.rooms.indexOf(r)).filter(i => i >= 0)); draw(); return; }
+  if (t.dataset.gnew) { gEdit = { k: -1, name: '', time: '', txt: sel.size ? compress([...sel].map(i => P.rooms[i])) : '' }; draw(); return; }
+  if (t.dataset.gsel) { gEdit.name = $('#gname').value; gEdit.time = $('#gtime').value; const cur0 = parseRooms($('#grooms').value).map(i => P.rooms[i]); gEdit.txt = compress(cur0.concat([...sel].map(i => P.rooms[i]))); draw(); return; }
+  if (t.dataset.gcancel) { gEdit = null; draw(); return; }
+  if (t.dataset.gdel) { const d = R(); d.groups.splice(gEdit.k, 1); d.edited = true; gEdit = null; draw(); toast('단체를 지웠어요'); return; }
+  if (t.dataset.gsave) {
+    const d = R(), name = $('#gname').value.trim(), time = $('#gtime').value.trim(), rooms = parseRooms($('#grooms').value).map(i => P.rooms[i]);
+    if (!name) { toast('단체명을 적어 주세요'); return; } if (!rooms.length) { toast('호실을 넣어 주세요'); return; }
+    const g = { name, time, rooms: [...new Set(rooms)] }; if (gEdit.k < 0) d.groups.push(g); else d.groups[gEdit.k] = g;
+    d.edited = true; gEdit = null; sel = new Set(g.rooms.map(r => P.rooms.indexOf(r))); draw(); toast('「' + name + '」 ' + g.rooms.length + '실 — 격자에 색 띠가 붙었어요'); return;
+  }
+  if (t.dataset.card != null) { const k = R().cards[+t.dataset.card]; focus = focus === k.n ? '' : k.n; draw(); return; }
+  const idx = [...sel];
+  if (t.dataset.ask) { closeAsk(t.dataset.ask === 'yes'); return; }
+  if (t.dataset.st != null) { setSt(idx, t.dataset.st); return; }
+  if (t.dataset.memo) { const m = t.dataset.memo; let moved = 0;
+    apply(idx, x => { if (x.m1 === m) x.m1 = ''; else if (x.m2 === m) x.m2 = ''; else { if (!x.m1) x.m1 = m; else x.m2 = m;
+      if (m === '룸체' && x.yl && !/^[1-4]$/.test(x.st)) { x.st = '1'; moved++; } } });   // 연박 방 룸체인지 = 사실상 퇴실 (11/26 소장님)
+    if (moved) toast('연박 ' + moved + '실 룸체인지 → 퇴실(1)로 바꿨어요'); return; }
+  if (t.dataset.done) { t.blur(); toggleDone(idx); return; }
+  if (t.dataset.yl) { apply(idx, x => { x.yl = !x.yl; }); return; }
+  if (t.dataset.undo) { doUndo(); return; }
+  if (t.dataset.mkprio) {
+    const name = ($('#pname').value || '우선정비').trim(), until = ($('#ptime').value || '14:00').trim(), rank = +$('#prank').value;
+    prioList().push({ name, rooms: idx.map(i => P.rooms[i]), until, rank, note: '' }); toast(idx.length + '실을 「' + name + '」 ' + until + '까지로 지정했어요'); draw(); return;
+  }
+  if (t.dataset.preset) { preset1125(); draw(); return; }
+  if (t.dataset.reset) { window.JBR.reset(); toast('엑셀 자료로 되돌렸어요'); return; }
+  if (t.dataset.clearp) { PRIO[day] = []; LATE[day] = {}; draw(); return; }
+  if (t.dataset.delp != null) { prioList().splice(+t.dataset.delp, 1); draw(); return; }
+  if (t.dataset.out) { const l = LATE[day][t.dataset.out]; l.out = !l.out; if (l.out) { const r = t.dataset.out, i = P.rooms.indexOf(r), x = R().rooms[i]; toast('🔔 ' + (x && x.nm ? x.nm + ' 님 휴대폰: ' : '') + r + '호 퇴실됐어요 — 바로 정비 시작'); } draw(); return; }
+  if (t.dataset.tail) {
+    const m = /(\d{1,2})\s*-\s*(\d{1,2})/.exec($('#tail').value || ''); if (!m) { toast('끝번호를 12-17 처럼 적어 주세요'); return; }
+    const a = +m[1], b = +m[2], rooms = P.rooms.filter(r => { const s = +r.slice(-2); return s >= a && s <= b; }).filter(r => { const i = P.rooms.indexOf(r), x = R().rooms[i]; return x && x.nm; });
+    prioList().push({ name: ($('#tailname').value || '끝번호 ' + a + '~' + b + '호').trim(), rooms, until: '14:00', rank: 2, note: '모든 층 ' + a + '~' + b + '호' }); toast('모든 층 ' + a + '~' + b + '호 ' + rooms.length + '실을 지정했어요'); draw(); return;
+  }
+});
+document.addEventListener('mousedown', e => { const c = e.target.closest('.c[data-i]'); if (!c || tab !== 'grid') return; if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); const i = +c.dataset.i; if (e.shiftKey && cur >= 0) { sel = new Set(rect(cur, i)); } else if (e.ctrlKey || e.metaKey) { sel.has(i) ? sel.delete(i) : sel.add(i); cur = i; } else { drag = i; cur = i; sel = new Set([i]); } draw(); e.preventDefault(); });
+document.addEventListener('mouseover', e => { if (drag == null) return; const c = e.target.closest('.c[data-i]'); if (!c) return; const n = new Set(rect(drag, +c.dataset.i)); if (n.size !== sel.size) { sel = n; draw(); } });
+document.addEventListener('compositionend', e => { if (e.target.id !== 'cmd' || !pendEnter) return; pendEnter = false; setTimeout(() => { const c = $('#cmd'); if (c) { cmdVal = c.value; if (cmdVal.trim()) assignTyped(cmdVal); } }, 0); });
+document.addEventListener('mouseup', e => { const was = drag != null || e.target.closest('.c[data-i]'); drag = null; if (was && tab === 'grid') { cmdVal = ''; focusCmd(); } });
+document.addEventListener('change', e => {
+  if (e.target.id === 'phm') { phMaid = e.target.value; draw(); return; }
+  if (e.target.id === 'o_tr') { OPT.trainee = e.target.checked; draw(); return; }
+  if (/^o_/.test(e.target.id)) { const v = parseFloat(e.target.value); if (!isNaN(v)) { if (e.target.id === 'o_rate') OPT.rate = v; if (e.target.id === 'o_ot') OPT.ot = v; if (e.target.id === 'o_min') OPT.otMin = v; draw(); } }
+});
+document.addEventListener('input', e => { if (e.target.id === 'cmd') { cmdVal = e.target.value; const sg = $('#sug'); if (sg) sg.innerHTML = sugHtml(cmdVal); return; } if (e.target.id === 'clk') { clock = +e.target.value; draw(); const k = $('#clk'); if (k) k.focus(); } });
+document.addEventListener('keydown', e => {
+  if (askCb) { if (e.key === 'Escape') { e.preventDefault(); closeAsk(false); } else if (e.key === 'Enter') { e.preventDefault(); closeAsk(true); } else e.preventDefault(); return; }
+  if (e.target.id === 'cmd') {
+    if (e.isComposing || e.key === 'Process' || e.keyCode === 229) { if (e.key === 'Enter') pendEnter = true; return; }   // 한글 조합 중 — Enter 는 조합이 끝난 뒤 처리
+    const v = e.target.value, idx = [...sel];
+    if (e.key === 'Enter') { e.preventDefault(); if (v.trim()) assignTyped(v); else move(1, 0); focusCmd(); return; }
+    if (e.key === 'Escape') { e.target.value = cmdVal = ''; const sg = $('#sug'); if (sg) sg.innerHTML = sugHtml(''); return; }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !v) { e.preventDefault(); doUndo(); focusCmd(); return; }
+    if (v) return;                                                   // 이름 치는 중엔 글자 그대로
+    const k = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
+    if (k) { e.preventDefault(); move(...k); focusCmd(); return; }
+    if (/^[1-4]$/.test(e.key)) { e.preventDefault(); setSt(idx, e.key); return; }
+    if (e.key === '5') { e.preventDefault(); apply(idx, x => { x.yl = !x.yl; }); focusCmd(); return; }
+    if (e.key === '6') { e.preventDefault(); setSt(idx, '간단'); return; }
+    if (e.key === ' ') { e.preventDefault(); toggleDone(idx); focusCmd(); return; }
+    if (e.key === 'Backspace') { e.preventDefault(); unassign(idx); focusCmd(); return; }   // 배정 취소 (이름만 지움)
+    if (e.key === 'Delete') { e.preventDefault(); setSt(idx, ''); return; }   // 공실 (상태 지움)
+    return;
+  }
+  if (e.target.id === 'fmemo' && e.key === 'Enter') {
+    e.preventDefault(); const txt = e.target.value.trim(), idx = [...sel]; if (!idx.length) return;
+    let full = 0;
+    apply(idx, x => { const kw = [x.m1, x.m2].filter(m => m && MEMOS.includes(m));   // 버튼 메모는 그대로, 나머지 칸에 직접 쓴 메모
+      if (kw.length >= 2 && txt) { full++; return; } x.m1 = kw[0] || ''; x.m2 = ''; if (txt) { if (!x.m1) x.m1 = txt; else x.m2 = txt; } if (/룸체|RC/i.test(txt) && x.yl && !/^[1-4]$/.test(x.st)) x.st = '1'; });
+    toast(full ? '메모 칸 두 개가 버튼 메모로 차 있는 방 ' + full + '실은 못 넣었어요' : txt ? '메모를 남겼어요' : '직접 쓴 메모를 지웠어요'); focusCmd(); return;
+  }
+  if (e.target.id === 'quick' && e.key === 'Enter') {
+    let ids = parseRooms(e.target.value); const q = $('#qst').value; if (!ids.length) { toast('호실을 찾지 못했어요'); return; }
+    sel = new Set(ids); cur = ids[ids.length - 1];
+    if (q === 'done') { const bad = ids.filter(i => !canDone(R().rooms[i])); if (bad.length) toast(bad.map(i => P.rooms[i]).join(', ') + ' 은(는) 연박 · 공실이라 완료 안 됨'); ids = ids.filter(i => canDone(R().rooms[i])); if (!ids.length) return; }
+    if (q !== 'done') { setSt(ids, q, () => toast(ids.map(i => P.rooms[i]).join(', ') + ' → ' + (q === '1' ? '1 퇴실' : '2 재실'))); setTimeout(() => { const qi = $('#quick'); if (qi) { qi.value = ''; } }, 0); return; }
+    apply(ids, (x, i) => { x.done = true; JD[day + P.rooms[i]] = Date.now(); }); toast(ids.map(i => P.rooms[i]).join(', ') + ' → ' + (q === 'done' ? '완료' : q === '1' ? '1 퇴실' : '2 재실'));
+    setTimeout(() => { const qi = $('#quick'); if (qi) { qi.value = ''; qi.focus(); } }, 0); return;
+  }
+  if (e.target.tagName === 'BUTTON' && tab === 'grid' && sel.size && /^( |Enter|[1-4]|g|G|y|Y|Delete|Backspace)$/.test(e.key)) e.target.blur();
+  else if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || tab !== 'grid') { if ((e.ctrlKey || e.metaKey) && e.key === 'z' && tab === 'grid' && e.target.tagName !== 'INPUT') { e.preventDefault(); doUndo(); } return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); doUndo(); return; }
+  const k = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
+  if (k) { e.preventDefault(); move(...k); return; }
+  const idx = [...sel]; if (!idx.length) return;
+  if (/^[1-4]$/.test(e.key)) { e.preventDefault(); setSt(idx, e.key); return; }
+  if (e.key === '6') { setSt(idx, '간단'); return; }
+  if (e.key === 'Backspace') { e.preventDefault(); unassign(idx); return; }
+  if (e.key === 'Delete') { e.preventDefault(); setSt(idx, ''); return; }
+  if (e.key === ' ') { e.preventDefault(); toggleDone(idx); return; }
+  if (e.key === '5') { apply(idx, x => { x.yl = !x.yl; }); return; }
+});
+
+window.JBR = {
+  set(j) {
+    const first = !P; P = j; P.days = {}; Object.values(j.months).forEach(M => Object.assign(P.days, M.days));
+    Object.keys(ED).forEach(k => { if (!ED[k].edited) delete ED[k]; });   // 연습으로 고친 날은 그대로, 나머지는 새 자료로
+    if (first || !P.days[day]) { const ds = Object.keys(P.days).sort(), le = ds.filter(x => x <= TODAY); day = P.days[TODAY] ? TODAY : (le[le.length - 1] || ds[0]); }
+    draw();
+  },
+  edited: () => Object.values(ED).some(x => x.edited) || !!gEdit,
+  reset() { delete ED[day]; undo = undo.filter(u => u.ds !== day); draw(); }
+};
+if (window.__jbrQ) window.JBR.set(window.__jbrQ);
+}
+</script>
+<script src="../autoreload.js"></script>
+<script type="module" src="jbr.js?v=2026.11.26-4"></script>
+</body>
+</html>
