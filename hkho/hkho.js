@@ -45,6 +45,7 @@ let docs = {};                   // 날짜 → 문서 (D-14 ~)
 let notes = [];                  // 기간 공지
 let ui = { edit: null, lt: false, note: null, heat: null };
 let unsub = [];
+let saving = 0;                  // 저장 중인 건수 (자동 새로고침은 0일 때만)
 
 // ---------- 글자 꾸미기: 호실 번호를 칩으로 (1203 · 1203호 · 1701~1704)
 function roomify(t) {
@@ -80,8 +81,10 @@ const cur = () => docs[D] || { date: D, heat: '', duty: '', lights: {}, day: [],
 async function save(date, patch) {
   const base = docs[date] || { date, heat: '', duty: '', lights: {}, day: [], night: [] };
   docs[date] = Object.assign({}, base, patch); draw();
+  saving++;
   try { await S.merge('hkho/' + date, Object.assign({ date }, patch, { at: S.SERVER_TIME, by: role ? role.label : '' })); setSync('저장됨 · ' + hm(Date.now())); }
   catch (e) { toast('저장하지 못했어요 — 인터넷을 확인해 주세요'); setSync('저장 실패'); try { S.logErr && S.logErr('hkho', e); } catch (x) {} }
+  finally { saving--; }
 }
 function items(date, sh) { return ((docs[date] || {})[sh] || []).slice(); }
 function setItem(date, sh, id, fn) {
@@ -246,8 +249,10 @@ async function saveNote(del) {
   }
   list = list.filter(x => (x.to || x.from) >= addDays(today(), -120));   // 넉 달 지난 공지는 정리
   ui.note = null; notes = list; draw();
+  saving++;
   try { await S.set('hkho/notes', { list, at: S.SERVER_TIME, by: role.label }); toast(del ? '공지를 지웠어요' : '공지를 저장했어요'); }
   catch (e) { toast('저장하지 못했어요'); }
+  finally { saving--; }
 }
 function go(d) { ui = { edit: null, lt: false, note: null }; D = d; if (location.hash !== '#' + d) history.replaceState(null, '', '#' + d); watch(); draw(); }
 async function doLogin() {
@@ -263,6 +268,9 @@ async function doLogin() {
 //   상태: 완료 → 완료 / 추후·진행 → 진행 / 빈칸 → 지난날은 완료(엑셀에서 정리 안 한 것), 오늘은 진행
 //   손님 전화번호는 가운데를 가림
 async function importXlsx(file) {
+  saving++; try { return await importXlsx0(file); } finally { saving--; }
+}
+async function importXlsx0(file) {
   const msg = t => { const el = $('#impMsg'); if (el) el.textContent = t; };
   try {
     msg('읽는 중…');
@@ -330,3 +338,6 @@ S.onUser(u => {
   draw();
 });
 window.__hkho = { ver: VER };
+// 🔄 쉬는 순간 자동 새로고침 (2026-11-26, ../autoreload.js). 이 화면은 버전 글자를 허브 version.json 과 따로 써서 '처음 열었을 때 값'과 비교
+//   → 허브 쪽 ./bump.sh 를 돌려야 바뀐 걸 앎. 고치는 중(항목 · 공지 편집) · 저장 중이면 안 바꿈
+if (window.AutoReload && !window.__hubFast) window.AutoReload.start({ key: 'hkho', url: '../version.json', safe: () => !ui.edit && !ui.note && !ui.heat && !saving });

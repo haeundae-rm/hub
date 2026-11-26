@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.26-2';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.26-2';
-import * as PIN from './pin.js?v=2026.11.26-2';
-import { setupClose } from './close.js?v=2026.11.26-2';
-import { setupClosing } from './closing.js?v=2026.11.26-2';
-import { supProgress } from './supcalc.js?v=2026.11.26-2';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.26-2';
-import { setupMeal } from './meal.js?v=2026.11.26-2';
-import * as BD from './bday.js?v=2026.11.26-2';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.26-3';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.26-3';
+import * as PIN from './pin.js?v=2026.11.26-3';
+import { setupClose } from './close.js?v=2026.11.26-3';
+import { setupClosing } from './closing.js?v=2026.11.26-3';
+import { supProgress } from './supcalc.js?v=2026.11.26-3';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.26-3';
+import { setupMeal } from './meal.js?v=2026.11.26-3';
+import * as BD from './bday.js?v=2026.11.26-3';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.26-2';
+const VER = '2026.11.26-3';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -983,19 +983,13 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'pw') doLogin(); });
-// 새 버전 확인 (11/13): GitHub 가 index.html 을 10분까지 캐시해 예전 화면이 남음 → version.json 을 캐시 없이 읽어 다르면 한 번 새로 고침
-function checkVer() {
-  fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => {
-    if (!j || !j.v || j.v === VER) return;
-    let done = ''; try { done = sessionStorage.getItem('hub_reload') || ''; } catch (e) {}
-    if (done === j.v) return;
-    try { sessionStorage.setItem('hub_reload', j.v); } catch (e) {}
-    if (window.__hubFast) return;
-    location.reload();
-  }).catch(() => {});
-}
-checkVer();
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { reload(false); checkVer(); } });
+// 새 버전 (11/13 → 11/26): 예전엔 버전이 다르면 바로 새로 고침 → 이제 쉬는 순간에만 (autoreload.js)
+// 안 바꾸는 때: 창(정비 레포트 · 정비 지원 · 자동 배정 · 배정 의견 등 .vp) 열림 · 정비보고서 올리는 중 · VOC 창 · 시험 중
+if (!window.__hubFast && window.AutoReload) window.AutoReload.start({
+  key: 'hub', cur: VER, url: 'version.json',
+  safe: () => !document.querySelector('.vp') && !/-lock\b/.test(document.body.className) && !(up && !up.sent) && !vocOpen
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reload(false); });
 
 S.onUser(u => {
   if (vocOpen && !(u && !u.anon)) closeVoc();
