@@ -204,7 +204,7 @@ body.gm .wrap{height:100%}body.gm .left{height:100%;overflow-y:auto;padding:0 4p
 .btns{display:flex;flex-wrap:wrap;gap:5px}
 .btns button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 9px;min-height:36px;font-weight:600}
 .btns button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
-.b1{background:var(--s1)!important}.b2{background:var(--s2)!important}.b3{background:var(--s3)!important}.b4{background:var(--s4)!important}
+.b1{background:var(--s1)!important}.b2{background:var(--s2)!important}.b3{background:var(--s3)!important}.b4{background:var(--s4)!important}.b5{background:#FFF27A!important}
 .inp{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-height:40px;background:#fff;font-size:15px}
 .row{display:flex;gap:6px;align-items:center}
 .lat{font:700 12px Inter,sans-serif;color:var(--ok)}
@@ -443,7 +443,7 @@ function barHtml(d) {
   const pc = one ? (/^[1-4]$/.test(one.st) ? ' s' + one.st : one.yl ? ' yl' : '') : '';
   let h = '<div class="eb1"><span class="plate' + (n ? pc : ' empty') + '">' + (n === 1 ? '<b class="num">' + room1 + '</b><small>' + room1.slice(0, -2) + 'F</small><i' + (one && one.nm ? '>' + esc(one.nm) : ' class="none">배정 없음') + '</i>' : n ? '<b class="num">' + n + '실</b><i>' + esc(compress([...sel].map(i => P.rooms[i])).slice(0, 18)) + '</i>' : '<b class="num">—</b><i class="none">방을 누르세요</i>') + '</span>';
   h += '<span class="btns">' + [['1', '1 퇴실', 'b1'], ['2', '2 재실', 'b2'], ['3', '3 이월', 'b3'], ['4', '4 예정', 'b4']].map(b => '<button class="' + b[2] + (one && one.st === b[0] ? ' on' : '') + '" data-st="' + b[0] + '"' + dis + '>' + b[1] + '</button>').join('') +
-    '<button data-yl="1"' + dis + (one && one.yl ? ' class="on"' : '') + '>5 연박</button>' +   // 11/26 단축번호 1~6 순서대로
+    '<button data-yl="1" class="b5' + (one && one.yl ? ' on' : '') + '"' + dis + '>5 연박</button>' +   // 11/26 단축번호 1~6 순서대로
     [['간단', '6 간단', ''], ['', '공실', '']].map(b => '<button class="' + b[2] + (one && one.st === b[0] && b[0] ? ' on' : '') + '" data-st="' + b[0] + '"' + dis + '>' + b[1] + '</button>').join('') + '</span>';
   h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 이름 · 초성 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
   h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
