@@ -116,7 +116,7 @@ function weeklyMap(w, L = LAYOUT.main) {
     M['B' + R] = x ? x.name || null : null; for (let d = 0; d < 7; d++) M[SC[d] + R] = x ? N(x.d[d]) : null; M['X' + R] = x ? x.resume || null : null;
   }
   const SV = SC.concat('V');
-  [['res', 0], ['co', 1], ['inroom', 2], ['stay', 3], ['carry', 4], ['spare', 5]].map(([k, o]) => [k, L.sum + o]).forEach(([k, R]) => SV.forEach((c, d) => { M[c + R] = N(((w.sum || {})[k] || [])[d]); }));
+  [['res', 0], ['co', 1], ['inroom', 2], ['stay', 3], ['carry', 4], ['spare', 5]].map(([k, o]) => [k, L.sum + o]).forEach(([k, R]) => SV.forEach((c, d) => { const v = ((w.sum || {})[k] || [])[d]; M[c + R] = k === 'carry' && typeof v === 'string' && v ? v : N(v); }));   // 미정비 이월은 글자도
   for (let i = 0; i < 13; i++) {
     const h = (w.helpers || [])[i], R = L.help + i;
     M['B' + R] = h ? h.name : null; M['D' + R] = h ? (h.can || 'x') : null; for (let d = 0; d < 7; d++) M[SC[d] + R] = h && h.d[d] ? '출근' : null;
