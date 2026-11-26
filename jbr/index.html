@@ -213,7 +213,7 @@ body.gm .wrap{height:100%}body.gm .left{height:100%;overflow-y:auto;padding:0 4p
 .btns{display:flex;flex-wrap:wrap;gap:5px}
 .btns button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 9px;min-height:36px;font-weight:600}
 .btns button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
-.b1{background:var(--s1)!important}.b2{background:var(--s2)!important}.b3{background:var(--s3)!important}.b4{background:var(--s4)!important}.b5{background:#FFF27A!important}
+.b1{background:var(--s1)!important}.b2{background:var(--s2)!important}.b3{background:var(--s3)!important}.b4{background:var(--s4)!important}.b5{background:#FFF27A!important}.b7{background:#fff!important;border-color:#E0B400!important;color:#7A5B00!important}.b7.on{background:#FFF27A!important}.b5.on,.b7.on{color:#1B2A4A!important;box-shadow:inset 0 0 0 2px #C9A800}
 .inp{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-height:40px;background:#fff;font-size:15px}
 .row{display:flex;gap:6px;align-items:center}
 .lat{font:700 12px Inter,sans-serif;color:var(--ok)}
@@ -323,7 +323,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ROY = ['3001', '3002', '3101', '3102'];
 const MEMOS = ['VIP', '르씨엘', '룸체', '당직', '악취', '조기퇴실', '미정비', '가입력', 'H/U', '시설', '우선'];
-const MCOL = { VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
+const MCOL = { 재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
 const GCOL = ['#E53935', '#1E88E5', '#43A047', '#8E24AA', '#F4511E', '#00897B', '#6D4C41', '#3949AB', '#C0CA33', '#D81B60'];
 const TODAY = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 let waterOpen = false;
@@ -454,7 +454,7 @@ function drawGrid() {
       if (focus && !people(room, x).includes(focus)) cls.push('dim');
       if (typoOf(room, x).length) cls.push('typo');
       if (!x.done && ((pr[room] && pr[room].top) || x.m1 === '우선' || x.m2 === '우선' || /우선/.test(x.m1 + x.m2))) cls.push('pr');   // 우선정비 지정 · '우선' 메모 = 같은 주황 빛
-      const memos = [x.m1, x.m2].filter(Boolean);
+      const dk = downKind(x), memos = dk ? [dk + ' · ' + x.m1].concat(x.m2 ? [x.m2.replace(/^미정비( · )?/, '')].filter(Boolean) : []) : [x.m1, x.m2].filter(Boolean);
       g += '<div class="' + cls.join(' ') + '" data-i="' + i + '"' + jdStyle + '>' + (room in gi ? '<div class="gb" style="background:' + GCOL[gi[room] % 10] + '"></div>' : '') + 
         '<div class="no">' + room + (x.done ? '<b class="dn">✓</b>' : '') + '</div><div class="nm">' + esc(nmShort(room, x)) + '</div>' +
         (memos.length ? '<div class="mm">' + memos.map(m => '<span style="background:' + (MCOL[Object.keys(MCOL).find(k => m.includes(k))] || '#eef0f3') + '">' + esc(m) + '</span>').join('') + '</div>' : '') +
@@ -475,7 +475,9 @@ function barHtml(d) {
   let h = '<div class="eb1"><span class="plate' + (n ? pc : ' empty') + '">' + (n === 1 ? '<b class="num">' + room1 + '</b><small>' + room1.slice(0, -2) + 'F</small><i' + (one && one.nm ? '>' + esc(one.nm) : ' class="none">배정 없음') + '</i>' : n ? '<b class="num">' + n + '실</b><i>' + esc(compress([...sel].map(i => P.rooms[i])).slice(0, 18)) + '</i>' : '<b class="num">—</b><i class="none">방을 누르세요</i>') + '</span>';
   h += '<span class="btns">' + [['1', '1 퇴실', 'b1'], ['2', '2 재실', 'b2'], ['3', '3 이월', 'b3'], ['4', '4 예정', 'b4']].map(b => '<button class="' + b[2] + (one && one.st === b[0] ? ' on' : '') + '" data-st="' + b[0] + '"' + dis + '>' + b[1] + '</button>').join('') +
     '<button data-yl="1" class="b5' + (one && one.yl ? ' on' : '') + '"' + dis + '>5 연박</button>' +   // 11/26 단축번호 1~6 순서대로
-    [['간단', '6 간단', ''], ['', '공실', '']].map(b => '<button class="' + b[2] + (one && one.st === b[0] && b[0] ? ' on' : '') + '" data-st="' + b[0] + '"' + dis + '>' + b[1] + '</button>').join('') + '</span>';
+    [['간단', '6 간단', '']].map(b => '<button class="' + b[2] + (one && one.st === b[0] ? ' on' : '') + '" data-st="' + b[0] + '"' + dis + '>' + b[1] + '</button>').join('') +
+    '<button class="b7' + (one && downKind(one) === '재입' ? ' on' : '') + '" data-re="1"' + dis + ' title="퇴실 예정 → 연박 전환: 정비자를 한 칸 아래로">7 재입</button>' +
+    [['', '공실', '']].map(b => '<button class="' + b[2] + '" data-st=""' + dis + '>' + b[1] + '</button>').join('') + '</span>';
   h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 이름 · 초성 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
   h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
   h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-drawer="prio"' + (drawer === 'prio' ? ' class="on"' : '') + '>우선정비 ' + prioList().length + '</button></span></div>';
@@ -563,7 +565,20 @@ function unassign(idx) {
   if (!had.length) { toast('배정된 방이 아니에요'); return; }
   apply(had, x => { x.nm = ''; x.done = false; }); toast(had.map(i => P.rooms[i]).slice(0, 4).join(', ') + (had.length > 4 ? ' 외 ' + (had.length - 4) + '실' : '') + ' 배정을 취소했어요 (Ctrl+Z 로 되돌리기)');
 }
-function freeMemo(x) { return [x.m1, x.m2].filter(m => m && !MEMOS.includes(m)).join('\n'); }
+// 🔁 재입 (11/26 소장님): 퇴실 예정 방이 연박으로 바뀜 → 엑셀처럼 정비자 이름을 한 칸 아래(메모1)로 내리고 상태 지움 + 연박(노랑)
+//   미정비 처리도 같은 모양: 상태 그대로 · 이름 한 칸 아래 · 메모2 '미정비'. 이름 줄이 비어 정비수 · 유닛 · 생수에서 빠짐 (엑셀 COUNTA 와 같음)
+const isName = v => !!v && (v === TRAINEE || rosterOf(day).includes(v) || R().cards.some(k => k.n === v));
+const downKind = x => !x || x.nm || !isName(x.m1) ? '' : /미정비/.test(x.m2) ? '미정비' : x.yl && !x.st ? '재입' : '';
+const otherMemo = x => [x.m1, x.m2].filter(Boolean).join(' · ');
+function reEntry(idx) {
+  const d = R(), on = idx.filter(i => d.rooms[i] && d.rooms[i].nm), back = idx.filter(i => downKind(d.rooms[i]) === '재입');
+  if (!on.length && !back.length) { toast('재입은 정비자가 배정된 방에만 — 방을 먼저 고르세요'); return; }
+  if (on.length) { apply(on, x => { const o = otherMemo(x); x.m1 = x.nm; x.m2 = o; x.nm = ''; x.st = ''; x.yl = true; x.done = false; });
+    toast('🔁 재입 ' + on.length + '실 — 연박으로 바꾸고 정비자는 한 칸 아래로 (정비수 · 유닛에서 빠짐) · 다시 7 = 되돌리기'); }
+  else { apply(back, x => { x.nm = x.m1; x.m1 = x.m2; x.m2 = ''; x.yl = false; if (!x.st) x.st = '4'; }); toast('재입을 되돌렸어요 (4 퇴실 예정)'); }
+}
+// 재입 · 미정비: 내려 적은 이름은 빼고
+function freeMemo(x) { if (downKind(x)) return (x.m2 || '').replace(/^미정비( · )?/, '').split(' · ').join('\n'); return [x.m1, x.m2].filter(m => m && !MEMOS.includes(m)).join('\n'); }
 // 완료는 정비할 방에만: 1 금일 퇴실 · 2 재실청소 · 3 미정비 이월 · 4 퇴실 예정 (+ 간단 재정비). 연박(상태 없음) · 공실은 안 됨 (11/26 소장님)
 const canDone = x => !!x && (/^[1-4]$/.test(x.st) || /간단/.test(x.st));
 function toggleDone(idx) {
@@ -774,12 +789,18 @@ document.addEventListener('click', e => {
   const idx = [...sel];
   if (t.dataset.ask) { closeAsk(t.dataset.ask === 'yes'); return; }
   if (t.dataset.st != null) { setSt(idx, t.dataset.st); return; }
+  if (t.dataset.memo === '미정비') {   // 11/26 엑셀처럼: 배정된 방 미정비 = 이름 한 칸 아래 + 메모2 미정비 (정비수에서 빠짐) · 다시 누르면 되돌림
+    const d = R(), a = idx.filter(i => d.rooms[i] && d.rooms[i].nm), b = idx.filter(i => downKind(d.rooms[i]) === '미정비');
+    if (a.length) { apply(a, x => { const o = otherMemo(x); x.m1 = x.nm; x.m2 = '미정비' + (o ? ' · ' + o : ''); x.nm = ''; x.done = false; }); toast('미정비 ' + a.length + '실 — 정비자는 한 칸 아래로 (정비수 · 유닛에서 빠짐)'); return; }
+    if (b.length) { apply(b, x => { x.nm = x.m1; x.m1 = x.m2.replace(/^미정비( · )?/, ''); x.m2 = ''; }); toast('미정비를 되돌렸어요'); return; }
+  }
   if (t.dataset.memo) { const m = t.dataset.memo; let moved = 0;
     apply(idx, x => { if (x.m1 === m) x.m1 = ''; else if (x.m2 === m) x.m2 = ''; else { if (!x.m1) x.m1 = m; else x.m2 = m;
       if (m === '룸체' && x.yl && !/^[1-4]$/.test(x.st)) { x.st = '1'; moved++; } } });   // 연박 방 룸체인지 = 사실상 퇴실 (11/26 소장님)
     if (moved) toast('연박 ' + moved + '실 룸체인지 → 퇴실(1)로 바꿨어요'); return; }
   if (t.dataset.done) { t.blur(); toggleDone(idx); return; }
   if (t.dataset.yl) { apply(idx, x => { x.yl = !x.yl; }); return; }
+  if (t.dataset.re) { reEntry(idx); return; }
   if (t.dataset.undo) { doUndo(); return; }
   if (t.dataset.mkprio) {
     const name = ($('#pname').value || '우선정비').trim(), until = ($('#ptime').value || '14:00').trim(), rank = +$('#prank').value;
@@ -823,6 +844,7 @@ document.addEventListener('keydown', e => {
     if (/^[1-4]$/.test(e.key)) { e.preventDefault(); setSt(idx, e.key); return; }
     if (e.key === '5') { e.preventDefault(); apply(idx, x => { x.yl = !x.yl; }); focusCmd(); return; }
     if (e.key === '6') { e.preventDefault(); setSt(idx, '간단'); return; }
+    if (e.key === '7') { e.preventDefault(); reEntry(idx); focusCmd(); return; }
     if (e.key === ' ') { e.preventDefault(); toggleDone(idx); focusCmd(); return; }
     if (e.key === 'Backspace') { e.preventDefault(); unassign(idx); focusCmd(); return; }   // 배정 취소 (이름만 지움)
     if (e.key === 'Delete') { e.preventDefault(); setSt(idx, ''); return; }   // 공실 (상태 지움)
@@ -832,7 +854,8 @@ document.addEventListener('keydown', e => {
   if (e.target.id === 'fmemo' && e.key === 'Enter' && !e.isComposing) {
     e.preventDefault(); const txt = e.target.value.split('\n').map(l => l.trim()).filter(Boolean).join('\n'), idx = [...sel]; if (!idx.length) return;
     let full = 0;
-    apply(idx, x => { const kw = [x.m1, x.m2].filter(m => m && MEMOS.includes(m));   // 버튼 메모는 그대로, 나머지 칸에 직접 쓴 메모
+    apply(idx, x => { const dk = downKind(x); if (dk) { const t2 = txt.split('\n').join(' · '); x.m2 = dk === '미정비' ? '미정비' + (t2 ? ' · ' + t2 : '') : t2; return; }   // 재입 · 미정비 방: 이름(메모1)은 그대로
+      const kw = [x.m1, x.m2].filter(m => m && MEMOS.includes(m));   // 버튼 메모는 그대로, 나머지 칸에 직접 쓴 메모
       if (kw.length >= 2 && txt) { full++; return; } x.m1 = kw[0] || ''; x.m2 = ''; if (txt) { if (!x.m1) x.m1 = txt; else x.m2 = txt; } if (/룸체|RC/i.test(txt) && x.yl && !/^[1-4]$/.test(x.st)) x.st = '1'; });
     toast(full ? '메모 칸 두 개가 버튼 메모로 차 있는 방 ' + full + '실은 못 넣었어요' : txt ? '메모를 남겼어요' : '직접 쓴 메모를 지웠어요'); focusCmd(); return;
   }
@@ -852,6 +875,7 @@ document.addEventListener('keydown', e => {
   const idx = [...sel]; if (!idx.length) return;
   if (/^[1-4]$/.test(e.key)) { e.preventDefault(); setSt(idx, e.key); return; }
   if (e.key === '6') { setSt(idx, '간단'); return; }
+  if (e.key === '7') { reEntry(idx); return; }
   if (e.key === 'Backspace') { e.preventDefault(); unassign(idx); return; }
   if (e.key === 'Delete') { e.preventDefault(); setSt(idx, ''); return; }
   if (e.key === ' ') { e.preventDefault(); toggleDone(idx); return; }
@@ -871,7 +895,7 @@ function buildReport() {
   const cell = i => {
     const x = d.rooms[i], r = P.rooms[i]; if (!x) return '<td><div class="qn">' + r + '</div></td>';
     const cl = /^[1-4]$/.test(x.st) ? 's' + x.st : /간단/.test(x.st) ? 'q6' : x.yl ? 'yl' : '';
-    const memo = [/간단/.test(x.st) ? '간단' : '', x.m1, x.m2].filter(Boolean).join(' · ');
+    const dk = downKind(x), memo = [/간단/.test(x.st) ? '간단' : '', dk ? dk + ' ' + x.m1 : x.m1, dk === '미정비' ? x.m2.replace(/^미정비( · )?/, '') : x.m2].filter(Boolean).join(' · ');
     return '<td><div class="qw">' + (r in gi ? '<div class="qb" style="background:' + GCOL[gi[r] % 10] + '"></div>' : '') + (x.done ? '<span class="qck">✓</span>' : '') +
       '<div class="qn' + (cl ? ' ' + cl : '') + '">' + r + '</div><div class="qm">' + esc(nmShort(r, x)) + '</div>' + (memo ? '<div class="qo">' + esc(memo) + '</div>' : '') + '</div></td>';
   };
