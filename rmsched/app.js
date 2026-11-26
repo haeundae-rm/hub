@@ -12,6 +12,7 @@ const { DAYS, STATUSES, OFF, isNum, num, addDays, md } = C;
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const f1 = v => v == null ? '' : (Math.round(v * 10) / 10).toFixed(1);
 const nv = v => isNum(v) ? v : '';
+const tv = v => v == null ? '' : String(v);   // 숫자 · 글자 모두 (미정비 이월)
 const today = () => { const t = new Date(Date.now() + 9 * 3600e3); return t.toISOString().slice(0, 10); };
 const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2600); };
 const clone = o => o == null ? null : JSON.parse(JSON.stringify(o));
@@ -269,7 +270,10 @@ function weekHead() {
 function sumHtml() {
   const w = S.w, Cd = DAYS.map((_, d) => C.dayCalc(w, d)), nx = w.sum;
   const head = `<tr><th class="rh">일별 요약</th>${DAYS.map((d, i) => `<th class="${i === 5 ? 'sat' : i === 6 ? 'sun' : ''}">${d}<br>${md(addDays(w.mon, i))}</th>`).join('')}<th>다음<br>월</th></tr>`;
-  const inRow = (k, l, n8) => `<tr><td class="rh">${l}</td>${Array.from({ length: n8 ? 8 : 7 }, (_, d) => `<td><input type="number" inputmode="numeric" data-sum="${k}" data-d="${d}" value="${nv(nx[k][d])}" aria-label="${l} ${d < 7 ? DAYS[d] : '다음 월'}"></td>`).join('')}${n8 ? '' : '<td></td>'}</tr>`;
+  // 미정비 이월(carry)은 글자도 (11/26) — 숫자면 숫자로, 아니면 글자 그대로 저장
+  const inRow = (k, l, n8) => `<tr><td class="rh">${l}</td>${Array.from({ length: n8 ? 8 : 7 }, (_, d) => k === 'carry'
+    ? `<td><input type="text" class="tx" data-sum="${k}" data-d="${d}" value="${esc(tv(nx[k][d]))}" title="${esc(tv(nx[k][d]))}" aria-label="${l} ${DAYS[d]}"></td>`
+    : `<td><input type="number" inputmode="numeric" data-sum="${k}" data-d="${d}" value="${nv(nx[k][d])}" aria-label="${l} ${d < 7 ? DAYS[d] : '다음 월'}"></td>`).join('')}${n8 ? '' : '<td></td>'}</tr>`;
   const calRow = (l, f, n8) => `<tr><td class="rh">${l}</td>${Cd.map((x, d) => f(x, d)).join('')}<td class="calc">${n8 ? n8() : ''}</td></tr>`;
   const avail = v => v == null ? '' : v < 0 ? '-' : v;
   const nAvail = () => isNum(nx.res[7]) ? avail(w.rooms - nx.res[7] - (isNum(nx.spare[7]) ? nx.spare[7] : 0)) : '';
@@ -331,7 +335,7 @@ function dayHtml() {
   h += `<div class="card"><h3>정비 예상 요약</h3><div class="kv">
     <b>예약</b><span>${nv(s.res)}</span><b>체크아웃</b><span>${nv(s.co)}</span><b>정비수</b><span>${s.jb}</span><b>출근인원</b><span>${s.ppl}</span>
     <b>C/O - 필요재입</b><span class="${s.coRe < 0 ? 'neg' : ''}">${nv(s.coRe)}</span><b>인당정비수</b><span>${f1(s.per)}</span>
-    <b>미정비 이월</b><span>${nv(s.carry)}</span><b>유숙</b><span>${nv(s.stay)}</span><b>미정비 가능수</b><span>${s.avail == null ? '' : s.avail < 0 ? '-' : s.avail}</span></div>
+    <b>미정비 이월</b><span>${esc(tv(s.carry))}</span><b>유숙</b><span>${nv(s.stay)}</span><b>미정비 가능수</b><span>${s.avail == null ? '' : s.avail < 0 ? '-' : s.avail}</span></div>
     <p class="lbl" style="margin:8px 0 0">예약 · 체크아웃 · 이월 · 유숙은 주간 스케줄 '일별 요약'에서 입력해요</p></div>`;
   const D = V.D;
   h += `<div class="card"><h3>재입실 현황</h3><div class="scroll"><table class="sum re"><tr><th>투숙합계</th><th>판매예상</th><th>재입실조회</th><th>재입 예상</th></tr>
@@ -494,6 +498,7 @@ $('view').addEventListener('click', e => {
 // 입력 칸 (바뀐 뒤 한 번에)
 $('view').addEventListener('change', e => {
   const t = e.target, ds = t.dataset, v = num(t.value);
+  if (ds.sum === 'carry') { const tx = t.value.trim(), cv = tx === '' ? null : isNum(num(tx)) ? num(tx) : tx; change(w => { w.sum.carry[+ds.d] = cv; }); return; }
   if (ds.sum) { change(w => { if (ds.sum === 'prevSunRes') w.sum.prevSunRes = v; else w.sum[ds.sum][+ds.d] = v; }); return; }
   if (t.id === 'fullDays') { change(w => { w.fullDays = v || 21; }); return; }
   if (t.id === 'rooms') { change(w => { w.rooms = v || 417; }); return; }

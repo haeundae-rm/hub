@@ -147,7 +147,7 @@
     for (let r = 63; r <= 67; r++) { const name = s('B' + r); if (name) w.work.push({ name, d: SC.map(x => n(x + r)), resume: s('X' + r) }); }
     // 일별 요약 72~77행 (V열 = 다음 월)
     const SV = SC.concat('V');
-    [['res', 72], ['co', 73], ['inroom', 74], ['stay', 75], ['carry', 76], ['spare', 77]].forEach(([k, r]) => { w.sum[k] = SV.map(x => n(x + r)); });
+    [['res', 72], ['co', 73], ['inroom', 74], ['stay', 75], ['carry', 76], ['spare', 77]].forEach(([k, r]) => { w.sum[k] = SV.map(x => { const v = n(x + r); return k === 'carry' && v == null && s(x + r) ? s(x + r) : v; }); });   // 미정비 이월은 글자도
     // 정비보조 출근 86~98행
     w.helpers = [];
     for (let r = 86; r <= 98; r++) { const name = s('B' + r); if (name) w.helpers.push({ name, can: s('D' + r) === 'x' ? '' : s('D' + r), d: SC.map(x => s(x + r) === '출근') }); }
