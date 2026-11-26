@@ -74,6 +74,9 @@ main{padding:10px max(2vw,12px) 40px}
 .c.sel{outline:2.5px solid var(--navy);outline-offset:-1px;z-index:2}
 .c.cur{outline:3px solid #2563EB;z-index:3}
 .c.dim{opacity:.22}
+/* 11/26 메이드 카드 눌러 보기: 완료 흐림(.55)보다 강하게 — 저녁에 대부분 완료여도 구분되게. 그 메이드 방은 완료여도 또렷 (✓ 그대로) */
+.gridbox.focusing .c.dim{opacity:.12!important;filter:grayscale(.6)}
+.gridbox.focusing .c:not(.dim):not(.e){opacity:1!important;box-shadow:0 0 0 2px var(--navy)}
 .c.pr{box-shadow:0 0 0 2px var(--org),0 0 12px 2px #ff8a1f99;animation:glow 1.6s ease-in-out infinite}
 @keyframes glow{50%{box-shadow:0 0 0 2px var(--org),0 0 18px 6px #ff8a1fcc}}
 @media (prefers-reduced-motion:reduce){.c.pr,.ph .pr{animation:none}}
@@ -462,7 +465,7 @@ function drawGrid() {
   { const st = STYLES.find(x => x[0] === doneStyle) || STYLES[0];
     if (false) h += '<div class="dstyle">완료 표시: <b style="color:var(--ink)">' + esc(st[1]) + '</b><button data-gal="1"' + (gal ? ' class="on"' : '') + '>' + (gal ? '모아 보기 닫기' : '시안 ' + STYLES.length + '개 한눈에 보기') + '</button></div>';
     if (gal) h += galHtml(); }
-  h = '<div class="wrap' + (drawer ? '' : ' one') + '"><div class="left" id="left">' + h + '<div class="ebar" id="ebar">' + barHtml(d) + '</div><div class="gridbox ' + (STYLES.find(x => x[0] === doneStyle) || STYLES[0])[2] + '" id="gridbox">' + g + '</div><p class="mark">시험용 화면이에요. 고친 내용은 이 창에만 남고 실제 자료는 바뀌지 않아요. 직원 이름은 모두 가명입니다.</p></div>' + (drawer ? '<div class="side">' + sideHtml(d, c) + '</div>' : '') + '</div>';
+  h = '<div class="wrap' + (drawer ? '' : ' one') + '"><div class="left" id="left">' + h + '<div class="ebar" id="ebar">' + barHtml(d) + '</div><div class="gridbox ' + (STYLES.find(x => x[0] === doneStyle) || STYLES[0])[2] + (focus ? ' focusing' : '') + '" id="gridbox">' + g + '</div><p class="mark">시험용 화면이에요. 고친 내용은 이 창에만 남고 실제 자료는 바뀌지 않아요. 직원 이름은 모두 가명입니다.</p></div>' + (drawer ? '<div class="side">' + sideHtml(d, c) + '</div>' : '') + '</div>';
   $('#main').innerHTML = h;
 }
 function barHtml(d) {
