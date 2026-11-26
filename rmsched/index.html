@@ -160,6 +160,18 @@ table.wkt{table-layout:fixed}.sumh{margin:16px 0 8px;font-size:16px;font-weight:
 @media(max-width:600px){.wk h2{order:-1;width:100%;margin:0 0 4px}.wk select{flex:1}.top .lo{background:transparent;color:#fff;border-color:rgba(255,255,255,.35);min-height:36px;padding:4px 12px}
 .login{max-width:440px;margin:30px auto}.login .seg{margin:6px 0 10px}.login input{display:block;width:100%;margin-bottom:10px}.login .err{color:var(--red);font-weight:700;margin:0 0 8px}
 .top .sv{white-space:normal;text-align:right;max-width:110px}.top h1{font-size:15.5px}.pop{left:8px!important;right:8px;width:auto;bottom:8px;top:auto!important}.wk h2{font-size:18px}.dlg .f{grid-template-columns:minmax(0,1fr)}}
+
+/* 11/26 휴대폰(글자 크게 포함) 잘림 정리 — PC 그대로 */
+@media (max-width:760px){
+ .top{gap:8px;padding:8px 10px}
+ .top h1{font-size:15px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .top h1 small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .top .sv{max-width:76px;font-size:11px;line-height:1.25;white-space:normal;flex:0 1 auto}
+ .top .lo{flex:0 0 auto;padding:4px 10px}
+ .tabs button{flex:0 0 auto;white-space:nowrap;padding:8px 12px}
+ .daychips{flex-wrap:nowrap;overflow-x:auto}.daychips button{flex:0 0 auto}
+ .hkonly .top .sv,.hkonly .top h1 small{display:none}
+}
 </style>
 </head>
 <body>
@@ -184,7 +196,7 @@ table.wkt{table-layout:fixed}.sumh{margin:16px 0 8px;font-size:16px;font-weight:
 <input type="file" id="fileIn" accept=".xlsx,.xlsm,.xls" hidden>
 <input type="file" id="jsonIn" accept=".json" hidden>
 <input type="file" id="holFile" accept=".xlsx,.xlsm,.xls" hidden>
-<script src="core.js?v=2026.11.25-14"></script>
-<script type="module" src="app.js?v=2026.11.25-14"></script>
+<script src="core.js?v=2026.11.26-1"></script>
+<script type="module" src="app.js?v=2026.11.26-1"></script>
 </body>
 </html>

@@ -68,6 +68,12 @@ input.t{display:block;width:100%;min-height:46px;border:1.5px solid var(--line);
 .prow{display:flex;justify-content:flex-end;margin:0 0 10px}.prow .big{width:auto;padding:0 18px;min-height:44px}.big.sec{background:var(--tile);color:var(--ink);border:1.5px solid var(--line)}
 .memo{margin-top:12px;font-size:13px}.memo ul{list-style:none;margin:6px 0 0;padding:0}.memo li{padding:4px 0;border-bottom:1px dashed var(--line)}.memo li span{display:inline-block;min-width:70px;color:var(--muted)}.memo li b{margin-right:4px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none}.toast.on{opacity:1}
+
+/* 11/26 휴대폰 잘림 정리 — PC 그대로 */
+@media (max-width:760px){
+ .mbar .d{flex-wrap:wrap;gap:4px}.mbar .d b{font-size:17px;white-space:nowrap}
+ .mbar button{min-width:40px}
+}
 </style>
 </head>
 <body>
