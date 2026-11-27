@@ -11,7 +11,7 @@
 //   12/1 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.27-1';
+const VER = '2026.11.27-3';
 const LIVE_FROM = '2026-12-01';   // 이날부터 앱이 원본 (저장 저절로 켜짐)
 const ROLES = [
   { label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
@@ -25,10 +25,10 @@ const TODAY = seoul().toISOString().slice(0, 10);
 const ym = (d, n) => { const y = +d.slice(0, 4), m = +d.slice(5, 7) - 1 + n; return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7); };
 const hm = t => { if (!t) return ''; const d = seoul(Number(t)); return ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2); };
 
-let me = '', sv = { pend: 0, fail: 0, lastOk: 0, err: '' }, role = null, login = { who: 0, err: '', busy: false }, unsub = [], docs = [], hb = null, meta = { fromCache: false, pending: 0 }, fill = '';
+let hks = [], me = '', sv = { pend: 0, fail: 0, lastOk: 0, err: '' }, role = null, login = { who: 0, err: '', busy: false }, unsub = [], docs = [], hb = null, meta = { fromCache: false, pending: 0 }, fill = '';
 
 // ---------- 사본들 → 화면 자료 (시제품 data.json 모양)
-export function toP(list) {
+export function toP(list, sched) {
   const days = list.filter(x => x && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.r).sort((a, b) => (a.date < b.date ? -1 : 1));
   if (!days.length) return null;
   const last = days[days.length - 1], rooms = (last.rooms && last.rooms.length ? last.rooms : Object.keys(last.r)).map(String);
@@ -44,13 +44,27 @@ export function toP(list) {
     };
     if (d.roster && d.roster.length) M.roster = d.roster;
   }
+  // 👥 명단 (11/27 소장님): 12월(앱 원본)부터는 룸메이드 스케줄표의 근래 주간 명단 (HK 전파 사본 rmsched_hk 의 all). 11월까지는 엑셀 설정 시트 명단 그대로
+  Object.keys(months).forEach(m => { const M = months[m]; if (m >= LIVE_FROM.slice(0, 7)) { const L = schedRoster(m, M.days, sched); if (L.length) { M.roster = L; M.rsrc = 'sched'; } } });
   // 명단이 없는 달은 그 달 카드 이름으로
   Object.values(months).forEach(M => { if (!M.roster.length) { const s = new Set(); Object.values(M.days).forEach(x => x.cards.forEach(c => c[0] && s.add(c[0]))); M.roster = [...s]; } });
   return { rooms, months };
 }
+// 그 달 명단 = 그 달 가장 최근 HK 전파 사본의 주간 명단(순번 = 줄 순서, 퇴사 표시 빼고)
+//   + 그 달 정비 기록이 있는 분은 퇴사 · 명단에서 빠져도 남김 (근태 · 급여) — 예전 주의 순번 자리에 끼워 넣음
+export function schedRoster(m, days, sched) {
+  const S = (sched || []).filter(x => x && x.date && x.date.slice(0, 7) === m && Array.isArray(x.all) && x.all.length).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!S.length) return [];
+  const worked = new Set();
+  Object.values(days || {}).forEach(d => (d.r || []).forEach(x => { if (x && x[1]) String(x[1]).split(',').forEach(n => { n = n.trim(); if (n) worked.add(n); }); }));
+  const last = S[S.length - 1].all, order = last.map(x => x.n), outNow = new Set(last.filter(x => x.out).map(x => x.n));
+  for (let k = S.length - 2; k >= 0; k--) S[k].all.forEach((x, i) => { if (order.includes(x.n)) return; const at = Math.max(-1, ...S[k].all.slice(0, i).map(y => order.indexOf(y.n))); order.splice(at + 1, 0, x.n); });   // 예전 주에 앞에 있던 분들 중 지금 순번이 가장 뒤인 분 바로 뒤
+  const nowIn = new Set(last.filter(x => !x.out).map(x => x.n));
+  return order.filter(n => nowIn.has(n) || worked.has(n));
+}
 
 function push() {
-  const P = toP(docs);
+  const P = toP(docs, hks);
   if (!P) { $('#main').innerHTML = '<div class="box" style="max-width:640px;margin:30px auto"><h3>아직 올라온 정비보고서가 없어요</h3><p class="hint">오더테이커 PC 정비 레포트 관리자 화면의 「정비보고서 연결」이 켜져 있으면 1분 안에 오늘 것이 올라와요. 지난 날짜는 위 「📥 엑셀로 채우기」로 한 번에 올릴 수 있어요.</p></div>'; tag(); return; }
   if (window.JBR) window.JBR.set(P); else window.__jbrQ = P;
   tag();
@@ -70,6 +84,8 @@ function watch() {
   const from = ym(TODAY, -1) + '-01';
   unsub.push(S.listenQuery('jbr', [['date', '>=', from]], (list, m) => { docs = list.map(x => x.data); meta.fromCache = !!(m && m.fromCache); push(); }, e => { $('#main').innerHTML = '<p style="padding:20px">자료를 읽지 못했어요: ' + esc(e && e.message || e) + ' (규칙 v32 게시 전이면 이렇게 보여요)</p>'; }));
   unsub.push(S.listenDoc('meta/rsync', x => { hb = x; tag(); }, () => {}));
+  // 👥 룸메이드 스케줄표 HK 전파 사본 (명단 · 앞으로 출근자 · 유닛) — 규칙 v30: 하우스키퍼 읽기 가능
+  unsub.push(S.listenQuery('rmsched_hk', [['date', '>=', from]], list => { hks = list.map(x => x.data); if (docs.length) push(); }, () => {}));
 }
 
 // ---------- 지난 날짜 채우기: 정비보고서 엑셀(한 달 파일)을 이 브라우저에서 열어 1일~오늘까지 날짜마다 저장
@@ -205,7 +221,7 @@ S.onUser(u => {
   if (role && !was) watch();
   if (!role) { unsub.forEach(f => { try { f(); } catch (e) {} }); unsub = []; drawLogin(); }
 });
-window.__jbr = { ver: VER, toP, SV, sv };
+window.__jbr = { ver: VER, toP, SV, sv, schedRoster };
 // 🪟 따로 창 (11/27): 허브에서 새 창으로 열렸으면 「‹ 허브」 대신 「✕ 창 닫기」 — 이 창에선 다른 메뉴로 못 넘어가게
 if (window.name === 'jbr_window') {
   const hb = document.getElementById('hubBtn');
