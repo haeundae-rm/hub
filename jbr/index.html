@@ -27,7 +27,9 @@ h1{font-size:19px;margin:0;font-weight:900;letter-spacing:-.3px}
 .days{display:flex;gap:4px;overflow-x:auto;padding:7px 0 8px;scrollbar-width:thin}
 .days button{flex:1 0 auto;border:0;background:#ffffff14;color:#cfd8e6;border-radius:8px;padding:3px 6px;min-height:30px;min-width:34px}
 .days button.on{background:#fff;color:var(--navy);font-weight:800}
-.days button.today{box-shadow:inset 0 0 0 2px var(--org)}.days button.fut{opacity:.45}.days button.jnewb{background:#F08A24;color:#1B1206;font-weight:800;border:0;box-shadow:0 0 0 2px #FFD3A3 inset}.days button.jnewb:hover{background:#FF9F3F}   /* 11/27 🌙 초안 버튼: 네이비 위 붉은 글씨가 안 보여서 주황 바탕 · 진한 글씨 */.mons{display:flex;gap:3px}.mons .mon{border:1px solid #ffffff40;background:transparent;color:#fff;font-weight:800;border-radius:8px;min-height:30px;padding:2px 10px}.mons .mon.on{background:#fff;color:var(--navy)}
+.days button.today{box-shadow:inset 0 0 0 2px var(--org)}.days button.fut{opacity:.45}.tabs button.asgo{background:#2C8A55;color:#fff;font-weight:800;margin-right:6px}.tabs button.asgo:hover{background:#34A065}
+#asgx{position:fixed;inset:0;z-index:60;overflow:hidden;background:var(--bg,#F4F6FA);display:flex;flex-direction:column}#asgx .bar{flex:none;min-height:52px;display:flex;gap:8px;align-items:center;background:#10233F;color:#fff;padding:8px 14px}#asgx iframe{min-height:0}#asgx .bar b{flex:1;font-size:16px}#asgx .bar button{font:inherit;font-weight:700;border-radius:8px;border:1px solid #ffffff55;background:#ffffff14;color:#fff;padding:7px 14px;cursor:pointer}#asgx .bar button.x{background:#fff;color:#10233F}#asgx iframe{flex:1;border:0;width:100%;background:#F4F6FA}
+.days button.jnewb{background:#F08A24;color:#1B1206;font-weight:800;border:0;box-shadow:0 0 0 2px #FFD3A3 inset}.days button.jnewb:hover{background:#FF9F3F}   /* 11/27 🌙 초안 버튼: 네이비 위 붉은 글씨가 안 보여서 주황 바탕 · 진한 글씨 */.mons{display:flex;gap:3px}.mons .mon{border:1px solid #ffffff40;background:transparent;color:#fff;font-weight:800;border-radius:8px;min-height:30px;padding:2px 10px}.mons .mon.on{background:#fff;color:var(--navy)}
 .tabs{display:flex;gap:4px;margin-left:auto}
 .fs{border:1px solid #ffffff40;background:transparent;color:#fff;border-radius:8px;padding:3px 10px;min-height:30px;font-weight:700}
 .tabs button{border:0;background:#ffffff14;color:#cfd8e6;padding:6px 14px;border-radius:9px;font-weight:700;min-height:36px}
@@ -317,7 +319,7 @@ td.x{color:var(--bad);font-weight:800;background:#FDECEC}td.trd{background:#FFF1
 <body>
 <header>
   <div class="hrow"><h1>정비보고서</h1><a class="tag" id="hubBtn" href="../" style="text-decoration:none;color:#fff;font-weight:800;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4)">‹ 허브</a><span class="tag" id="liveTag">불러오는 중</span><span class="mons" id="mons"></span><button class="fs" data-prt="1" title="A4 가로 인쇄">🖨 인쇄</button><button class="fs" data-pdf="1" title="A4 가로 PDF 파일로 바로 저장">⬇ PDF 저장</button><button class="fs" data-xld="1" title="이 날 정비보고서 엑셀 (격자 · 목록 · 출근 카드)">⬇ 엑셀</button><button class="fs" data-xlm="1" title="이 달 결산 4종 + 날마다 정비보고서 한 파일">⬇ 월 전체 엑셀</button><button class="fs" id="fsBtn" data-fs="1">⛶ 전체 화면</button>
-    <div class="tabs" id="tabs"><button data-t="grid" class="on">객실 현황</button><button data-t="close">결산</button></div></div>
+    <div class="tabs" id="tabs"><button data-asgo="asg" class="asgo" title="출근자 불러오기 · 차이 정리 · 자동 배정 · 확정 (이 창 안에서)">🧩 자동 배정</button><button data-t="grid" class="on">객실 현황</button><button data-t="close">결산</button></div></div>
   <div class="days" id="days"></div>
 </header>
 <main id="main"><p>불러오는 중…</p></main>
@@ -917,6 +919,8 @@ document.addEventListener('click', e => {
   if (t.dataset.prt) { printReport(); return; }
   if (t.dataset.pdf) { savePdf(t); return; }
   if (t.dataset.water) { waterOpen = !waterOpen; draw(); return; }
+  if (t.dataset.asgo) { asgOpen(t.dataset.asgo); return; }
+  if (t.dataset.asgx) { asgClose(); return; }
   if (t.dataset.xld) { xlOut('day', t); return; }
   if (t.dataset.xlm) { xlOut('month', t); return; }
   if (t.dataset.xlc) { xlOut('close', t, t.dataset.xlc); return; }
@@ -926,7 +930,7 @@ document.addEventListener('click', e => {
   if (t.dataset.jlog) { window.JBR.sv.showLog(day); return; }
   if (t.dataset.jback) { if (confirm('⚠ 비상: ' + day + ' 을(를) 엑셀로 되돌릴까요?\n\n· 오더테이커 PC 「정비보고서 연결」이 그날 엑셀을 다시 읽어 메이드 휴대폰에 넘겨요 (예전 방식)\n· 엑셀 파일에 배정이 들어 있어야 해요 — 허브 자동 배정에서 「엑셀 파일로」 확정하거나 직접 입력\n· 앱에서 한 기록은 📜 변경 기록에 그대로 남아요')) window.JBR.sv.back(day); return; }
   if (t.dataset.jnew) { const x = t.dataset.jnew, ex = P.days[x];
-    if (confirm(x + ' 초안을 만들까요?\n\n· 전 객실 4(금일 퇴실 예정)로 시작해요 — 전날 연박 · 미정비는 안 넘겨요\n· 연박 · 공실 · 재실을 표시한 뒤 허브 🧩 자동 배정 → 「📋 정비보고서 앱에서 불러오기」' + (ex ? '\n· 이 날 엑셀 사본은 이 초안으로 바뀌어요 (이 날은 이제 엑셀이 안 덮어요)' : '') + (x < '2026-11-28' ? '\n· 11/28 전이라 연습이에요 — 메이드 휴대폰엔 안 가요' : '\n· 이 날은 앱이 원본이에요 — 확정하면 메이드 휴대폰에 들어가고, 근무 중 고친 것도 정비보고서 연결 PC를 통해 넘어가요'))) { window.JBR.sv.newDay(x); day = x; delete ED[x]; } return; }
+    if (confirm(x + ' 초안을 만들까요?\n\n· 전 객실 4(금일 퇴실 예정)로 시작해요 — 전날 연박 · 미정비는 안 넘겨요\n· 연박 · 공실 · 재실을 표시한 뒤 위 「🧩 자동 배정」 → 「📋 정비보고서 앱에서 불러오기」' + (ex ? '\n· 이 날 엑셀 사본은 이 초안으로 바뀌어요 (이 날은 이제 엑셀이 안 덮어요)' : '') + (x < '2026-11-28' ? '\n· 11/28 전이라 연습이에요 — 메이드 휴대폰엔 안 가요' : '\n· 이 날은 앱이 원본이에요 — 확정하면 메이드 휴대폰에 들어가고, 근무 중 고친 것도 정비보고서 연결 PC를 통해 넘어가요'))) { window.JBR.sv.newDay(x); day = x; delete ED[x]; } return; }
   if (t.dataset.clearp) { if (PRIO[day] && PRIO[day].demo) { PRIO[day] = []; LATE[day] = {}; draw(); return; } if (!confirm('오늘 우선정비 지정을 모두 지울까요? (메이드 휴대폰에서도 사라져요)')) return; prioList().splice(0); prioSave(); return; }
   if (t.dataset.delp != null) { prioList().splice(+t.dataset.delp, 1); prioSave(); return; }
   if (t.dataset.out) { const l = LATE[day][t.dataset.out]; l.out = !l.out; if (l.out) { const r = t.dataset.out, i = P.rooms.indexOf(r), x = R().rooms[i]; toast('🔔 ' + (x && x.nm ? x.nm + ' 님 휴대폰: ' : '') + r + '호 퇴실됐어요 — 바로 정비 시작'); } draw(); return; }
@@ -1204,7 +1208,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.27-18'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.27-19'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1222,6 +1226,19 @@ async function xlOut(kind, btn, which) {
   } catch (e) { toast('엑셀을 만들지 못했어요: ' + (e && e.message || e)); }
   btn.textContent = old; btn.disabled = false;
 }
+// 🧩 자동 배정을 이 창 안에서 (11/27 소장님 "정비보고서 화면에서 끝낼 수 있게"): 허브를 ?embed=asg 로 겹창에 띄움 — 같은 로그인 · 같은 화면 · 확정 = 메이드 휴대폰
+function asgOpen(kind) {
+  let o = document.getElementById('asgx'); if (o) o.remove();
+  o = document.createElement('div'); o.id = 'asgx';
+  o.innerHTML = '<div class="bar"><b>' + (kind === 'notes' ? '📝 배정 의견 · 답' : '🧩 자동 배정 — 출근자 불러오기 · 차이 정리 · 자동 배정 · 확정') + '</b>' + (kind === 'notes' ? '' : '<button data-asgo="notes">📝 배정 의견</button>') + '<button class="x" data-asgx="1">✕ 닫고 정비보고서로</button></div><iframe src="../?embed=' + kind + '" title="자동 배정"></iframe>';
+  document.body.appendChild(o);
+}
+function asgClose() {
+  const o = document.getElementById('asgx'); if (!o) return;
+  try { const w = o.querySelector('iframe').contentWindow; if (w && w.__hubBusy && w.__hubBusy()) { toast('메이드 휴대폰에 올리는 중이에요 — 끝나면 닫아 주세요'); return; } } catch (e) {}
+  o.remove(); if (P && P.days[day]) draw();
+}
+window.addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.hub === 'embedclose') asgClose(); });
 window.JBR = {
   set(j) {
     const first = !P; P = j; P.days = {}; Object.values(j.months).forEach(M => Object.assign(P.days, M.days));
@@ -1239,6 +1256,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.27-18"></script>
+<script type="module" src="jbr.js?v=2026.11.27-19"></script>
 </body>
 </html>
