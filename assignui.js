@@ -150,7 +150,7 @@ function pick() {
 
 // ---------- 📋 정비보고서 앱에서 불러오기 (11/27 야간 배정 흐름 — 소장님 결정 claude/정비보고서앱_야간배정흐름_결정_1126.md)
 //   정비보고서 = jbr/{날} (하우스맨이 정비보고서 창에서 4 깔린 초안에 연박 · 공실 · 재실 표시), 출근자 · 유닛 = HK 전파 사본 rmsched_hk/{날}.rm
-const LIVE_FROM = '2026-12-01';   // 이날부터 확정 = 메이드 휴대폰에 (그 전엔 연습: 정비보고서에만 저장)
+const LIVE_FROM = '2026-11-28';   // 이날부터 확정 = 메이드 휴대폰에 (그 전엔 연습: 정비보고서에만 저장) — 11/27 소장님: 12/1 → 11/28 로 당김
 // 테마 객실 (11/27 소장님: 매일 같은 방) = 엑셀 정비보고서 상단 '테마 객실' 표 — 로얄(RYH·RYL) · OTT(HTT) · 키즈(FAK) · 워케이션(FAW)
 //   엔진: 우선정비(14시까지)로 셈 → 한 분에게 몰리지 않게 · 로얄 맡은 분에겐 가급적 안 줌 · 교육생 제외 · 담당 우선 / 메이드 휴대폰: '테마' · 14시까지
 export const THEME_ROOMS = ['3001', '3002', '3101', '3102', '2909', '2910', '1807', '1808', '1809', '1810', '1811', '1707', '1708'];
@@ -501,7 +501,7 @@ async function confirmApp() {
   const R = A.res, S = H.S, live = A.date >= LIVE_FROM;
   if (R.left.length && !confirm('미배정 객실이 ' + R.left.length + '실 있어요 (' + R.left.join(' ') + '). 그래도 확정할까요?')) return;
   if (A.asgd) { A.err = '이미 확정된 날이에요 — 위 「↩ 확정 취소」를 먼저 눌러 주세요'; draw(); return; }
-  if (!confirm(H.md(A.date) + ' 배정을 확정할까요?\n\n· 정비보고서(앱)에 이름 · 미정비 · 출근 카드가 들어가요\n' + (live ? '· 1~2분 안에 메이드 휴대폰에 들어가고, 정비 지원 더티 배분도 이 배정으로 불러와요\n· 같은 날 이미 올린 배정이 있으면 바뀌어요 (완료 기록은 그대로)' : '· 지금은 연습 기간이라 메이드 휴대폰에는 보내지 않아요 (12/1부터 보냄)'))) return;
+  if (!confirm(H.md(A.date) + ' 배정을 확정할까요?\n\n· 정비보고서(앱)에 이름 · 미정비 · 출근 카드가 들어가요\n' + (live ? '· 1~2분 안에 메이드 휴대폰에 들어가고, 정비 지원 더티 배분도 이 배정으로 불러와요\n· 같은 날 이미 올린 배정이 있으면 바뀌어요 (완료 기록은 그대로)' : '· 지금은 연습 기간이라 메이드 휴대폰에는 보내지 않아요 (11/28부터 보냄)'))) return;
   try {
     const ownerOf = {}; Object.keys(R.workers).forEach(n => R.workers[n].rooms.forEach(r => { (ownerOf[r] = ownerOf[r] || []).push(n); }));
     const cur = await S.get('jbr/' + A.date); if (!cur || !cur.r) throw new Error('정비보고서를 다시 읽지 못했어요');
@@ -528,7 +528,7 @@ async function confirmApp() {
       const summary = { ok: !R.left.length, maids: new Set(rows.map(x => x[1])).size, rooms: rows.length, units, checks: [], tags: {}, groups: [], due: [] };
       H.upload({ date: A.date, file: '자동 배정 · 📋 정비보고서 앱', res: { csv, rows, sheet: A.sheet, summary, data: d2 } });
       close();
-    } else { await pickApp(); A.saved = '✅ ' + H.md(A.date) + ' 배정을 정비보고서(앱)에 저장했어요 · 연습 기간이라 메이드 휴대폰엔 안 보냈어요 (12/1부터 보냄). 정비보고서 창에서 확인해 보세요.'; draw(); const b = document.getElementById('asp'); if (b) b.scrollTop = 0; }
+    } else { await pickApp(); A.saved = '✅ ' + H.md(A.date) + ' 배정을 정비보고서(앱)에 저장했어요 · 연습 기간이라 메이드 휴대폰엔 안 보냈어요 (11/28부터 보냄). 정비보고서 창에서 확인해 보세요.'; draw(); const b = document.getElementById('asp'); if (b) b.scrollTop = 0; }
   } catch (e) { A.err = '확정하지 못했어요: ' + (e && e.message || e); draw(); }
 }
 

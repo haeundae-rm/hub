@@ -1,0 +1,58 @@
+// ⬇ 정비보고서 엑셀 시험 (2026-11-27) — node test/jbr_xl_run.js  (가명 · 만든 자료)
+//   날마다(격자 · 목록 · 출근 카드) · 월 전체(요약 · 결산 4종 · 날마다 격자) 내려받아 openpyxl 로 열어 화면 숫자와 대조
+const { chromium } = require('playwright');
+const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
+const ROOT = { hub: path.resolve(__dirname, '..'), rm: process.env.RM || path.resolve(__dirname, '../../rm') };
+const BASE = 'https://haeundae-rm.github.io/';
+let pass = 0, fail = 0; const ok = (c, l) => { c ? pass++ : fail++; console.log((c ? '  ✅ ' : '  ❌ ') + l); };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const NAMES = ['가람', '나래', '다솜', '라온', '마루', '바다'];
+const ROOMS = []; for (let f = 31; f >= 4; f--) for (let s = 1; s <= 17; s++) ROOMS.push(String(f * 100 + s));
+function dayDoc(ds, k, src) { const r = {};
+  ROOMS.forEach((rm, i) => { const v = (i + k) % 7; r[rm] = v === 0 ? ['', '', '', '', 0, 1] : v === 1 ? ['', '', '', '', 0, 0] : [String((v % 4) + 1), NAMES[(i + k) % 6], v === 5 ? 'VIP' : '', '', v === 6 ? 1 : 0, 0]; });
+  return { date: ds, src, rooms: ROOMS, r, xl: {}, cards: NAMES.map(n => ({ n, u: '9', in: false })), groups: [], roster: src === 'excel' ? NAMES : undefined, at: Date.now() - 864e5 }; }
+const SEED = { 'meta/rsync': { on: true, at: Date.now() } };
+['2026-11-25', '2026-11-26', '2026-11-27'].forEach((d, k) => { SEED['jbr/' + d] = dayDoc(d, k, d === '2026-11-27' ? 'app' : 'excel'); });
+(async () => {
+  const b = await chromium.launch();
+  const ctx = await b.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul', viewport: { width: 1600, height: 950 }, acceptDownloads: true });
+  await ctx.addInitScript(s => { window.__seed = s; window.__live = 1; }, SEED);
+  await ctx.route('**/*', async route => { const u = route.request().url(); if (!u.startsWith(BASE)) return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+    const [app, ...rest] = u.slice(BASE.length).split('?')[0].split('#')[0].split('/'); let f = rest.join('/') || 'index.html'; if (f.endsWith('/')) f += 'index.html';
+    const file = app === 'rm' && f === 'app/store.js' ? path.join(__dirname, 'fake_store.js') : path.join(ROOT[app] || '/nope', f);
+    if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) return route.fulfill({ status: 404, body: 'nf' });
+    route.fulfill({ status: 200, contentType: (/\.js$/.test(file) ? 'application/javascript' : /\.html$/.test(file) ? 'text/html' : 'application/json') + '; charset=utf-8', body: fs.readFileSync(file) }); });
+  const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(BASE + 'hub/jbr/'); await p.click('[data-jwho="0"]'); await p.fill('#jpw', 'pw'); await p.click('[data-jlogin]');
+  await p.waitForSelector('.c[data-i]'); await p.click('#days [data-d="2026-11-26"]'); await sleep(200);
+  const tiles = await p.innerText('.sum');
+  console.log('① 날마다 엑셀');
+  let [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-xld]')]);
+  const f1 = '/tmp/xl_day.xlsx'; await dl.saveAs(f1);
+  ok(/^(정비보고서_2026-11-26\.xlsx|download)$/.test(dl.suggestedFilename()), '내려받기 (Playwright 는 blob 이름을 download 로 보여 줌 — 실제 크롬은 정비보고서_날짜.xlsx)');
+  const py = (file, code) => JSON.parse(execFileSync('python3', ['-c', 'import openpyxl,json,sys\nwb=openpyxl.load_workbook(sys.argv[1])\n' + code, file]).toString());
+  let o = py(f1, "ws=wb['정비보고서'];L=wb['목록'];C=wb['출근 카드']\nprint(json.dumps({'sheets':wb.sheetnames,'t':ws['A1'].value,'s':ws['A2'].value,'r1':ws['B5'].value,'n1':ws['B6'].value,'list':L.max_row-4,'cards':[[c.value for c in r] for r in C.iter_rows(min_row=5,max_col=4)]}))");
+  ok(o.sheets.join(',') === '정비보고서,목록,출근 카드', '시트: ' + o.sheets.join(', '));
+  ok(/11월 26일/.test(o.t) && /금일 정비수 \d+/.test(o.s), '제목 · 요약: ' + o.s.slice(0, 60));
+  const fam = +(tiles.match(/금일 정비수\s*(\d+)/) || [])[1];
+  ok(+(o.s.match(/금일 정비수 (\d+)/) || [])[1] === fam, '요약 정비수 = 화면 ' + fam);
+  ok(/^3101 /.test(o.r1) && o.list === ROOMS.length, '격자 첫 칸 ' + o.r1 + ' / ' + o.n1 + ' · 목록 ' + o.list + '실');
+  const sc = await p.evaluate(() => { const r = window.__seed['jbr/2026-11-26'].r, per = {}; Object.keys(r).forEach(k => { if (r[k][1]) per[r[k][1]] = (per[r[k][1]] || 0) + (['3001', '3002', '3101', '3102'].includes(k) ? 2 : 1); }); return per; });
+  ok(o.cards.every(c => sc[c[1]] === c[3]), '출근 카드 배정 유닛 = 자료 (' + o.cards.map(c => c[1] + ' ' + c[3]).join(', ') + ')');
+  console.log('② 월 전체 엑셀');
+  await p.click('[data-t="close"]'); await sleep(300);
+  const kp = await p.innerText('.kpis');
+  [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-xlm]')]);
+  const f2 = '/tmp/xl_month.xlsx'; await dl.saveAs(f2);
+  o = py(f2, "S=wb['요약'];B=wb['청구금액'];R=wb['객실정비현황']\nrows=[[c.value for c in r] for r in B.iter_rows(min_row=4)]\nrr=[[c.value for c in r] for r in R.iter_rows(min_row=4)]\nprint(json.dumps({'sheets':wb.sheetnames,'k':[[S.cell(r,1).value,S.cell(r,2).value] for r in range(4,13)],'bill':rows,'room':rr,'foot':S.cell(14,1).value}))");
+  ok(o.sheets.join(',') === '요약,객실정비현황,청구금액,연장근로,유닛누계,25일,26일,27일', '시트: ' + o.sheets.join(', '));
+  const S = +(kp.match(/정비수 \(청구 기준\)\s*([\d,]+)/) || [])[1].replace(/,/g, '');
+  ok(o.k[0][1] === S && o.k[1][1] === S * 16300, '요약 정비수 ' + o.k[0][1] + ' · 금액 ' + o.k[1][1] + ' = 화면');
+  const bTot = o.bill.find(r => r[0] === '정비수'), bAmt = o.bill.find(r => r[0] === '금액');
+  ok(bTot && bTot[bTot.length - 1] === S && bAmt[bAmt.length - 1] === S * 16300, '청구금액 시트 합계 = 화면 (' + bTot.slice(1).join(' · ') + ')');
+  const dTot = o.room.find(r => r[0] === '정비수');
+  ok(dTot && dTot.slice(1, 4).reduce((a, b) => a + b, 0) === S, '객실정비현황 날짜별 정비수 합 = ' + S);
+  ok(/25일 엑셀 사본 · 26일 엑셀 사본 · 27일 앱/.test(o.foot), '날짜별 자료 출처 표시: ' + o.foot);
+  ok(!errs.length, '오류 없음 ' + errs.join(' | '));
+  await b.close(); console.log('\n' + pass + ' 통과 / ' + fail + ' 실패'); process.exit(fail ? 1 : 0);
+})();
