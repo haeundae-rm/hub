@@ -25,9 +25,17 @@ const kids = c => Object.keys(D).filter(p => p.startsWith(c + '/') && p.split('/
 export async function get(p) { window.__reads++; return D[p] ? JSON.parse(JSON.stringify(D[p])) : null; }
 export async function getQuery(c, w) { const r = kids(c).filter(p => match(D[p], w || [])).map(p => ({ id: p.split('/').pop(), data: JSON.parse(JSON.stringify(D[p])) })); window.__reads += Math.max(1, r.length); return r; }
 export async function count(c, w) { window.__counts++; window.__reads++; return kids(c).filter(p => match(D[p], w || [])).length; }
-export async function set(p, d) { D[p] = val(d); keepFx(p); fire(); }
-export async function merge(p, d) { D[p] = deep(D[p], val(d)); keepFx(p); fire(); }
-export function add(c, d) { const id = 'a' + Math.random().toString(36).slice(2); set(c + '/' + id, d); return { id, done: Promise.resolve() }; }
+// window.__hold (Promise): 화면엔 바로 반영되지만 서버 확인은 늦게 — 오프라인 · 저장 대기 흉내 (정비보고서 11/27)
+// window.__deny (함수 p => true): 규칙 거부 흉내 — 저장 안 되고 약속이 실패
+const ack = p => { if (window.__deny && window.__deny(p)) return Promise.reject(Object.assign(new Error('permission-denied'), { code: 'permission-denied' })); return window.__hold || Promise.resolve(); };
+export function set(p, d) { if (window.__deny && window.__deny(p)) return ack(p); D[p] = val(d); keepFx(p); fire(); return ack(p); }
+export function merge(p, d) { if (window.__deny && window.__deny(p)) return ack(p); D[p] = deep(D[p], val(d)); keepFx(p); fire(); return ack(p); }
+export function add(c, d) { const id = 'a' + Math.random().toString(36).slice(2); return { id, done: set(c + '/' + id, d) }; }
+export function batch(ops) {   // 묶음: 하나라도 거부면 아무것도 안 씀
+  if (window.__deny && ops.some(o => window.__deny(o.path))) return Promise.reject(Object.assign(new Error('permission-denied'), { code: 'permission-denied' }));
+  ops.forEach(o => { const p = o.op === 'add' ? o.path + '/a' + Math.random().toString(36).slice(2) : o.path; D[p] = o.op === 'merge' ? deep(D[p], val(o.data)) : val(o.data); keepFx(p); });
+  fire(); return window.__hold || Promise.resolve();
+}
 export async function del(p) { delete D[p]; keepFx(p); }
 export function listenDoc(p, cb) { const f = () => cb(D[p] ? JSON.parse(JSON.stringify(D[p])) : null, { fromCache: false }); setTimeout(f, 0); if (window.__live) LS.push(f); return () => { const i = LS.indexOf(f); if (i >= 0) LS.splice(i, 1); }; }
 export function listenQuery(c, w, cb) { const f = () => getQuery(c, w).then(r => cb(r, { fromCache: false, pending: 0 })); f(); if (window.__live) LS.push(f); return () => { const i = LS.indexOf(f); if (i >= 0) LS.splice(i, 1); }; }
