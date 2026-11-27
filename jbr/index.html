@@ -415,6 +415,8 @@ function drawHead() {
   const m = monOf(day), ds = Object.keys(P.days).filter(x => monOf(x) === m);
   $('#mons').innerHTML = Object.keys(P.months).map(k => '<button data-mon="' + k + '" class="mon' + (k === m ? ' on' : '') + '">' + (+k.slice(5)) + '월</button>').join('');
   $('#days').innerHTML = ds.map(x => '<button data-d="' + x + '" class="' + (x === day ? 'on ' : '') + (x === TODAY ? 'today ' : '') + (x > TODAY ? 'fut' : '') + '">' + (+x.slice(8)) + '일</button>').join('');
+  { const sv = window.JBR && window.JBR.sv, t1 = new Date(Date.parse(TODAY + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10);   // 🌙 초안 만들기 (11/27)
+    if (sv && sv.newOk) [TODAY, t1].filter(x => monOf(x) === m || !P.days[x]).filter(x => sv.newOk(x)).forEach(x => { $('#days').innerHTML += '<button data-jnew="' + x + '" class="fut" style="border:1.5px dashed #F2B48A;color:#9A3412;font-weight:800" title="전 객실 4(퇴실 예정)로 시작">🌙 ' + (+x.slice(5, 7)) + '/' + (+x.slice(8)) + ' 초안 만들기' + (P.days[x] ? ' (엑셀 사본 대신)' : '') + '</button>'; }); }
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
   
 }
@@ -839,6 +841,8 @@ document.addEventListener('click', e => {
   if (t.dataset.jon) { if (confirm(day + ' 을(를) 실제 저장으로 켤까요?\n\n· 고치는 내용이 저장소에 바로 저장되고 기록이 남아요\n· 이 날은 이제 엑셀 사본이 덮지 않아요\n· 「연습 끝내기」로 켜기 전 자료로 되돌릴 수 있어요' + (R().edited ? '\n· 지금 연습으로 고친 내용은 버려요' : ''))) { delete ED[day]; window.JBR.sv.on(day); } return; }
   if (t.dataset.joff) { if (confirm(day + ' 저장 연습을 끝낼까요?\n\n켜기 전 엑셀 자료로 되돌리고 다시 보기 · 연습만 돼요. 변경 기록은 그대로 남아요.')) window.JBR.sv.off(day); return; }
   if (t.dataset.jlog) { window.JBR.sv.showLog(day); return; }
+  if (t.dataset.jnew) { const x = t.dataset.jnew, ex = P.days[x];
+    if (confirm(x + ' 초안을 만들까요?\n\n· 전 객실 4(금일 퇴실 예정)로 시작해요 — 전날 연박 · 미정비는 안 넘겨요\n· 연박 · 공실 · 재실을 표시한 뒤 허브 🧩 자동 배정 → 「📋 정비보고서 앱에서 불러오기」' + (ex ? '\n· 이 날 엑셀 사본은 이 초안으로 바뀌어요 (이 날은 이제 엑셀이 안 덮어요)' : '') + (x < '2026-12-01' ? '\n· 12/1 전이라 연습이에요 — 메이드 휴대폰엔 안 가요' : ''))) { window.JBR.sv.newDay(x); day = x; delete ED[x]; } return; }
   if (t.dataset.clearp) { PRIO[day] = []; LATE[day] = {}; draw(); return; }
   if (t.dataset.delp != null) { prioList().splice(+t.dataset.delp, 1); draw(); return; }
   if (t.dataset.out) { const l = LATE[day][t.dataset.out]; l.out = !l.out; if (l.out) { const r = t.dataset.out, i = P.rooms.indexOf(r), x = R().rooms[i]; toast('🔔 ' + (x && x.nm ? x.nm + ' 님 휴대폰: ' : '') + r + '호 퇴실됐어요 — 바로 정비 시작'); } draw(); return; }
@@ -993,6 +997,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.27-3"></script>
+<script type="module" src="jbr.js?v=2026.11.27-5"></script>
 </body>
 </html>
