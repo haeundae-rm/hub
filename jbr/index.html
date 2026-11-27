@@ -80,7 +80,11 @@ main{padding:10px max(2vw,12px) 40px}
 .gridbox.focusing .c:not(.dim):not(.e){opacity:1!important;box-shadow:0 0 0 2px var(--navy)}
 .c.pr{box-shadow:0 0 0 2px var(--org),0 0 12px 2px #ff8a1f99;animation:glow 1.6s ease-in-out infinite}
 @keyframes glow{50%{box-shadow:0 0 0 2px var(--org),0 0 18px 6px #ff8a1fcc}}
-@media (prefers-reduced-motion:reduce){.c.pr,.ph .pr{animation:none}}
+.c.lt{box-shadow:0 0 0 2px #7C3AED,0 0 12px 2px #7c3aed88;animation:glowp 1.6s ease-in-out infinite}.c.lt.pr{box-shadow:0 0 0 2px #7C3AED,0 0 12px 2px #ff8a1f99}   /* 11/27 🟣 늦은 퇴실 (손님 계심) — 우선정비 주황과 구별 */
+@keyframes glowp{50%{box-shadow:0 0 0 2px #7C3AED,0 0 18px 6px #7c3aedcc}}
+.ltl{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 8px;align-items:center;font-size:13px;margin:4px 0}.ltl .sw{width:10px;height:10px;border-radius:3px;background:#7C3AED}.ltl.out .sw{background:#7CCB7C}.ltl.out{color:var(--mute)}
+.lbtn{border:1px solid #7C3AED;background:#F3EEFF;color:#5B21B6;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer}.lbtn[disabled]{opacity:.45;cursor:default}
+@media (prefers-reduced-motion:reduce){.c.pr,.c.lt,.ph .pr{animation:none}}
 .side{display:flex;flex-direction:column;gap:8px}
 .stabs{display:flex;gap:4px}.stabs button{flex:1;border:1px solid var(--line);background:#fff;border-radius:9px;min-height:38px;font-weight:700}
 .stabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -482,6 +486,7 @@ function drawGrid() {
       if (focus && !people(room, x).includes(focus)) cls.push('dim');
       if (typoOf(room, x).length) cls.push('typo');
       if (!x.done && ((pr[room] && pr[room].top) || x.m1 === '우선' || x.m2 === '우선' || /우선/.test(x.m1 + x.m2))) cls.push('pr');   // 우선정비 지정 · '우선' 메모 = 같은 주황 빛
+      if (!x.done && lateOf(room) && !lateOf(room).out) cls.push('lt');   // 🟣 늦은 퇴실 (11/27)
       const dk = downKind(x), memos = dk ? [dk + ' · ' + x.m1].concat(x.m2 ? [x.m2.replace(/^미정비( · )?/, '')].filter(Boolean) : []) : [x.m1, x.m2].filter(Boolean);
       g += '<div class="' + cls.join(' ') + '" data-i="' + i + '"' + jdStyle + '>' + (room in gi ? '<div class="gb" style="background:' + GCOL[gi[room] % 10] + '"></div>' : '') + 
         '<div class="no">' + room + (x.done ? '<b class="dn">✓</b>' : '') + '</div><div class="nm">' + esc(nmShort(room, x)) + '</div>' +
@@ -508,7 +513,7 @@ function barHtml(d) {
     [['', '공실', '']].map(b => '<button class="' + b[2] + '" data-st=""' + dis + '>' + b[1] + '</button>').join('') + '</span>';
   h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 이름 · 초성 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
   h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
-  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-drawer="prio"' + (drawer === 'prio' ? ' class="on"' : '') + '>우선정비 ' + prioList().length + '</button></span></div>';
+  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-drawer="prio"' + (drawer === 'prio' ? ' class="on"' : '') + '>우선정비 ' + prioList().length + (Object.keys(lateMap()).length ? ' · 🟣' + Object.values(lateMap()).filter(l => !l.out).length : '') + '</button></span></div>';
   h += '<div class="eb2"><span class="btns">' + MEMOS.map(m => '<button data-memo="' + m + '"' + (one && (one.m1 === m || one.m2 === m) ? ' class="on"' : '') + dis + '>' + m + '</button>').join('') + '</span>';
   { const fv = one ? freeMemo(one) : ''; h += '<textarea class="inp" id="fmemo" rows="' + Math.min(3, Math.max(1, fv.split('\n').length)) + '" autocomplete="off" placeholder="' + (n ? '메모 → Enter 저장 · Shift+Enter 다음 줄' : '메모') + '"' + dis + '>' + esc(fv) + '</textarea>'; }   // 11/26 기존 메모 두고 다음 줄에 추가
   h += '<span class="row qk" title="방을 누르지 않고 호실 번호만 쳐서 한 번에 처리 (프런트 퇴실 연락 받을 때)"><select class="inp" id="qst"><option value="1">1 퇴실</option><option value="2">2 재실</option><option value="done">완료</option></select><input class="inp num" id="quick" placeholder="호실 번호로: 1203 1205-1207 → Enter" autocomplete="off"></span></div>';
@@ -517,12 +522,30 @@ function barHtml(d) {
 // 우선정비는 1 퇴실 · 4 퇴실 예정 · 3 미정비(이월) 방에만 (11/27 소장님: 끌어서 고를 때 연박 · 공실까지 지정되던 문제)
 //   11/27 15:13 소장님: 퇴실된(1) 배정 방도 우선정비가 돼야 함 (3109 시험에서 막힘) → 1 추가. 연박 · 공실 · 재실(2) · 간단은 그대로 빠짐
 const canPrio = x => !!x && !x.yl && (x.st === '1' || x.st === '4' || x.st === '3');
+// 🟣 늦은 퇴실 (11/27 소장님 "우선정비처럼"): 손님이 아직 계신 방 + 예상 시각 → 보라 빛 · 메이드 휴대폰에도 보라.
+//   프런트 연락 → 「퇴실」 누르면 그 방이 1(퇴실)로 바뀌고 담당 메이드 휴대폰이 울림 (meta/late_{날} — 메이드 휴대폰이 읽음, 규칙 그대로)
+//   지정할 수 있는 방 = 퇴실 예정(4) · 재실(2) · 연박 · 미정비(3) (공실 · 완료 · 이미 퇴실(1)은 빠짐)
+const canLate = x => !!x && !x.done && (x.st === '4' || x.st === '2' || x.st === '3' || !!x.yl);
+const lateMap = () => (window.JBR && window.JBR.late && window.JBR.late(day)) || LATE[day] || {};
+const lateOf = r => lateMap()[r];
+function lateHtml(d) {
+  const L = lateMap(), ks = Object.keys(L).sort((a, b) => (L[a].out ? 1 : 0) - (L[b].out ? 1 : 0) || String(L[a].at || '99').localeCompare(String(L[b].at || '99')) || +a - +b);
+  const nl = [...sel].filter(i => canLate(d.rooms[i])).length, nx = sel.size - nl, on = !!(window.JBR && window.JBR.late);
+  let h = '<div class="box" style="margin-top:10px;border-left:4px solid #7C3AED"><h3>🟣 늦은 퇴실</h3><div class="row"><input class="inp num" id="ltime" style="width:84px" placeholder="13:00"><button class="lbtn" data-mklate="1"' + (nl && on ? '' : ' disabled') + '>선택한 ' + nl + '실 늦은 퇴실</button></div>' +
+    '<p class="hint">' + (nx ? '<b style="color:#B26A00">고른 방 중 ' + nx + '실은 공실 · 이미 퇴실 · 완료라 빠져요</b> · ' : '') + (on ? '예상 퇴실 시각은 비워도 돼요. 프런트에서 퇴실 연락이 오면 아래 「퇴실」 → 그 방이 1(퇴실)로 바뀌고 담당 메이드 휴대폰이 울려요' : '로그인 전이라 지정할 수 없어요') + '</p>';
+  h += ks.length ? ks.map(r => { const l = L[r], i = P.rooms.indexOf(r), x = d.rooms[i] || {};
+    return '<div class="ltl' + (l.out ? ' out' : '') + '"><span class="sw"></span><span><b class="num">' + r + '</b> <small>' + (l.out ? '퇴실 ' + esc(l.outHm || '') : l.at ? esc(l.at) + ' 예정' : '시각 미정') + ' · ' + (x.nm ? esc(x.nm) : '배정 없음') + '</small></span>' +
+      (l.out ? '<button data-lateun="' + r + '" style="border:0;background:none;color:var(--mute);text-decoration:underline">되돌리기</button>' : '<button class="lbtn" data-lateout="' + r + '">퇴실</button>') +
+      '<button data-latedel="' + r + '" style="border:0;background:none;color:var(--mute)" aria-label="빼기">빼기</button></div>'; }).join('') : '<p class="hint" style="margin:6px 0 0">아직 늦은 퇴실 방이 없어요</p>';
+  return h + '</div>';
+}
 function sideHtml(d, c) {
   const n = [...sel].filter(i => canPrio(d.rooms[i])).length, nx = sel.size - n;
   let h = '<div class="stabs"><button class="on">' + (drawer === 'grp' ? '단체 현황' : '우선정비') + '</button><button data-drawer="" style="flex:none;width:44px" aria-label="닫기">✕</button></div>';
   if (drawer === 'prio') {
   h += '<div class="box"><h3>우선정비로 지정</h3><div class="row"><input class="inp" id="pname" placeholder="예: 카이스트 HTL"><input class="inp num" id="ptime" style="width:84px" placeholder="16:00"></div><div class="row" style="margin-top:6px"><select class="inp" id="prank"><option value="1">1순위</option><option value="2">2순위</option><option value="3">3순위</option></select><button class="pbtn" data-mkprio="1"' + (n ? '' : ' disabled') + '>선택한 ' + n + '실 지정</button></div><p class="hint">' + (nx ? '<b style="color:#B26A00">고른 방 중 ' + nx + '실은 연박 · 공실 · 재실 등이라 빠져요</b> · ' : '') + '퇴실(1) · 퇴실 예정(4) · 미정비(3) 방만 지정돼요. 지정한 방은 주황으로 빛나고, 메이드 휴대폰에 순서대로 떠요 (우선정비 탭)</p></div>';
     h += '<div class="box">' + (prioList().length ? prioList().map((p, k) => '<div class="grp"><span class="sw" style="background:var(--org)"></span><span><b>' + esc(p.name) + '</b> <small>' + esc(p.until) + '까지 · ' + p.rank + '순위</small></span><span class="num">' + p.rooms.length + '실 <button data-delp="' + k + '" style="border:0;background:none;color:var(--mute)">빼기</button></span></div>').join('') : '<p class="hint">지정된 우선정비가 없어요</p>') + '</div>';
+    h += lateHtml(d);
   } else h += grpHtml(d);
   return h;
 }
@@ -678,7 +701,7 @@ function preset1125() {
   toast('11/25 단톡방 안내 3장을 앱 지시로 불러왔어요 · 아침 10:30 상황으로 완료 표시를 지웠어요');
 }
 function maidRooms(name) {
-  const d = R(), pr = prioRooms(), late = LATE[day] || {}, ord = prioList().order;
+  const d = R(), pr = prioRooms(), late = lateMap(), ord = prioList().order;
   return d.rooms.map((x, i) => [P.rooms[i], x]).filter(([r, x]) => x && x.nm && people(r, x).includes(name)).map(([r, x]) => {
     const p = pr[r], l = late[r] && !late[r].out ? late[r] : null;
     let key = (x.done ? 900 : 0) + (l ? 500 : 0) + (p ? p.rank * 10 : 100) + (ord ? ord(r) : 0);
@@ -699,7 +722,7 @@ function drawPrio() {
     return '<div class="it"><h4><span class="rk">' + p.rank + '순위</span>' + esc(p.name) + ' <small class="num" style="color:var(--org)">' + esc(p.until) + '까지' + (left != null ? (left > 0 ? ' · ' + Math.floor(left / 60) + '시간 ' + left % 60 + '분 남음' : ' · 지남') : '') + '</small><button data-delp="' + k + '" style="margin-left:auto;border:0;background:none;color:var(--mute)">빼기</button></h4>' +
       '<p>' + p.rooms.length + '실 · 배정 ' + a.length + ' · 완료 ' + f.length + (eta != null && a.length > f.length ? ' · 지금 속도면 <b style="color:' + (risk ? 'var(--bad)' : 'var(--ok)') + '">' + hm(Math.min(eta, 1439)) + ' 끝' + (risk ? ' ⚠ 늦음 — 정비 지원 붙이기' : ' ✓') + '</b>' : '') + (p.note ? ' · ' + esc(p.note) : '') + '</p></div>';
   }).join('') : '<div class="it"><p>아직 지정된 우선정비가 없어요. 위 버튼으로 11/25 안내를 불러오거나, 객실 현황 탭에서 방을 끌어 고른 뒤 「우선정비로 지정」을 누르세요.</p></div>') + '</div>';
-  const late = LATE[day] || {};
+  const late = lateMap();
   if (Object.keys(late).length) h += '<div class="box"><h3>늦은 퇴실 — 프런트가 퇴실을 누르면 그 방 메이드 휴대폰이 울림</h3><div class="btns">' + Object.entries(late).map(([r, l]) => '<button data-out="' + r + '"' + (l.out ? ' class="on"' : '') + '>' + r + (l.at ? ' (' + l.at + ')' : '') + (l.out ? ' 퇴실 ✓' : '') + '</button>').join('') + '</div></div>';
   h += '<div class="box" style="margin-top:10px"><h3>시험 시계</h3><input type="range" id="clk" min="540" max="1020" step="10" value="' + clock + '"><p class="hint">시계를 움직이면 남은 시간 · 예상 끝 시각이 바뀌어요 (지금 ' + hm(clock) + ')</p></div>';
   h += '</div><div><div class="box" style="margin-bottom:10px"><h3>메이드 휴대폰 화면 미리 보기</h3><select class="inp" id="phm">' + working.map(k => '<option' + (k.n === phMaid ? ' selected' : '') + '>' + esc(k.n) + '</option>').join('') + '</select></div>' + phoneHtml(phMaid) + '</div></div>';
@@ -869,6 +892,17 @@ document.addEventListener('click', e => {
     if (!okI.length) { toast('퇴실(1) · 퇴실 예정(4) · 미정비(3) 방만 우선정비로 지정할 수 있어요'); return; }
     prioList().push({ name, rooms: okI.map(i => P.rooms[i]), until, rank, note: '' }); toast(okI.length + '실을 「' + name + '」 ' + until + '까지로 지정했어요' + (skip ? ' · 연박 · 공실 등 ' + skip + '실은 뺐어요' : '')); draw(); return;
   }
+  if (t.dataset.mklate) {
+    const at = ($('#ltime').value || '').trim().replace(/^(\d{1,2})$/, '$1:00'), d = R(), okI = idx.filter(i => canLate(d.rooms[i]));
+    if (at && !/^\d{1,2}:\d{2}$/.test(at)) { toast('시각은 13:00 처럼 적어 주세요'); return; }
+    if (!okI.length) { toast('퇴실 예정 · 재실 · 연박 · 미정비 방만 늦은 퇴실로 지정할 수 있어요'); return; }
+    window.JBR.late.add(day, okI.map(i => P.rooms[i]), at); toast('🟣 ' + okI.length + '실 늦은 퇴실' + (at ? ' (' + at + ' 예정)' : '') + ' — 메이드 휴대폰에 보라로 떠요'); return;
+  }
+  if (t.dataset.lateout) { const r = t.dataset.lateout, i = P.rooms.indexOf(r), x = R().rooms[i];
+    if (live(day) && x && x.st !== '1') apply([i], y => { y.st = '1'; });   // 그 방 = 1 퇴실
+    window.JBR.late.out(day, r, true); toast('🔔 ' + r + '호 퇴실 — ' + (x && x.nm ? x.nm + ' 님 휴대폰이 울려요' : '아직 배정된 메이드가 없어요')); return; }
+  if (t.dataset.lateun) { window.JBR.late.out(day, t.dataset.lateun, false); toast(t.dataset.lateun + '호 퇴실 표시를 되돌렸어요 (방 상태는 그대로)'); return; }
+  if (t.dataset.latedel) { window.JBR.late.del(day, t.dataset.latedel); toast(t.dataset.latedel + '호 늦은 퇴실을 뺐어요'); return; }
   if (t.dataset.preset) { preset1125(); draw(); return; }
   if (t.dataset.prt) { printReport(); return; }
   if (t.dataset.pdf) { savePdf(t); return; }
@@ -1156,7 +1190,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.27-15'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.27-16'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1183,7 +1217,7 @@ window.JBR = {
   },
   edited: () => Object.values(ED).some(x => x.edited) || !!gEdit,
   reset() { delete ED[day]; undo = undo.filter(u => u.ds !== day); draw(); },
-  day: () => day, toast: m => toast(m), redraw: () => draw(),
+  day: () => day, toast: m => toast(m), redraw: () => { if (P && P.days[day]) draw(); },
   setCfg(m, d) { AWC[m] = d || null; if (tab === 'close') draw(); },
   sv: null
 };
@@ -1191,6 +1225,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.27-15"></script>
+<script type="module" src="jbr.js?v=2026.11.27-16"></script>
 </body>
 </html>
