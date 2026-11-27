@@ -117,9 +117,44 @@ const asp = p => p.innerText('#asp');
   ok(logs.some(x => x.k === 'assign' && x.n === named.length + carry.length) && logs.some(x => x.k === 'new'), '변경 기록: 초안 · 자동 배정 확정');
   ok(!(await p.evaluate(() => window.__up)), '연습이라 메이드 휴대폰 올리기 안 함');
   ok(/연습 기간이라 메이드 휴대폰엔 안 보냈어요/.test(await asp(p)), '안내 문구');
+
+  console.log('⑧ 확정 뒤: 체크리스트 · 오버/다운 · 카톡 요약');
+  t = await asp(p);
+  ok(/✓ 연박 · 공실 입력[\s\S]*✓ 출근자 불러오기[\s\S]*✓ 차이 정리[\s\S]*✓ 자동 배정[\s\S]*✓ 확정/.test(t), '체크리스트 띠 5단계 모두 ✓');
+  ok(/이 날은 .*확정/.test(t), '「이 날은 확정됐어요」 상자');
+  d = await doc(p, 'jbr/' + T1);
+  ok(d.asg && d.asg.ov && Object.keys(d.asg.ov).length > 0 && d.asg.carryRooms.length === carry.length, '오버/다운 저장 ' + JSON.stringify(d.asg.ov) + ' · 미정비 방 목록 ' + d.asg.carryRooms.length);
+  await p.click('#asp [data-as="sum"]'); await sleep(400);
+  t = await asp(p);
+  const sm = await p.evaluate(() => { const ta = document.querySelector('#asp textarea'); return ta ? ta.value : ''; });
+  ok(/카톡용 요약을 복사했어요|길게 눌러/.test(t), '카톡 요약 복사');
+  if (sm) { console.log('   ' + sm.split('\n').join(' / ')); ok(/출근 4명 · 정비 \d+실/.test(sm) && /미정비 \d+실/.test(sm), '요약 내용'); }
+  await p.click('#asp [data-as="run"]').catch(() => {}); await sleep(100);
+
+  console.log('⑨ 🚫 노쇼: 나래');
+  const nareRooms = Object.keys(d.r).filter(k => d.r[k][1] === '나래');
+  await p.click('#asp [data-as="nsopen"]'); await sleep(100);
+  await p.click('#asp [data-as="ns"][data-v="나래"]'); await sleep(700);
+  d = await doc(p, 'jbr/' + T1);
+  ok(d.cards.length === 3 && !d.cards.find(c => c.n === '나래'), '카드 3명 (나래 빠짐)');
+  ok(nareRooms.length > 0 && nareRooms.every(k => d.r[k][1] && d.r[k][1] !== '나래'), '나래 ' + nareRooms.length + '실 → 다른 분 (' + [...new Set(nareRooms.map(k => d.r[k][1]))].join(', ') + ')');
+  ok(d.asg.noshow.includes('나래') && /노쇼 처리/.test(await asp(p)), '노쇼 기록 · 안내');
+  const named2 = Object.keys(d.r).filter(k => d.r[k][1]).length;
+  ok(named2 === named.length, '다른 분 배정 · 전체 수 그대로 (' + named2 + '실)');
+
+  console.log('⑩ ↩ 확정 취소');
+  await p.click('#asp [data-as="unconf"]'); await sleep(700);
+  d = await doc(p, 'jbr/' + T1);
+  ok(Object.values(d.r).every(x => !x[1]) && !(d.cards || []).length && !d.asg, '이름 · 카드 · 확정 모두 지움');
+  ok(Object.values(d.r).every(x => !/미정비/.test(x[3])), '이 확정으로 넣은 미정비 메모도 지움');
+  ok(Object.keys(d.r).filter(k => d.r[k][5]).length > 100, '연박 초안은 그대로');
+  const lg = await p.evaluate(T1 => Object.keys(window.__seed).filter(k => k.startsWith('jbr/' + T1 + '/log/')).map(k => window.__seed[k].k), T1);
+  ok(['new', 'assign', 'noshow', 'unassign'].every(k => lg.includes(k)), '기록: ' + lg.join(' → '));
+  ok(/확정을 취소했어요/.test(await asp(p)) && !(await p.$('#asp [data-as="unconf"]')), '안내 · 확정 상자 없어짐');
   await p.click('#asp [data-as="close"]'); await sleep(300);
   await p.click('#days [data-d="' + T1 + '"]'); await sleep(300);
-  ok(/가람|나래/.test(await p.innerText('.gridbox')), '정비보고서 화면에 배정 이름이 보임');
+  await p.click('[data-jlog]'); await p.waitForFunction(() => { const m = document.getElementById('jlogm'); return m && !/불러오는/.test(m.innerText); });
+  ok(/확정 취소/.test(await p.innerText('#jlogm')) && /노쇼 나래/.test(await p.innerText('#jlogm')), '📜 변경 기록에 확정 · 노쇼 · 취소');
   ok(!p.errs.length, '오류 없음 ' + p.errs.slice(0, 3).join(' | '));
   await b.close();
   console.log('\n' + pass + ' 통과 / ' + fail + ' 실패'); process.exit(fail ? 1 : 0);
