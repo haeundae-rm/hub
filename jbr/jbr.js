@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.27-20';
+const VER = '2026.11.28-1';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -78,7 +78,7 @@ function tag() {
   let s = t ? (t.src === 'app' ? '앱 저장 ' + hm(t.at) : '엑셀 ' + hm(t.at) + ' 읽음') : '오늘 사본 없음';
   s += hbOk ? ' · 연결 켜짐' : ' · <b style="color:#ffb4b4">연결 꺼짐</b>';
   if (meta.fromCache) s += ' · 오프라인';
-  el.innerHTML = s + ' · <b>' + (sv.pend ? '⏳ 저장 대기 ' + sv.pend + '건' : (docOf(TODAY) && docOf(TODAY).src === 'app') ? '💾 앱 원본' : '엑셀 사본 · 보기') + '</b> <label class="fillb" style="cursor:pointer;text-decoration:underline;margin-left:6px">📥 엑셀로 채우기<input type="file" id="fillFile" accept=".xlsx" hidden></label>' + (fill ? ' <span>' + esc(fill) + '</span>' : '');
+  el.innerHTML = s + ' · <b>' + (sv.pend ? '⏳ 저장 대기 ' + sv.pend + '건' : (docOf(TODAY) && docOf(TODAY).src === 'app') ? '💾 앱 원본' : '엑셀 사본 · 보기') + '</b> <label class="fillb" style="cursor:pointer;text-decoration:underline;margin-left:6px">📥 엑셀로 채우기<input type="file" id="fillFile" accept=".xlsx" hidden></label>' + (role && (window.JBR && window.JBR.day ? window.JBR.day() : TODAY) >= LIVE_FROM ? ' <label class="fillb" style="cursor:pointer;text-decoration:underline;margin-left:6px;color:#FFB35C" title="야간에 엑셀로 짠 날 → 그 날 시트 그대로 앱 정비보고서로 (이후 앱에서 고침)">📥 이 날 엑셀 → 앱 원본<input type="file" id="takeFile" accept=".xlsx" hidden></label>' : '') + '' + (fill ? ' <span>' + esc(fill) + '</span>' : '');
 }
 
 function watch() {
@@ -114,6 +114,29 @@ async function fillFrom(file) {
       n++;
     }
     say('✅ ' + n + '일 올림' + (skip ? ' · 앱 원본 ' + skip + '일은 그대로' : '') + (bad.length ? ' · 못 읽음: ' + bad.join(', ') : ''));
+  } catch (e) { say('❌ ' + (e && e.message || e)); }
+}
+
+// ---------- 📥 이 날 엑셀 → 앱 원본 (11/28: 야간에 엑셀로 짜서 「정비보고서 올리기」로 메이드 휴대폰에 넣은 날 → 주간은 앱 정비보고서로)
+//   지금 보는 날짜 한 날만. 엑셀 내용 그대로(이름 · 상태 · 메모 · 완료 · 연박 · 카드 · 단체) + src 'app' → 이제 그날은 앱에서 고치고 엑셀은 쉼
+//   PC 정비보고서 연결 창이 앱 자료와 메이드 휴대폰을 비교 → 같으면 아무것도 안 바꿈, 그 뒤 고친 것만 휴대폰으로
+async function takeFrom(file, ds) {
+  const say = m => { fill = m; tag(); };
+  try {
+    const v = new URLSearchParams(location.search).get('v') || VER;
+    const eng = await import('../../rm/app/engine.js?v=' + v), rs = await import('../../rm/app/rsync.js?v=' + v);
+    const buf = new Uint8Array(await file.arrayBuffer()), roster = await eng.readRoster(buf);
+    say(ds.slice(5) + ' 읽는 중…');
+    const r = await eng.buildFromXlsx(buf, ds);
+    if (!r.summary.ok && !confirm('엑셀 양식 검사에서 다른 점이 있어요:\n' + r.summary.checks.filter(x => !x.ok).map(x => '· ' + x.msg).join('\n') + '\n\n그래도 옮길까요?')) { say('취소했어요'); return; }
+    const snap = rs.snapOf(r, roster, ds, file.name), named = Object.keys(snap.r).filter(k => snap.r[k][1]).length;
+    if (!named) { say('❌ ' + ds.slice(5) + ' 시트에 정비자 이름이 없어요 — 파일 · 날짜를 확인해 주세요'); return; }
+    const cur = docOf(ds), curNamed = cur && cur.r ? Object.keys(cur.r).filter(k => cur.r[k][1]).length : 0;
+    if (!confirm(file.name + ' → ' + ds + '\n\n엑셀 ' + ds.slice(8) + '일 시트 그대로 앱 정비보고서로 옮길까요?\n· 정비자 ' + named + '실 · 출근 카드 ' + snap.cards.length + '명\n· 이제 이 날은 앱에서 고치고, 엑셀은 더 안 읽어요' +
+      (cur && cur.src === 'app' && curNamed ? '\n\n⚠ 이 날 앱에 이미 이름이 ' + curNamed + '실 있어요 — 엑셀 내용으로 바뀌어요' : ''))) { say('취소했어요'); return; }
+    const by2 = (role && role.label) || '';
+    await save(ds, 'set', Object.assign(snap, { src: 'app', took: S.SERVER_TIME, at: S.SERVER_TIME, by: by2 }), { k: 'take', file: file.name.slice(0, 80), n: named });
+    say('✅ ' + ds.slice(5) + ' 엑셀 → 앱 원본 (' + named + '실) — 이제 이 화면에서 고치세요');
   } catch (e) { say('❌ ' + (e && e.message || e)); }
 }
 
@@ -198,7 +221,7 @@ const SV = {
       const fmt = c => Object.keys(c).sort().map(k => { const b = c[k].b || [], a = c[k].a || [];
         const d = FLD.map((f, i) => (String(b[i] || '') === String(a[i] || '') ? '' : i >= 4 ? f + (a[i] ? ' ✓' : ' 풀림') : f + ' 「' + esc(b[i] || '') + '」→「' + esc(a[i] || '') + '」')).filter(Boolean);
         return '<b>' + k + '</b> ' + d.join(', '); }).join('<br>');
-      const what = x => x.k === 'room' ? fmt(x.ch || {}) : x.k === 'groups' ? '단체 ' + (x.g || []).map(g => esc(g.name) + ' ' + String(g.rooms || '').split(',').filter(Boolean).length + '실').join(' · ') : x.k === 'new' ? '🌙 초안 만듦 (전 객실 4)' : x.k === 'awards' ? '🏆 시상 명단 저장 (' + (x.n || 0) + '줄)' : x.k === 'back' ? '⚠ 엑셀로 돌아감 (비상)' : x.k === 'unassign' ? '↩ 확정 취소 · ' + (x.n || 0) + '실 지움 · ' + esc(x.why || '') : x.k === 'noshow' ? '🚫 노쇼 ' + esc(x.who || '') + ' → ' + esc(x.got || '') : x.k === 'assign' ? '🧩 자동 배정 확정 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') + '<br>' + fmt(x.ch || {}) : x.k === 'on' ? '💾 실제 저장 켬' : x.k === 'off' ? '연습 끝냄 (켜기 전 자료로)' : esc(x.k);
+      const what = x => x.k === 'room' ? fmt(x.ch || {}) : x.k === 'groups' ? '단체 ' + (x.g || []).map(g => esc(g.name) + ' ' + String(g.rooms || '').split(',').filter(Boolean).length + '실').join(' · ') : x.k === 'new' ? '🌙 초안 만듦 (전 객실 4)' : x.k === 'awards' ? '🏆 시상 명단 저장 (' + (x.n || 0) + '줄)' : x.k === 'take' ? '📥 엑셀 → 앱 원본 (' + esc(x.file || '') + ' · ' + (x.n || 0) + '실)' : x.k === 'back' ? '⚠ 엑셀로 돌아감 (비상)' : x.k === 'unassign' ? '↩ 확정 취소 · ' + (x.n || 0) + '실 지움 · ' + esc(x.why || '') : x.k === 'noshow' ? '🚫 노쇼 ' + esc(x.who || '') + ' → ' + esc(x.got || '') : x.k === 'assign' ? '🧩 자동 배정 확정 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') + '<br>' + fmt(x.ch || {}) : x.k === 'on' ? '💾 실제 저장 켬' : x.k === 'off' ? '연습 끝냄 (켜기 전 자료로)' : esc(x.k);
       const t = x => { const d = seoul(Number(x.at || 0)); return hm(x.at) + ':' + ('0' + d.getUTCSeconds()).slice(-2); };
       box(L.length ? '<table style="width:100%;border-collapse:collapse;font-size:13px">' + L.slice(0, 300).map(x => '<tr style="border-top:1px solid #eee;text-align:left"><td style="padding:5px 8px;white-space:nowrap;vertical-align:top;text-align:left">' + t(x) + '</td><td style="padding:5px 8px;white-space:nowrap;vertical-align:top;text-align:left">' + esc(x.by) + '</td><td style="padding:5px 8px;text-align:left">' + what(x) + '</td></tr>').join('') + '</table>' + (L.length > 300 ? '<p class="hint">최근 300건만 보여요 (전체 ' + L.length + '건)</p>' : '') : '<p class="hint">아직 기록이 없어요</p>');
     } catch (e) { box('<p style="color:#B23A48">기록을 읽지 못했어요: ' + esc(e && e.message || e) + '</p>'); }
@@ -262,6 +285,12 @@ document.addEventListener('change', e => {
   const f = e.target.files[0];
   if (!confirm(f.name + '\n\n이 파일의 1일~오늘까지를 앱에 올릴까요? (같은 날짜 엑셀 사본은 새로 덮고, 앱에서 쓴 날은 그대로 둬요)')) return;
   fillFrom(f);
+});
+document.addEventListener('change', e => {
+  if (e.target.id !== 'takeFile' || !e.target.files[0]) return;
+  const f = e.target.files[0], ds = window.JBR && window.JBR.day ? window.JBR.day() : TODAY; e.target.value = '';
+  if (ds < LIVE_FROM) { window.JBR.toast('11/28 부터 날짜만 옮길 수 있어요 — 위에서 날짜를 고르세요'); return; }
+  takeFrom(f, ds);
 });
 
 S.onUser(u => {
