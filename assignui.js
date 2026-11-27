@@ -151,12 +151,16 @@ function pick() {
 // ---------- 📋 정비보고서 앱에서 불러오기 (11/27 야간 배정 흐름 — 소장님 결정 claude/정비보고서앱_야간배정흐름_결정_1126.md)
 //   정비보고서 = jbr/{날} (하우스맨이 정비보고서 창에서 4 깔린 초안에 연박 · 공실 · 재실 표시), 출근자 · 유닛 = HK 전파 사본 rmsched_hk/{날}.rm
 const LIVE_FROM = '2026-12-01';   // 이날부터 확정 = 메이드 휴대폰에 (그 전엔 연습: 정비보고서에만 저장)
+// 테마 객실 (11/27 소장님: 매일 같은 방) = 엑셀 정비보고서 상단 '테마 객실' 표 — 로얄(RYH·RYL) · OTT(HTT) · 키즈(FAK) · 워케이션(FAW)
+//   엔진: 우선정비(14시까지)로 셈 → 한 분에게 몰리지 않게 · 로얄 맡은 분에겐 가급적 안 줌 · 교육생 제외 · 담당 우선 / 메이드 휴대폰: '테마' · 14시까지
+export const THEME_ROOMS = ['3001', '3002', '3101', '3102', '2909', '2910', '1807', '1808', '1809', '1810', '1811', '1707', '1708'];
 export function jbrToData(d) {
   const order = (d.rooms && d.rooms.length ? d.rooms : Object.keys(d.r || {})).map(String);
   const rooms = order.filter(r => d.r && d.r[r]).map(r => { const x = d.r[r];
     return { room: r, floor: Math.floor(Number(r) / 100), st: x[0] || '', st_fill: x[5] ? 'FFFFFF00' : '', name: x[1] || '', m1: x[2] || '', m2: x[3] || '', done: x[4] ? '1' : '', grp_fill: '', yl: !!x[5] }; });
   return { rooms, cards: (d.cards || []).map(c => ({ label: c.n, name: c.n, unit: c.u, actual: '' })),
-    groups: (d.groups || []).map(g => ({ name: g.name || '', time: g.time || '', rooms: String(g.rooms || '').split(',').filter(Boolean) })), themes: [] };
+    groups: (d.groups || []).map(g => ({ name: g.name || '', time: g.time || '', rooms: String(g.rooms || '').split(',').filter(Boolean) })),
+    themes: THEME_ROOMS.filter(r => d.r && d.r[r]).map(r => ({ room: r, type: typeOf(r) })) };
 }
 async function pickApp() {
   A.busy = '정비보고서 앱에서 불러오는 중…'; A.err = ''; A.res = null; A.cmp = null; A.ask = false; draw();

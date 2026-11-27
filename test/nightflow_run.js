@@ -72,6 +72,8 @@ const asp = p => p.innerText('#asp');
   ok(/유닛 남음 › 어느 분에게 더 넣을까요/.test(t), '차이 문구: ' + (t.match(/방 [\d.]+유닛 남음/) || [''])[0]);
   ok(await p.$eval('#asp [data-as="run"]', x => x.disabled), '차이가 있으면 자동 배정 꺼짐');
 
+  const th = await p.evaluate(async () => { const m = await import('../assignui.js'); const r = {}; ['3001', '1707', '1811', '2909', '1203'].forEach(k => { r[k] = ['4', '', '', '', 0, 0]; }); return m.jbrToData({ r, rooms: Object.keys(r) }).themes.map(t => t.room + ':' + t.type).join(','); });
+  ok(th === '3001:RYH,2909:HTT,1811:FAK,1707:FAW', '테마 객실 고정 (로얄 · OTT · 키즈 · 워케이션): ' + th);
   console.log('④ −/+ : 가람 +2 → 표시');
   await p.click('#asp [data-as="u+"][data-v="가람"]'); await p.click('#asp [data-as="u+"][data-v="가람"]'); await sleep(100);
   ok(/가람[\s\S]{0,30}11[\s\S]{0,6}\+2/.test(await asp(p)), '가람 11 (+2 표시)');
