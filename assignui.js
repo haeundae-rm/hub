@@ -151,12 +151,16 @@ function pick() {
 // ---------- 📋 정비보고서 앱에서 불러오기 (11/27 야간 배정 흐름 — 소장님 결정 claude/정비보고서앱_야간배정흐름_결정_1126.md)
 //   정비보고서 = jbr/{날} (하우스맨이 정비보고서 창에서 4 깔린 초안에 연박 · 공실 · 재실 표시), 출근자 · 유닛 = HK 전파 사본 rmsched_hk/{날}.rm
 const LIVE_FROM = '2026-12-01';   // 이날부터 확정 = 메이드 휴대폰에 (그 전엔 연습: 정비보고서에만 저장)
+// 테마 객실 (11/27 소장님: 매일 같은 방) = 엑셀 정비보고서 상단 '테마 객실' 표 — 로얄(RYH·RYL) · OTT(HTT) · 키즈(FAK) · 워케이션(FAW)
+//   엔진: 우선정비(14시까지)로 셈 → 한 분에게 몰리지 않게 · 로얄 맡은 분에겐 가급적 안 줌 · 교육생 제외 · 담당 우선 / 메이드 휴대폰: '테마' · 14시까지
+export const THEME_ROOMS = ['3001', '3002', '3101', '3102', '2909', '2910', '1807', '1808', '1809', '1810', '1811', '1707', '1708'];
 export function jbrToData(d) {
   const order = (d.rooms && d.rooms.length ? d.rooms : Object.keys(d.r || {})).map(String);
   const rooms = order.filter(r => d.r && d.r[r]).map(r => { const x = d.r[r];
     return { room: r, floor: Math.floor(Number(r) / 100), st: x[0] || '', st_fill: x[5] ? 'FFFFFF00' : '', name: x[1] || '', m1: x[2] || '', m2: x[3] || '', done: x[4] ? '1' : '', grp_fill: '', yl: !!x[5] }; });
   return { rooms, cards: (d.cards || []).map(c => ({ label: c.n, name: c.n, unit: c.u, actual: '' })),
-    groups: (d.groups || []).map(g => ({ name: g.name || '', time: g.time || '', rooms: String(g.rooms || '').split(',').filter(Boolean) })), themes: [] };
+    groups: (d.groups || []).map(g => ({ name: g.name || '', time: g.time || '', rooms: String(g.rooms || '').split(',').filter(Boolean) })),
+    themes: THEME_ROOMS.filter(r => d.r && d.r[r]).map(r => ({ room: r, type: typeOf(r) })) };
 }
 async function pickApp() {
   A.busy = '정비보고서 앱에서 불러오는 중…'; A.err = ''; A.res = null; A.cmp = null; A.ask = false; draw();
@@ -171,8 +175,106 @@ async function pickApp() {
     A.fromCards = null;
     if (A.fromHk) buildRows(cards); else buildRows();
     A.hk0 = Object.assign({}, cards);   // HK 전파 원래 유닛 (−/+ 로 바꾼 것 표시용)
+    A.jdoc = d; A.asgd = d.asg || null;
+    // 이번 달 오버 · 다운 횟수 (확정 때 asg.ov 에 쌓인 것) — 몰림 방지 · 근거 자료 (11/26 채택)
+    A.od = {}; try { const ym = A.date.slice(0, 7), L = await H.S.getQuery('jbr', [['date', '>=', ym + '-01']]);
+      L.map(x => x.data).filter(x => x && x.date && x.date.slice(0, 7) === ym && x.date !== A.date && x.asg && x.asg.ov).forEach(x => Object.keys(x.asg.ov).forEach(n => { const o = A.od[n] = A.od[n] || { o: 0, d: 0 }; if (x.asg.ov[n] > 0) o.o++; else if (x.asg.ov[n] < 0) o.d++; })); } catch (e) {}
   } catch (e) { A.err = String(e && e.message || e); A.data = null; }
   if (A) { A.busy = ''; draw(); }
+}
+// ✔ 초안 체크리스트 띠 (11/26 채택): ① 연박 · 공실 → ② 출근자 → ③ 차이 정리 → ④ 자동 배정 → ⑤ 확정. 앞 단계가 안 되면 다음 단계 잠김
+function stepsHtml() {
+  if (A.src !== 'app' || !A.data) return '';
+  const c = draftCounts(), s5 = !!A.asgd, s1 = s5 || c.yl + c.gong > 0, s2 = s5 || c.ppl > 0, s3 = s5 || (s1 && s2 && (gapOk() || A.force)), s4 = s5 || (s3 && !!A.res);
+  const st = [['연박 · 공실 입력', s1], ['출근자 불러오기', s2], ['차이 정리', s3], ['자동 배정', s4 || s5], ['확정', s5]];
+  let cur = st.findIndex(x => !x[1]); if (cur < 0) cur = st.length;
+  return '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:0 0 12px">' + st.map((x, i) => '<span style="flex:1;min-width:92px;text-align:center;padding:7px 4px;border-radius:8px;font-size:12.5px;font-weight:800;' +
+    (x[1] ? 'background:#E3F4E8;color:#1F7A3A' : i === cur ? 'background:#FFF1DC;color:#9A3412;border:1.5px solid #F2B48A' : 'background:#F1F3F7;color:#9AA4B5') + '">' + (x[1] ? '✓ ' : (i + 1) + ' ') + x[0] + '</span>').join('') + '</div>';
+}
+// 📋 카톡용 요약 (11/26 채택 — 소장님 개인톡 인계 대체): 출근 · 정비 실수 · 오버/다운 이름 · 미정비 호실
+function sumText(d) {
+  const day = '일월화수목금토'[new Date(d.date + 'T00:00:00').getDay()], cards = d.cards || [], ov = (d.asg && d.asg.ov) || {};
+  const named = Object.keys(d.r || {}).filter(k => d.r[k][1]), units = cards.reduce((a, c) => a + (Number(c.u) || 0), 0);
+  const carry = Object.keys(d.r || {}).filter(k => /미정비/.test((d.r[k][2] || '') + (d.r[k][3] || '')) && !d.r[k][1]).sort((a, b) => a - b);
+  const up = Object.keys(ov).filter(n => ov[n] > 0), dn = Object.keys(ov).filter(n => ov[n] < 0);
+  return ['■ ' + H.md(d.date) + '(' + day + ') 방배정 확정', '출근 ' + cards.length + '명 · 정비 ' + named.length + '실 (' + units + '유닛)',
+    '오버: ' + (up.length ? up.map(n => n + ' +' + ov[n]).join(', ') : '없음'), '다운: ' + (dn.length ? dn.map(n => n + ' ' + ov[n]).join(', ') : '없음'),
+    '미정비 ' + carry.length + '실' + (carry.length ? ': ' + carry.join(', ') : ''), ((d.asg && d.asg.noshow) || []).length ? '노쇼: ' + d.asg.noshow.join(', ') : ''].filter(Boolean).join('\n');
+}
+async function copySum() {
+  try { const d = await H.S.get('jbr/' + A.date); const t = sumText(d);
+    try { await navigator.clipboard.writeText(t); A.saved = '📋 카톡용 요약을 복사했어요 — 카톡에 붙여 넣으세요'; } catch (e) { A.sumText = t; A.saved = '아래 글을 길게 눌러 복사하세요'; }
+  } catch (e) { A.err = '요약을 만들지 못했어요: ' + (e && e.message || e); }
+  draw();
+}
+// 업무 시작(08:30 배포)까지 남은 시간 — 확정 취소 경고창
+function untilText(ds) {
+  const m = Math.round((Date.parse(ds + 'T08:30:00+09:00') - Date.now()) / 60000);
+  return m > 0 ? '업무 시작 ' + (m >= 60 ? Math.floor(m / 60) + '시간 ' : '') + (m % 60) + '분 전입니다 (08:30 배포).' : '⛔ 이미 배포됨 — 메이드 휴대폰에 이 배정이 올라가 있을 수 있어요.';
+}
+async function saveJ(data, log) {
+  const S = H.S, path = 'jbr/' + A.date; log = Object.assign({ at: S.SERVER_TIME, uid: (H.user() && H.user().uid) || '', by: (H.admin() && H.admin().label) || '' }, log);
+  if (S.batch) return S.batch([{ op: 'merge', path, data }, { op: 'add', path: path + '/log', data: log }]);
+  await S.merge(path, data); return S.add(path + '/log', log).done;
+}
+// ↩ 확정 취소 (11/26 결정): 시간 제한 없음 · 경고창 · 기록. 이름 · 출근 카드 · 이 확정으로 넣은 '미정비' 메모를 지움 (연박 · 공실 · 재실 초안은 그대로)
+async function unconfirm() {
+  const d = await H.S.get('jbr/' + A.date); if (!d || !d.asg) { A.err = '확정된 배정이 없어요'; draw(); return; }
+  if (!confirm('정말 확정을 취소하시겠습니까?\n\n' + untilText(A.date) + '\n취소하면 모든 배정이 초기화됩니다. (연박 · 공실 · 재실 초안은 그대로)')) return;
+  const carry = new Set((d.asg.carryRooms || []).map(String)), r = {}, ch = {};
+  Object.keys(d.r).forEach(k => { const b = d.r[k], a = b.slice(); a[1] = ''; a[4] = b[4];
+    if (carry.has(k)) a[3] = String(b[3] || '').replace(/^미정비( · )?/, '');
+    if (JSON.stringify(a) !== JSON.stringify(b)) { r[k] = a; ch[k] = { b, a }; } });
+  try { await saveJ({ r, cards: [], asg: null, at: H.S.SERVER_TIME }, { k: 'unassign', n: Object.keys(ch).length, ch, why: untilText(A.date) });
+    A.asgd = null; A.res = null; A.saved = '↩ ' + H.md(A.date) + ' 확정을 취소했어요 — 배정 ' + Object.keys(ch).length + '실을 지웠어요. 다시 자동 배정을 돌려 확정해 주세요.' + (A.date >= LIVE_FROM ? ' (메이드 휴대폰은 다시 확정해야 바뀌어요)' : '');
+    await pickApp(); A.saved = A.saved || ''; }
+  catch (e) { A.err = '확정을 취소하지 못했어요: ' + (e && e.message || e); draw(); }
+}
+// 🚫 노쇼 (11/26 채택): 그분 방만 비우고 → 남은 분들께 자동으로 (같은 층에 방이 많은 분 → 가까운 층 → 유닛 적은 분, 오버 유닛). 다른 분 배정은 그대로
+async function noShow(name) {
+  const d = await H.S.get('jbr/' + A.date); if (!d || !d.asg) return;
+  const own = k => String(d.r[k][1] || '').split(',').map(x => x.trim()).filter(Boolean);
+  const mine = Object.keys(d.r).filter(k => own(k).includes(name)).sort((a, b) => a - b);
+  const others = (d.cards || []).map(c => c.n).filter(n => n !== name);
+  if (!mine.length || !others.length) { A.err = name + ' 님 방이 없거나 받을 분이 없어요'; draw(); return; }
+  if (!confirm(name + ' 님 노쇼 처리\n\n' + mine.length + '실(' + mine.join(' ') + ')을 남은 ' + others.length + '분께 나눌까요?\n유닛이 적은 분 먼저, 같은 층 · 가까운 층에 방이 있는 분을 앞으로 해서 나눠요. 다른 분 배정은 그대로예요.')) return;
+  const U = k => (ROYAL.includes(k) ? 2 : /간단/.test(String(d.r[k][0])) ? 0.5 : 1);
+  const load = {}, fl = {}; others.forEach(n => { load[n] = 0; fl[n] = []; });
+  Object.keys(d.r).forEach(k => own(k).forEach(n => { if (n in load) { load[n] += U(k); fl[n].push(Math.floor(k / 100)); } }));
+  const r = {}, ch = {}, got = {};
+  mine.forEach(k => { const b = d.r[k], f = Math.floor(k / 100);
+    if (k === '2901' || own(k).length > 1) { const a = b.slice(); a[1] = own(k).filter(n => n !== name).join(', '); r[k] = a; ch[k] = { b, a }; return; }
+    // 유닛 적은 분 먼저 + 같은 층에 방이 있으면 2유닛만큼 · 가까운 층이면 조금 앞으로 (한 분에게 몰리지 않게)
+    const sc = n => load[n] + (fl[n].includes(f) ? -2 : 0) + (fl[n].length ? Math.min(5, Math.min(...fl[n].map(x => Math.abs(x - f)))) * 0.3 : 1.5);
+    const to = others.slice().sort((p, q) => sc(p) - sc(q))[0];
+    const a = b.slice(); a[1] = to; r[k] = a; ch[k] = { b, a }; load[to] += U(k); fl[to].push(f); (got[to] = got[to] || []).push(k); });
+  const ov = Object.assign({}, d.asg.ov || {}); Object.keys(got).forEach(n => { ov[n] = (ov[n] || 0) + got[n].reduce((s, k) => s + U(k), 0); }); delete ov[name];
+  const cards = (d.cards || []).filter(c => c.n !== name).map(c => ({ n: c.n, u: load[c.n] != null ? load[c.n] : c.u, in: !!c.in }));
+  try {
+    await saveJ({ r, cards, asg: Object.assign({}, d.asg, { ov, noshow: (d.asg.noshow || []).concat([name]) }), at: H.S.SERVER_TIME }, { k: 'noshow', who: name, n: Object.keys(ch).length, ch, got: Object.keys(got).map(n => n + ' ' + got[n].join('·')).join(' / ') });
+    const nd = await H.S.get('jbr/' + A.date);
+    if (A.date >= LIVE_FROM) await uploadDoc(nd, '노쇼 처리 · ' + name);
+    A.saved = '🚫 ' + name + ' 님 노쇼 처리 — ' + Object.keys(got).map(n => n + ' ' + got[n].join('·')).join(' / ') + (A.date >= LIVE_FROM ? ' · 메이드 휴대폰에 다시 보냈어요' : ' (연습 — 메이드 휴대폰엔 안 감)');
+    A.nsOpen = false; await pickApp();
+  } catch (e) { A.err = '노쇼 처리를 못 했어요: ' + (e && e.message || e); draw(); }
+}
+// 정비보고서(앱) 한 날 → 메이드 휴대폰 · 더티 배분 (기존 '정비보고서 올리기' 길 그대로, 12/1부터)
+async function uploadDoc(d, file) {
+  const E = await import(new URL('../rm/app/engine.js?v=' + VER, import.meta.url).href);
+  const d2 = jbrToData(d); d2.cards = (d.cards || []).map((c, i) => ({ label: (i + 1) + '] ' + c.n, name: c.n, unit: c.u, actual: '' }));
+  const { rows } = E._test.makeRows(d2, d.date);
+  const csv = E._test.toCsv(rows), units = rows.reduce((s, x) => s + (ROYAL.includes(x[2]) ? 2 : 1), 0);
+  H.upload({ date: d.date, file: file || '📋 정비보고서 앱', res: { csv, rows, sheet: String(Number(d.date.slice(8))), summary: { ok: true, maids: new Set(rows.map(x => x[1])).size, rooms: rows.length, units, checks: [], tags: {}, groups: [], due: [] }, data: d2 } });
+}
+function asgdHtml() {
+  if (A.src !== 'app' || !A.asgd) return '';
+  const esc = H.esc, d = A.jdoc || {}, t = A.asgd.at ? new Date(Number(A.asgd.at) + 9 * 3600e3).toISOString().slice(11, 16) : '';
+  let h = '<div class="okbox" style="margin-top:8px">✅ 이 날은 ' + (t ? t + ' 에 ' : '') + '<b>확정</b>됐어요 · 출근 ' + (d.cards || []).length + '명' + ((A.asgd.noshow || []).length ? ' · 노쇼 ' + esc(A.asgd.noshow.join(', ')) : '') +
+    '<div class="btn2" style="margin-top:8px"><button class="big-btn sec" data-as="sum">📋 카톡용 요약 복사</button><button class="big-btn sec" data-as="nsopen">🚫 노쇼 처리</button></div>' +
+    '<button class="big-btn sec" style="margin-top:8px;color:var(--warn)" data-as="unconf">↩ 확정 취소</button></div>';
+  if (A.nsOpen) h += '<div class="card" style="margin-top:8px"><h2>🚫 노쇼 처리 <small>안 오신 분을 누르세요</small></h2><div class="asg-chips">' + (d.cards || []).map(c => '<button class="asg-chip" data-as="ns" data-v="' + esc(c.n) + '">' + esc(c.n) + ' ' + c.u + '</button>').join(' ') + '</div><p class="note">그분 방만 비우고 남은 분들께 나눠요 (유닛 적은 분 먼저, 같은 층 · 가까운 층이면 앞으로). 다른 분 배정은 그대로예요.</p></div>';
+  if (A.sumText) h += '<textarea style="width:100%;min-height:150px;margin-top:8px">' + esc(A.sumText) + '</textarea>';
+  return h;
 }
 // 초안 숫자 (자동 배정 확인 창): 연박 · 공실 · 재입 · 재실 → 정비할 방 / 출근 · 유닛 합
 function draftCounts() {
@@ -398,6 +500,7 @@ async function confirmUpload() {
 async function confirmApp() {
   const R = A.res, S = H.S, live = A.date >= LIVE_FROM;
   if (R.left.length && !confirm('미배정 객실이 ' + R.left.length + '실 있어요 (' + R.left.join(' ') + '). 그래도 확정할까요?')) return;
+  if (A.asgd) { A.err = '이미 확정된 날이에요 — 위 「↩ 확정 취소」를 먼저 눌러 주세요'; draw(); return; }
   if (!confirm(H.md(A.date) + ' 배정을 확정할까요?\n\n· 정비보고서(앱)에 이름 · 미정비 · 출근 카드가 들어가요\n' + (live ? '· 1~2분 안에 메이드 휴대폰에 들어가고, 정비 지원 더티 배분도 이 배정으로 불러와요\n· 같은 날 이미 올린 배정이 있으면 바뀌어요 (완료 기록은 그대로)' : '· 지금은 연습 기간이라 메이드 휴대폰에는 보내지 않아요 (12/1부터 보냄)'))) return;
   try {
     const ownerOf = {}; Object.keys(R.workers).forEach(n => R.workers[n].rooms.forEach(r => { (ownerOf[r] = ownerOf[r] || []).push(n); }));
@@ -410,7 +513,8 @@ async function confirmApp() {
       if (JSON.stringify(a) !== JSON.stringify(b)) { r[k] = a; ch[k] = { b, a }; } });
     const order = Object.keys(R.workers).filter(n => R.workers[n].rooms.length).sort((a, b) => (R.workers[b].floors[0] || 0) - (R.workers[a].floors[0] || 0));
     const cards = order.map(n => ({ n, u: R.workers[n].load, in: false }));
-    const data = { date: A.date, r, cards, src: 'app', at: S.SERVER_TIME, by: (H.admin() && H.admin().label) || '', asg: { at: S.SERVER_TIME, edits: (A.edits || []).length, carry: [...(A.carry || [])].length, live } };
+    const ov = {}; order.forEach(n => { const base = A.hk0 && A.hk0[n] != null ? A.hk0[n] : null; if (base != null && Math.abs(R.workers[n].load - base) > 1e-9) ov[n] = Math.round((R.workers[n].load - base) * 10) / 10; });
+    const data = { date: A.date, r, cards, src: 'app', at: S.SERVER_TIME, by: (H.admin() && H.admin().label) || '', asg: { at: S.SERVER_TIME, by: (H.admin() && H.admin().label) || '', edits: (A.edits || []).length, carry: [...(A.carry || [])].length, carryRooms: Object.keys(r).filter(k => /미정비/.test(r[k][3] || '') && !/미정비/.test(cur.r[k][3] || '')), live, ov, noshow: [] } };
     const log = { at: S.SERVER_TIME, uid: (H.user() && H.user().uid) || '', by: data.by, k: 'assign', n: Object.keys(ch).length, ch, cards: cards.map(c => c.n + ' ' + c.u).join(', ') };
     if (S.batch) await S.batch([{ op: 'merge', path: 'jbr/' + A.date, data }, { op: 'add', path: 'jbr/' + A.date + '/log', data: log }]);
     else { await S.merge('jbr/' + A.date, data); await S.add('jbr/' + A.date + '/log', log).done; }
@@ -424,7 +528,7 @@ async function confirmApp() {
       const summary = { ok: !R.left.length, maids: new Set(rows.map(x => x[1])).size, rooms: rows.length, units, checks: [], tags: {}, groups: [], due: [] };
       H.upload({ date: A.date, file: '자동 배정 · 📋 정비보고서 앱', res: { csv, rows, sheet: A.sheet, summary, data: d2 } });
       close();
-    } else { A.saved = '✅ ' + H.md(A.date) + ' 배정을 정비보고서(앱)에 저장했어요 · 연습 기간이라 메이드 휴대폰엔 안 보냈어요 (12/1부터 보냄). 정비보고서 창에서 확인해 보세요.'; draw(); const b = document.getElementById('asp'); if (b) b.scrollTop = 0; }
+    } else { await pickApp(); A.saved = '✅ ' + H.md(A.date) + ' 배정을 정비보고서(앱)에 저장했어요 · 연습 기간이라 메이드 휴대폰엔 안 보냈어요 (12/1부터 보냄). 정비보고서 창에서 확인해 보세요.'; draw(); const b = document.getElementById('asp'); if (b) b.scrollTop = 0; }
   } catch (e) { A.err = '확정하지 못했어요: ' + (e && e.message || e); draw(); }
 }
 
@@ -610,6 +714,7 @@ function draw() {
   if (A.view === 'blocks') { box.innerHTML = h.replace('data-as="close"', 'data-as="' + (A.back === 'close' ? 'close' : 'bkback') + '"') + blocksHtml() + '</div>'; box.scrollTop = y; return; }
   if (A.saved) h += '<p class="okbox">' + esc(A.saved) + '</p>';
   h += '<div class="btn2" style="margin:0 0 12px"><button class="big-btn sec" data-as="cfg">⚙️ 담당표·정량</button><button class="big-btn sec" data-as="blocks">🚧 장기 미정비</button></div>';
+  h += stepsHtml();
   // 1 날짜·파일
   const t0 = H.ymd(), t1 = H.addDays(t0, 1);
   h += '<div class="card"><h2>1 · 정비보고서</h2><div class="seg2">' + [[t0, '오늘'], [t1, '내일']].map(([d, l]) => '<button data-as="date" data-v="' + d + '" aria-pressed="' + (A.date === d) + '">' + l + ' ' + H.md(d) + '</button>').join('') + '</div>' +
@@ -629,6 +734,7 @@ function draw() {
     if (A.src === 'app') h += '<button class="big-btn sec" style="margin-top:8px" data-as="carry2">📦 미정비 남기기 (유닛 기준)' + (nc ? ' — ' + nc + '실 · ' + unitsOf(A.carry) + '유닛' : '') + '</button>';
     else if (!A.done) h += '<button class="big-btn sec" style="margin-top:8px" data-as="carry">📦 미정비 남기기 (타입별 수량)' + (nc ? ' — ' + nc + '실' : '') + '</button>';
     else h += '<button class="big-btn sec" style="margin-top:8px" disabled>📦 미정비 남기기 — 초안(이름 없는 파일)에서만</button>';
+    if (A.src === 'app') h += asgdHtml();
     if (A.src === 'app') h += A.fromHk ? '<p class="okbox" style="margin-top:8px">출근자 · 유닛은 <b>HK 전파</b>(룸메이드 스케줄)에서 불러왔어요 → <b>' + A.fromHk.n + '명 · ' + A.fromHk.u + '유닛</b>. 아래 2번에서 −/+ 로 더하거나 빼요.</p>' : '<p class="err" style="margin-top:8px">' + esc(H.md(A.date)) + ' HK 전파가 아직 없어요 (소장 · 부소장님이 룸메이드 스케줄을 저장하면 들어와요) → 아래 2번 출근자 · 유닛을 인계표대로 맞춰 주세요.</p>';
     else if (A.done) h += '<p class="okbox" style="margin-top:8px">이름이 들어 있는 <b>완성본</b>이에요 → 이름은 빼고 엔진이 새로 배정한 뒤 <b>하우스키퍼 배정과 대조</b>해요. 출근자·유닛은 완성본 카드대로 채웠어요.</p>';
     else if (A.fromCards) h += '<p class="okbox" style="margin-top:8px">정비보고서 <b>출근 카드</b>의 유닛을 인계 유닛으로 읽었어요 → <b>' + A.fromCards.n + '명 · ' + A.fromCards.u + '유닛</b>. 아래 2번은 따로 고칠 필요 없어요 (바꿀 때만 −/+).</p>';
@@ -641,7 +747,7 @@ function draw() {
     const list = A.showAll ? A.rows : A.rows.filter(r => r.on);
     h += '<div class="card"><h2>2 · 출근자 · 인계 유닛 <small>' + on.length + '명 · ' + sum + '유닛</small></h2>' +
       '<p class="note" style="margin:0 0 8px">관리자 인계표(RM 방배정표)대로 맞춰 주세요. 이름을 누르면 출근/휴무, 숫자는 인계 유닛이에요. 정량: 8 = 정규A 전환자, 7·4 = 신입.</p>' +
-      '<div class="asg-rows">' + list.map(r => '<div class="asg-r' + (r.on ? '' : ' off') + '"><button data-as="tog" data-v="' + esc(r.name) + '">' + (r.on ? '✅ ' : '휴 ') + esc(r.name) + (q[r.name] != null ? '<small>정량 ' + q[r.name] + '</small>' : '') + '</button>' +
+      '<div class="asg-rows">' + list.map(r => '<div class="asg-r' + (r.on ? '' : ' off') + '"><button data-as="tog" data-v="' + esc(r.name) + '">' + (r.on ? '✅ ' : '휴 ') + esc(r.name) + (q[r.name] != null ? '<small>정량 ' + q[r.name] + '</small>' : '') + (A.src === 'app' && A.od && A.od[r.name] && (A.od[r.name].o || A.od[r.name].d) ? '<small style="color:#6B7A90">이번 달 오버 ' + A.od[r.name].o + ' · 다운 ' + A.od[r.name].d + '</small>' : '') + '</button>' +
         (r.on ? '<span class="asg-u"><button data-as="u-" data-v="' + esc(r.name) + '">−</button><b>' + r.unit + '</b><button data-as="u+" data-v="' + esc(r.name) + '">+</button>' + (A.src === 'app' && A.hk0 && A.hk0[r.name] != null && A.hk0[r.name] !== Number(r.unit) ? '<small style="color:' + (Number(r.unit) > A.hk0[r.name] ? 'var(--warn)' : '#1E6FB8') + ';font-weight:800;margin-left:4px">' + (Number(r.unit) > A.hk0[r.name] ? '+' : '') + (Number(r.unit) - A.hk0[r.name]) + '</small>' : '') + '</span>' : '') + '</div>').join('') + '</div>' +
       '<div class="btn2"><button class="big-btn sec" data-as="all">' + (A.showAll ? '출근자만 보기' : '휴무자도 보기 (' + (A.rows.length - on.length) + ')') + '</button></div>' +
       (A.src === 'app' ? diffHtml() : '') +
@@ -772,6 +878,10 @@ document.addEventListener('click', e => {
   if (a === 'pick') { A.src = ''; pick(); return; }
   if (a === 'app') { pickApp(); return; }
   if (a === 'force') { A.force = true; draw(); return; }
+  if (a === 'sum') { copySum(); return; }
+  if (a === 'unconf') { unconfirm(); return; }
+  if (a === 'nsopen') { A.nsOpen = !A.nsOpen; draw(); return; }
+  if (a === 'ns') { noShow(v); return; }
   if (a === 'askno') { A.ask = false; draw(); return; }
   if (a === 'askyes') { A.ask = false; run(true); return; }
   if (a === 'carry2') { c2Open(); return; }
