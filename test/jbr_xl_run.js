@@ -45,7 +45,7 @@ const SEED = { 'meta/rsync': { on: true, at: Date.now() } };
   [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-xlm]')]);
   const f2 = '/tmp/xl_month.xlsx'; await dl.saveAs(f2);
   o = py(f2, "S=wb['요약'];B=wb['청구금액'];R=wb['객실정비현황']\nrows=[[c.value for c in r] for r in B.iter_rows(min_row=4)]\nrr=[[c.value for c in r] for r in R.iter_rows(min_row=4)]\nprint(json.dumps({'sheets':wb.sheetnames,'k':[[S.cell(r,1).value,S.cell(r,2).value] for r in range(4,13)],'bill':rows,'room':rr,'foot':S.cell(14,1).value}))");
-  ok(o.sheets.join(',') === '요약,객실정비현황,청구금액,연장근로,유닛누계,25일,26일,27일', '시트: ' + o.sheets.join(', '));
+  ok(o.sheets.join(',') === '요약,객실정비현황,청구금액,연장근로,유닛누계,시상 명단,25일,26일,27일', '시트: ' + o.sheets.join(', '));
   const S = +(kp.match(/정비수 \(청구 기준\)\s*([\d,]+)/) || [])[1].replace(/,/g, '');
   ok(o.k[0][1] === S && o.k[1][1] === S * 16300, '요약 정비수 ' + o.k[0][1] + ' · 금액 ' + o.k[1][1] + ' = 화면');
   const bTot = o.bill.find(r => r[0] === '정비수'), bAmt = o.bill.find(r => r[0] === '금액');

@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.27-9';
+const VER = '2026.11.27-10';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -87,6 +87,8 @@ function watch() {
   unsub.push(S.listenQuery('jbr', [['date', '>=', from]], (list, m) => { docs = list.map(x => x.data); meta.fromCache = !!(m && m.fromCache); push(); }, e => { $('#main').innerHTML = '<p style="padding:20px">자료를 읽지 못했어요: ' + esc(e && e.message || e) + ' (규칙 v32 게시 전이면 이렇게 보여요)</p>'; }));
   unsub.push(S.listenDoc('meta/rsync', x => { hb = x; tag(); }, () => {}));
   // 👥 룸메이드 스케줄표 HK 전파 사본 (명단 · 앞으로 출근자 · 유닛) — 규칙 v30: 하우스키퍼 읽기 가능
+  // 🏆 시상 (jbr/cfg-YYYY-MM.awards) — 이번 달 · 지난달 · 그 전 달 (이월 가져오기용)
+  [ym(TODAY, 0), ym(TODAY, -1), ym(TODAY, -2)].forEach(m => unsub.push(S.listenDoc('jbr/cfg-' + m, x => { if (window.JBR && window.JBR.setCfg) window.JBR.setCfg(m, x); }, () => {})));
   unsub.push(S.listenQuery('rmsched_hk', [['date', '>=', from]], list => { hks = list.map(x => x.data); if (docs.length) push(); }, () => {}));
 }
 
@@ -171,6 +173,7 @@ const SV = {
     save(ds, 'merge', { src: 'app', r0: d.r || {}, g0: d.groups || [], onAt: S.SERVER_TIME, onBy: by() }, { k: 'on' }); if (window.JBR) window.JBR.toast('💾 ' + ds + ' 실제 저장을 켰어요 — 이제 고치는 내용이 저장돼요');
   },
   // ⚠ 비상: 엑셀로 돌아가기 (11/27) — 앱 원본인 날을 엑셀 사본으로 되돌림 → 오더테이커 PC 정비보고서 연결이 그날 엑셀을 다시 읽어 메이드 휴대폰에 넘김. 앱 기록은 그대로 남음
+  awards(m, list) { save('cfg-' + m, 'merge', { awards: list.map(a => ({ id: a.id, k: a.k || '', n: String(a.n || '').trim().slice(0, 20), why: String(a.why || '').slice(0, 80), c: Number(a.c) || 0, u: Number(a.u) || 0, x: Number(a.x) || 0, st: a.st || '당월 지급 대상', from: a.from || '', moved: a.moved || '' })), at: S.SERVER_TIME, by: by() }, { k: 'awards', n: list.length }); },
   canBack: ds => !!(docOf(ds) && docOf(ds).src === 'app') && !docOf(ds).r0,
   back(ds) { save(ds, 'merge', { src: 'excel', at: S.SERVER_TIME, by: by(), backAt: S.SERVER_TIME }, { k: 'back' }); window.JBR.toast('⚠ ' + ds + ' 엑셀로 돌아갔어요 — 정비보고서 연결 PC가 1~2분 안에 그날 엑셀을 다시 읽어요'); },
   async off(ds) {
@@ -193,7 +196,7 @@ const SV = {
       const fmt = c => Object.keys(c).sort().map(k => { const b = c[k].b || [], a = c[k].a || [];
         const d = FLD.map((f, i) => (String(b[i] || '') === String(a[i] || '') ? '' : i >= 4 ? f + (a[i] ? ' ✓' : ' 풀림') : f + ' 「' + esc(b[i] || '') + '」→「' + esc(a[i] || '') + '」')).filter(Boolean);
         return '<b>' + k + '</b> ' + d.join(', '); }).join('<br>');
-      const what = x => x.k === 'room' ? fmt(x.ch || {}) : x.k === 'groups' ? '단체 ' + (x.g || []).map(g => esc(g.name) + ' ' + String(g.rooms || '').split(',').filter(Boolean).length + '실').join(' · ') : x.k === 'new' ? '🌙 초안 만듦 (전 객실 4)' : x.k === 'back' ? '⚠ 엑셀로 돌아감 (비상)' : x.k === 'unassign' ? '↩ 확정 취소 · ' + (x.n || 0) + '실 지움 · ' + esc(x.why || '') : x.k === 'noshow' ? '🚫 노쇼 ' + esc(x.who || '') + ' → ' + esc(x.got || '') : x.k === 'assign' ? '🧩 자동 배정 확정 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') + '<br>' + fmt(x.ch || {}) : x.k === 'on' ? '💾 실제 저장 켬' : x.k === 'off' ? '연습 끝냄 (켜기 전 자료로)' : esc(x.k);
+      const what = x => x.k === 'room' ? fmt(x.ch || {}) : x.k === 'groups' ? '단체 ' + (x.g || []).map(g => esc(g.name) + ' ' + String(g.rooms || '').split(',').filter(Boolean).length + '실').join(' · ') : x.k === 'new' ? '🌙 초안 만듦 (전 객실 4)' : x.k === 'awards' ? '🏆 시상 명단 저장 (' + (x.n || 0) + '줄)' : x.k === 'back' ? '⚠ 엑셀로 돌아감 (비상)' : x.k === 'unassign' ? '↩ 확정 취소 · ' + (x.n || 0) + '실 지움 · ' + esc(x.why || '') : x.k === 'noshow' ? '🚫 노쇼 ' + esc(x.who || '') + ' → ' + esc(x.got || '') : x.k === 'assign' ? '🧩 자동 배정 확정 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') + '<br>' + fmt(x.ch || {}) : x.k === 'on' ? '💾 실제 저장 켬' : x.k === 'off' ? '연습 끝냄 (켜기 전 자료로)' : esc(x.k);
       const t = x => { const d = seoul(Number(x.at || 0)); return hm(x.at) + ':' + ('0' + d.getUTCSeconds()).slice(-2); };
       box(L.length ? '<table style="width:100%;border-collapse:collapse;font-size:13px">' + L.slice(0, 300).map(x => '<tr style="border-top:1px solid #eee;text-align:left"><td style="padding:5px 8px;white-space:nowrap;vertical-align:top;text-align:left">' + t(x) + '</td><td style="padding:5px 8px;white-space:nowrap;vertical-align:top;text-align:left">' + esc(x.by) + '</td><td style="padding:5px 8px;text-align:left">' + what(x) + '</td></tr>').join('') + '</table>' + (L.length > 300 ? '<p class="hint">최근 300건만 보여요 (전체 ' + L.length + '건)</p>' : '') : '<p class="hint">아직 기록이 없어요</p>');
     } catch (e) { box('<p style="color:#B23A48">기록을 읽지 못했어요: ' + esc(e && e.message || e) + '</p>'); }
