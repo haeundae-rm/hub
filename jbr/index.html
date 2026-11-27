@@ -30,6 +30,10 @@ h1{font-size:19px;margin:0;font-weight:900;letter-spacing:-.3px}
 .days button.on{background:#fff;color:var(--navy);font-weight:800}
 .days button.today{box-shadow:inset 0 0 0 2px var(--org)}.days button.fut{opacity:.45}.tabs button.asgo{background:#2C8A55;color:#fff;font-weight:800;margin-right:6px}.tabs button.asgo:hover{background:#34A065}
 .takeb{display:inline-block;background:#F08A24;color:#1B1206;font-weight:900;border-radius:8px;padding:4px 12px;margin-right:8px;cursor:pointer}.takeb:hover{background:#FF9F3F}
+.sndb{display:flex;align-items:center;gap:12px;justify-content:space-between;border-radius:10px;padding:10px 14px;margin:8px 0;font-size:14px}.sndb span{display:flex;flex-direction:column;gap:2px}.sndb small{font-size:12.5px;opacity:.85}
+.sndb.wait{background:#FFF1DC;border:2px solid #F08A24;color:#7A2E0B}.sndb.ok{background:#E3F4E8;border:1.5px solid #9BD3AE;color:#1F5E33}
+.sndb button{flex:none;border:0;border-radius:10px;background:#E8730C;color:#fff;font-weight:900;font-size:15px;padding:11px 18px;cursor:pointer}.sndb button.sec{background:#fff;color:#1F5E33;border:1.5px solid #9BD3AE;font-size:13px;padding:7px 12px}
+@media (max-width:760px){.sndb{flex-direction:column;align-items:stretch}}
 #asgx{position:fixed;inset:0;z-index:60;overflow:hidden;background:var(--bg,#F4F6FA);display:flex;flex-direction:column}#asgx .bar{flex:none;min-height:52px;display:flex;gap:8px;align-items:center;background:#10233F;color:#fff;padding:8px 14px}#asgx iframe{min-height:0}#asgx .bar b{flex:1;font-size:16px}#asgx .bar button{font:inherit;font-weight:700;border-radius:8px;border:1px solid #ffffff55;background:#ffffff14;color:#fff;padding:7px 14px;cursor:pointer}#asgx .bar button.x{background:#fff;color:#10233F}#asgx iframe{flex:1;border:0;width:100%;background:#F4F6FA}
 .days button.jnewb{background:#F08A24;color:#1B1206;font-weight:800;border:0;box-shadow:0 0 0 2px #FFD3A3 inset}.days button.jnewb:hover{background:#FF9F3F}   /* 11/27 🌙 초안 버튼: 네이비 위 붉은 글씨가 안 보여서 주황 바탕 · 진한 글씨 */.mons{display:flex;gap:3px}.mons .mon{border:1px solid #ffffff40;background:transparent;color:#fff;font-weight:800;border-radius:8px;min-height:30px;padding:2px 10px}.mons .mon.on{background:#fff;color:var(--navy)}
 .tabs{display:flex;gap:4px;margin-left:auto}
@@ -444,6 +448,16 @@ function drawHead() {
 
 // ---------- 객실 현황 · 입력
 // 💾 저장 띠: 켜진 날 = 저장 상태 · 기록 / 연습 가능한 지난 날 = 켜기 단추
+// 📱 메이드 휴대폰 보내기 (11/28 A안 — 첫 실전: 확정 = 바로 휴대폰이라 하우스키퍼가 확정을 못 누르고 엑셀로 감)
+//   자동 배정은 이름을 격자에 「넣기」만 → 여기서 엑셀처럼 고침 → 이 단추로 보냄. 보낸 뒤 고친 건 PC 연결 창이 1분 안팎에 따라 넣음
+function sendBar() {
+  if (!live(day) || !P.days[day]) return '';
+  const g = P.days[day].asg; if (!g) return '';
+  const t = g.sentAt ? hmOf(g.sentAt) : '';
+  if (!g.sentAt) return '<div class="sndb wait"><span><b>📱 아직 메이드 휴대폰엔 안 보냈어요</b><small>자동 배정 이름이 격자에 들어왔어요 — 엑셀처럼 고친 뒤 (담당 바꾸기 · 미정비 · 연박 · 방 빼기/더하기) 보내세요</small></span><button data-jsend="1">📱 메이드 휴대폰 보내기</button></div>';
+  return '<div class="sndb ok"><span><b>📱 ' + t + ' 메이드 휴대폰에 보냄</b>' + (g.sent > 1 ? ' (' + g.sent + '번째)' : '') + '<small>그 뒤 격자에서 고친 건 1분 안팎에 따라 들어가요 (PC 정비보고서 연결 창) · 한꺼번에 많이 바꿨으면 다시 보내도 돼요</small></span><button data-jsend="1" class="sec">다시 보내기</button></div>';
+}
+function hmOf(v) { const n = v && v.toMillis ? v.toMillis() : v && v.seconds ? v.seconds * 1000 : Number(v) || 0; if (!n) return ''; const d = new Date(n + 9 * 3600e3); return ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2); }
 function svBar() {
   const sv = window.JBR && window.JBR.sv; if (!sv) return '';
   const lb = 'style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0"';
@@ -469,6 +483,7 @@ function drawGrid() {
   else h += '<div class="check">' + (typos.length ? '<a data-typos="1">⚠ 명단에 없는 이름 ' + typos.length + '실 (' + esc([...new Set(typos.flatMap(([r, x]) => typoOf(r, x)))].join(', ')) + ') — 눌러서 고르기</a> · ' : '') + (d.edited ? '<span class="warn">연습 중 — 고친 내용은 저장되지 않아요</span> (🌙 초안으로 시작한 날 · 「💾 저장 켜기」를 누른 날만 저장) · <button data-reset="1" style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">엑셀 자료로 되돌리기</button>' :
     (okN === 6 ? '<span class="good">엑셀 계산값과 같음 ' + okN + '/6</span> (금일 정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단)' : '<span class="warn">엑셀과 다른 칸 ' + (6 - okN) + '개</span> ' + same.filter(s => !s[3]).map(s => s[0] + ' 앱 ' + s[1] + ' / 엑셀 ' + s[2]).join(', '))) + '</div>';
   h += svBar();
+  h += sendBar();
   h += '<div class="cards">' + d.cards.map((k, i) => {
     const st = /휴/.test(k.u) ? 'off' : k.u === '퇴사' ? 'quit' : k.in ? 'in' : '';
     const u = c.per[k.n] || 0;
@@ -923,6 +938,7 @@ document.addEventListener('click', e => {
   if (t.dataset.water) { waterOpen = !waterOpen; draw(); return; }
   if (t.dataset.asgo) { asgOpen(t.dataset.asgo); return; }
   if (t.dataset.asgx) { asgClose(); return; }
+  if (t.dataset.jsend) { if (window.JBR.sv && window.JBR.sv.pending && window.JBR.sv.pending()) { toast('저장 대기 중인 칸이 있어요 — 저장된 뒤 눌러 주세요'); return; } const g = (P.days[day] || {}).asg || {}; if (!confirm((+day.slice(5, 7)) + '/' + (+day.slice(8)) + ' 배정을 메이드 휴대폰에 ' + (g.sentAt ? '다시 ' : '') + '보낼까요?\n\n· 지금 격자 그대로 보내요\n· 정비 지원 더티 배분도 이 배정으로 불러와요')) return; asgOpen('send'); return; }
   if (t.dataset.xld) { xlOut('day', t); return; }
   if (t.dataset.xlm) { xlOut('month', t); return; }
   if (t.dataset.xlc) { xlOut('close', t, t.dataset.xlc); return; }
@@ -1232,7 +1248,7 @@ async function xlOut(kind, btn, which) {
 function asgOpen(kind) {
   let o = document.getElementById('asgx'); if (o) o.remove();
   o = document.createElement('div'); o.id = 'asgx';
-  o.innerHTML = '<div class="bar"><b>' + (kind === 'notes' ? '📝 배정 의견 · 답' : '🧩 자동 배정 — 출근자 불러오기 · 차이 정리 · 자동 배정 · 확정') + '</b>' + (kind === 'notes' ? '' : '<button data-asgo="notes">📝 배정 의견</button>') + '<button class="x" data-asgx="1">✕ 닫고 정비보고서로</button></div><iframe src="../?embed=' + kind + '" title="자동 배정"></iframe>';
+  o.innerHTML = '<div class="bar"><b>' + (kind === 'send' ? '📱 메이드 휴대폰 보내기 — 「반영 완료」가 뜨면 닫으세요' : kind === 'notes' ? '📝 배정 의견 · 답' : '🧩 자동 배정 — 출근자 불러오기 · 차이 정리 · 자동 배정 · 확정') + '</b>' + (kind === 'notes' || kind === 'send' ? '' : '<button data-asgo="notes">📝 배정 의견</button>') + '<button class="x" data-asgx="1">✕ 닫고 정비보고서로</button></div><iframe src="../?embed=' + kind + (kind === 'send' ? '&d=' + day : '') + '" title="자동 배정"></iframe>';
   document.body.appendChild(o);
 }
 function asgClose() {

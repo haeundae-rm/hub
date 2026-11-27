@@ -375,7 +375,7 @@ function upSend(skipAsk) {
   if (r.data) S.set('uploads/rep_' + u0.date, repDoc(u0, r)).catch(e => logErr('더티배분용 보고서', e));   // 정비 지원 더티 배분용 (실패해도 배정 올리기는 그대로)
   withTimeout(S.set('uploads/latest', { date: u0.date, csv: r.csv, state: 'wait', at: S.SERVER_TIME, by: user.uid, who: admin.label, file: String(u0.file).slice(0, 80),
     sheet: r.sheet, maids: s.maids, rooms: s.rooms, units: s.units, ok: s.ok }), 20000, '인터넷 연결을 확인하고 다시 눌러 주세요.')
-    .then(() => { up = { sent: { date: u0.date, at: Date.now() } }; draw(); watchUp(); },
+    .then(() => { if (u0.after) { try { u0.after(); } catch (e) { logErr('보낸 뒤', e); } } up = { sent: { date: u0.date, at: Date.now() } }; draw(); watchUp(); },
       e => { if (up === u0) { u0.sending = false; u0.err = '올리지 못했어요: ' + (e && (e.code || e.message) || e); draw(); } });
 }
 // 올린 뒤: 중계가 끝날 때까지 uploads/latest 문서 하나만 20초마다 다시 읽음 (최대 5분)
@@ -603,8 +603,15 @@ function closeVoc() {
   const p = document.getElementById('vp'); if (p) p.remove(); document.body.classList.remove('sb-lock');
 }
 async function openAssignUI(view) {
-  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, logErr, admin: () => admin, user: () => user, upload: o => { up = { file: o.file, date: o.date, res: o.res, buf: null }; goSec('work', 'up'); draw(); upSend(true); scrollUp(); } }, { view }); }
+  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href); m.openAssign({ S, esc, ymd, addDays, md, logErr, admin: () => admin, user: () => user, upload: (o, after) => { up = { file: o.file, date: o.date, res: o.res, buf: null, after }; goSec('work', 'up'); draw(); upSend(true); scrollUp(); } }, { view }); }
   catch (e) { alert('자동 배정 화면을 못 불러왔어요: ' + (e && e.message || e)); }
+}
+// 📱 메이드 휴대폰 보내기 (11/28 A안): 정비보고서 창 「📱 보내기」 → ?embed=send&d=날짜 → 지금 정비보고서 그대로 올리기 (보고서 올리기 화면에서 진행 · 완료 표시)
+async function sendFromJbr(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('날짜를 모르겠어요'); return; }
+  try { const m = await import(new URL('./assignui.js?v=' + VER, import.meta.url).href);
+    await m.sendJbr({ S, esc, ymd, addDays, md, logErr, admin: () => admin, user: () => user, upload: (o, after) => { up = { file: o.file, date: o.date, res: o.res, buf: null, after }; goSec('work', 'up'); draw(); upSend(true); scrollUp(); } }, date); }
+  catch (e) { alert('보내지 못했어요: ' + (e && e.message || e)); }
 }
 // 📝 배정 의견 (2026-11-19): 하우스맨 의견 → 매일 오전 10시 점검이 답 (asgnote.js · asg_notes)
 async function openAsgNotes() {
@@ -758,6 +765,7 @@ window.__hubBusy = () => !!(up && (up.sending || (up.res && !up.sent)));
 function embedOpen() {
   if (!EMBED || embedDone || !admin) return; embedDone = true; if (EMBQ) document.body.classList.add('embed');
   if (EMBED === 'notes') { openAsgNotes(); return; }
+  if (EMBED === 'send') { sendFromJbr(new URLSearchParams(location.search).get('d') || ''); return; }
   openAssignUI(EMBED === 'blocks' ? 'blocks' : '').then(() => { const o = new MutationObserver(() => { if (document.getElementById('asp') || document.querySelector('.vp')) return; if (!EMBQ || window.__hubBusy() || (up && up.sent && !up.sent.done)) return; o.disconnect(); try { window.parent.postMessage({ hub: 'embedclose' }, location.origin); } catch (e) {} }); o.observe(document.body, { childList: true }); });
 }
 function parseRoute() {
