@@ -782,7 +782,7 @@ function drawClose(only) {
       '<p class="hint">1건 = ' + AW_PER + '실 × ' + OPT.ot.toLocaleString() + '원 = ' + (AW_PER * OPT.ot).toLocaleString() + '원 · 건수를 바꾸면 OT 수량이 저절로 (건 × ' + AW_PER + ') · 추가 금액은 「+20만원」 같은 별도 금액 · 「당월 지급 대상 · 시상 완료」만 연장근로 표 \'시상\' 칸에 더해져요 · 정비보고서 방 기록은 그대로 (교육생 방은 교육생) · ⬇ 월 전체 엑셀에 「시상 명단」 시트로 들어가요</p>';
     html.award = h; badOf.award = 0; }
   const S = tot.reduce((a, b) => a + b, 0), OT = names.reduce((a, n) => a + per(n).map(otv).reduce((p, q) => p + q, 0), 0);
-  if (only) return { m, html, S, OT, trS, ds, names, fam: C.reduce((a, c) => a + c.fam, 0), roy: C.reduce((a, c) => a + c.roy, 0) };   // ⬇ 엑셀 (화면과 같은 숫자)
+  if (only) return { m, html, S, OT, trS, ds, names, C, per, tot, cnt, otv, fam: C.reduce((a, c) => a + c.fam, 0), roy: C.reduce((a, c) => a + c.roy, 0) };   // ⬇ 엑셀 (화면과 같은 숫자)
   let h = '<div class="kpis">';
   h += '<div class="kpi"><small>' + (+m.slice(5)) + '월 정비수 (청구 기준)</small><b class="num">' + S.toLocaleString() + '</b><span class="v">' + (X.has === false ? '앱 계산' : eq(S, X.bill['합계']) ? '엑셀과 같음 ✓' : eq(S - trS, X.bill['합계']) ? '엑셀 ' + X.bill['합계'].toLocaleString() + ' + 교육생 ' + trS + ' (엑셀이 뺌)' : '엑셀 ' + X.bill['합계'].toLocaleString()) + '</span></div>';
   h += '<div class="kpi"><small>청구 금액 (× ' + OPT.rate.toLocaleString() + '원)</small><b class="num">' + (S * OPT.rate).toLocaleString() + '원</b><span class="v">' + (X.has === false ? '앱 계산' : eq(S * OPT.rate, X.bill['금액합']) ? '엑셀과 같음 ✓' : eq((S - trS) * OPT.rate, X.bill['금액합']) ? '엑셀보다 ' + (trS * OPT.rate).toLocaleString() + '원 많음 (교육생 몫)' : '엑셀 ' + X.bill['금액합'].toLocaleString() + '원') + '</span></div>';
@@ -790,7 +790,8 @@ function drawClose(only) {
   h += '<div class="kpi">' + (X.has === false ? '<small>날마다 엑셀 요약 칸과 대조</small><b class="num" style="color:' + (dBad ? 'var(--bad)' : 'var(--ok)') + '">' + (dBad ? '다른 날 ' + dBad : '모두 같음') + '</b><span class="v" style="color:var(--mute)">' + dN + '일 대조 (정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단)</span></div></div>' : '<small>엑셀과 한 칸씩 대조 (네 시트)</small><b class="num" style="color:' + (bad ? 'var(--bad)' : 'var(--ok)') + '">' + (bad ? '다른 칸 ' + bad : '모두 같음') + '</b><span class="v" style="color:var(--mute)">' + cells.toLocaleString() + '칸 대조' + (trd ? ' · <b style="color:var(--org)">교육생 차이 ' + trd + '칸</b>' : '') + '</span></div></div>');
   const tr = per(TRAINEE).reduce((a, b) => a + b, 0);
   if (tr) h += '<div class="warnbox">📘 <b>교육생</b> 배정 ' + tr + '유닛 — 청구에 <b>' + (OPT.trainee ? '포함' : '제외') + '</b> (기준: 도급비는 받아야 하므로 포함 · 수당은 나중에 시상금으로 다른 분 이름으로 옮김). 엑셀은 10월 27일만 넣고 나머지 날 · 11월은 빼고 있어서, 그 칸은 <span style="background:#FFF1DC;padding:0 4px;border-radius:4px">주황</span>으로 표시해요. <label style="white-space:nowrap"><input type="checkbox" id="o_tr"' + (OPT.trainee ? ' checked' : '') + '> 교육생도 청구에 포함</label></div>';
-  h += '<div class="stabs" style="max-width:620px;margin-bottom:8px">' + tabs.map(t => '<button data-ctab="' + t[0] + '"' + (closeTab === t[0] ? ' class="on"' : '') + '>' + t[1] + (badOf[t[0]] ? ' <b style="color:var(--bad)">✗' + badOf[t[0]] + '</b>' : ' ✓') + '</button>').join('') + '</div>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px"><div class="stabs" style="max-width:620px;margin:0">' + tabs.map(t => '<button data-ctab="' + t[0] + '"' + (closeTab === t[0] ? ' class="on"' : '') + '>' + t[1] + (badOf[t[0]] ? ' <b style="color:var(--bad)">✗' + badOf[t[0]] + '</b>' : ' ✓') + '</button>').join('') + '</div>' +
+    (closeTab !== 'award' ? '<button class="pri" data-xlc="' + closeTab + '" title="지금 보는 표 하나만 엑셀로">⬇ 이 표 엑셀</button>' : '') + '<button class="pri" data-xlc="all" title="객실정비현황 · 청구금액 · 연장근로 · 유닛누계 4장을 한 파일로">⬇ 결산 4종 엑셀</button></div>';
   h += '<div class="box"><div class="scroll">' + html[closeTab] + '</div><p class="hint">빨간 칸 = 엑셀 값과 다름 (마우스를 올리면 엑셀 값). 날짜를 고치면 이 표도 바로 다시 계산돼요.</p></div>';
   h += '<div class="box" style="margin-top:10px"><h3>단가 설정</h3><div class="row" style="flex-wrap:wrap"><label>정비 단가 <input class="inp num" id="o_rate" value="' + OPT.rate + '" style="width:110px"></label><label>연장 단가 <input class="inp num" id="o_ot" value="' + OPT.ot + '" style="width:100px"></label><label>연장 기준 <input class="inp num" id="o_min" value="' + OPT.otMin + '" style="width:70px"></label></div></div>';
   h += '<p class="mark">' + (X.has === false ? '엑셀 결산 시트 값이 없는 달이라 앱 계산만 보여 줘요. 명단 = 정비보고서 「설정」 시트 (' + names.length + '명).' : '') + '</p>';
@@ -873,6 +874,7 @@ document.addEventListener('click', e => {
   if (t.dataset.water) { waterOpen = !waterOpen; draw(); return; }
   if (t.dataset.xld) { xlOut('day', t); return; }
   if (t.dataset.xlm) { xlOut('month', t); return; }
+  if (t.dataset.xlc) { xlOut('close', t, t.dataset.xlc); return; }
   if (t.dataset.reset) { window.JBR.reset(); toast('엑셀 자료로 되돌렸어요'); return; }
   if (t.dataset.jon) { if (confirm(day + ' 을(를) 실제 저장으로 켤까요?\n\n· 고치는 내용이 저장소에 바로 저장되고 기록이 남아요\n· 이 날은 이제 엑셀 사본이 덮지 않아요\n· 「연습 끝내기」로 켜기 전 자료로 되돌릴 수 있어요' + (R().edited ? '\n· 지금 연습으로 고친 내용은 버려요' : ''))) { delete ED[day]; window.JBR.sv.on(day); } return; }
   if (t.dataset.joff) { if (confirm(day + ' 저장 연습을 끝낼까요?\n\n켜기 전 엑셀 자료로 되돌리고 다시 보기 · 연습만 돼요. 변경 기록은 그대로 남아요.')) window.JBR.sv.off(day); return; }
@@ -1080,18 +1082,89 @@ function awardSheet(m, R) {
   [['당월 배정 예산 (교육생 정비 유닛)', R.trS + '유닛'], ['지급 (당월 지급 대상 · 시상 완료)', used + '유닛 · ' + sum(pay.concat(done), 'amt').toLocaleString() + '원'], ['잔  액 (도급 수익)', (R.trS - used) + '유닛'], ['이월 (다음 달 우선 지급)', cr.length + '명']].forEach(([k, v]) => rows.push([{ v: k, s: 'kpil' }, { v, s: 'kpiv' }]));
   return { name: '시상 명단', rows, cols: [16, 14, 10, 34, 9, 9, 13, 14], heights: { [rows.length - 6]: 34 } };
 }
-async function xlOut(kind, btn) {
+// ---------- ⬇ 결산 4종 엑셀 (11/27 소장님: 객실정비현황 · 청구금액 · 연장근로 · 유닛누계 — 통일감 있고 세련되게)
+//   네 장 모두 같은 틀: 제목(네이비 18pt) · 부제 · 가로 KPI 띠(주황 세로선) · 네이비 머리줄(토 파랑 · 일 빨강 글자) · 줄무늬 · 합계 줄(옅은 네이비 + 위 굵은 선) · 이름 열 · 머리줄 틀 고정 · A4 가로 한 장 폭
+//   숫자 = 화면(앱 계산)과 같음. 0 은 빈칸 (엑셀 결산 양식처럼)
+const WD = ds => new Date(ds + 'T00:00:00').getDay();
+function clHead(R, title, kp, w = 6) {
+  const m = R.m, ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월', ds = R.ds, f = ds[0], l = ds[ds.length - 1];
+  const src = ds.map(srcOf), nA = src.filter(x => x === '앱').length;
+  const rows = [[{ v: ym + '  ' + title, s: 'title2' }],
+    [{ v: '한화리조트 해운대 · 유니에스   |   ' + (+f.slice(5, 7)) + '/' + (+f.slice(8)) + ' ~ ' + (+l.slice(5, 7)) + '/' + (+l.slice(8)) + ' (' + ds.length + '일' + (nA ? ' · 앱 ' + nA + '일' : '') + ')   |   만든 시각 ' + new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 16).replace('T', ' '), s: 'sub' }], []];
+  // KPI: 한 칸에 3열씩 합침 (이름 열 다음부터)
+  const lab = [], val = [], merge = []; let c = 0;
+  kp.forEach(([k, v, won]) => { lab[c] = { v: k, s: 'kl' }; val[c] = { v, s: won ? 'kvw' : 'kv' }; for (let i = 1; i < w; i++) { lab[c + i] = { v: '', s: 'kl' }; val[c + i] = { v: '', s: won ? 'kvw' : 'kv' }; }
+    merge.push(X_.col(c) + '4:' + X_.col(c + w - 1) + '4', X_.col(c) + '5:' + X_.col(c + w - 1) + '5'); c += w + 1; });
+  rows.push(lab, val, []);
+  return { rows, merge, heights: { 0: 34, 1: 18, 3: 18, 4: 30 } };
+}
+function clDays(R, lead) { return lead.concat(R.ds.map(x => ({ v: (+x.slice(8)) + '\n' + '일월화수목금토'[WD(x)], s: WD(x) === 6 ? 'hsat' : WD(x) === 0 ? 'hsun' : 'hl' }))); }
+const nz = v => (v === 0 || v === '' || v == null ? '' : typeof v === 'number' ? +v.toFixed(2) : v);
+function shRoom(R) {
+  const H = clHead(R, '객실정비현황', [['월 정비수 (청구 기준)', R.S], ['일평균 정비수', +(R.S / (R.ds.length || 1)).toFixed(1)], ['정비 인원 (명단)', R.names.filter(n => R.per(n).some(v => v > 0)).length + '명'], ['교육생 유닛', R.trS]]);
+  const rows = H.rows; rows.push(clDays(R, [{ v: '성  명', s: 'hl' }]).concat(['총정비수', '정비일수', '평균'].map(v => ({ v, s: 'hl' }))));
+  const hr = rows.length; let z = 0;
+  const line = (n, u) => { const s = u.reduce((a, b) => a + b, 0), dn = u.filter(v => v > 0).length, k = z++ % 2;
+    rows.push([{ v: n, s: 'nm' + k }].concat(u.map(v => ({ v: nz(v), s: 'z' + k })), [{ v: nz(s), s: 'em0' }, { v: nz(dn), s: 'z' + k }, { v: dn ? s / dn : '', s: 'd' + k }])); };
+  R.names.forEach(n => { const u = R.per(n); if (u.some(v => v > 0)) line(n, u); });
+  if (OPT.trainee && R.per(TRAINEE).some(v => v > 0)) line(TRAINEE, R.per(TRAINEE));
+  rows.push([{ v: '정비수', s: 'tl' }].concat(R.tot.map(v => ({ v: nz(v), s: 'tn' })), [{ v: R.S, s: 'tn' }, { v: '', s: 'tn' }, { v: '', s: 'tn' }]));
+  rows.push([{ v: '인원', s: 'tl' }].concat(R.cnt.map(v => ({ v: nz(v), s: 'tn' })), [{ v: R.cnt.reduce((a, b) => a + b, 0), s: 'tn' }, { v: '', s: 'tn' }, { v: '', s: 'tn' }]));
+  rows.push([], [{ v: '평균 = 총정비수 ÷ 정비일수 · 유닛 기준(로얄 2 · 간단 0.5 · 2901 PLT 인원수) · 교육생 ' + (OPT.trainee ? '포함' : '제외'), s: 'sub' }]);
+  return { name: '객실정비현황', rows, merge: H.merge, heights: Object.assign(H.heights, { [hr - 1]: 30 }), cols: [13].concat(R.ds.map(() => 4.6), [9, 8, 7]), freeze: hr, freezeCol: 1, rowH: 19 };
+}
+function shBill(R) {
+  const P2 = R.cnt.reduce((a, b) => a + b, 0);
+  const H = clHead(R, '청구금액', [['청구 금액', R.S * OPT.rate, 1], ['월 정비수', R.S], ['정비 단가', OPT.rate, 1], ['정비수 / 인', P2 ? +(R.S / P2).toFixed(2) : '']], 3);
+  const rows = H.rows; rows.push(clDays(R, [{ v: '구  분', s: 'hl' }]).concat([{ v: (+R.m.slice(5)) + '월 합계', s: 'hl' }]));
+  const hr = rows.length;
+  rows.push([{ v: '정비수', s: 'nm0' }].concat(R.tot.map(v => ({ v: nz(v), s: 'z0' })), [{ v: R.S, s: 'em0' }]));
+  rows.push([{ v: '정비인원', s: 'nm1' }].concat(R.cnt.map(v => ({ v: nz(v), s: 'z1' })), [{ v: P2, s: 'em0' }]));
+  rows.push([{ v: '정비수 / 인', s: 'nm0' }].concat(R.tot.map((v, k) => ({ v: R.cnt[k] ? v / R.cnt[k] : '', s: 'd0' })), [{ v: P2 ? R.S / P2 : '', s: 'd0' }]));
+  rows.push([{ v: '금액', s: 'tl' }].concat(R.tot.map(v => ({ v: nz(v * OPT.rate), s: 'tw' })), [{ v: R.S * OPT.rate, s: 'tw' }]));
+  rows.push([], [{ v: '비고 — 로얄 ' + R.roy + '실 · 패밀리 ' + R.fam + ' · 금액 = 정비수 × ' + OPT.rate.toLocaleString() + '원 · 교육생 청구 ' + (OPT.trainee ? '포함 (도급비)' : '제외') + (R.trS ? ' ' + R.trS + '유닛' : ''), s: 'sub' }]);
+  return { name: '청구금액', rows, merge: H.merge, heights: Object.assign(H.heights, { [hr - 1]: 30 }), cols: [13].concat(R.ds.map(() => 9.6), [13]), freeze: hr, freezeCol: 1, rowH: 19 };
+}
+function shOt(R) {
+  const AWN = awByName(R.m), list = R.names.filter(n => R.per(n).some(v => R.otv(v) > 0) || AWN[n]).concat(Object.keys(AWN).filter(n => !R.names.includes(n)));
+  let awU = 0, awX = 0, payT = 0; const dayT = R.ds.map(() => 0);
+  const body = list.map((n, i) => { const o = R.names.includes(n) ? R.per(n).map(R.otv) : R.ds.map(() => 0), s = o.reduce((a, b) => a + b, 0), a = AWN[n] || { u: 0, x: 0 }, pay = (s + a.u) * OPT.ot + a.x, k = i % 2;
+    o.forEach((v, j) => { dayT[j] += v; }); awU += a.u; awX += a.x; payT += pay;
+    return [{ v: n + (R.names.includes(n) ? '' : ' (명단 밖)'), s: 'nm' + k }].concat(o.map(v => ({ v: nz(v), s: 'z' + k })), [{ v: nz(s), s: 'z' + k }, { v: nz(s * OPT.ot), s: 'w' + k }, { v: nz(a.u) + (a.x ? (a.u ? ' + ' : '') + a.x.toLocaleString() + '원' : ''), s: 'z' + k }, { v: nz(pay), s: 'em1' }]); });
+  const S = dayT.reduce((a, b) => a + b, 0);
+  const H = clHead(R, '연장근로', [['지급 금액 합계', payT, 1], ['연장 유닛', +S.toFixed(2)], ['연장 금액', S * OPT.ot, 1], ['시상 (OT 수량)', awU + (awX ? ' + ' + awX.toLocaleString() + '원' : '')]]);
+  const rows = H.rows; rows.push(clDays(R, [{ v: '성  명', s: 'hl' }]).concat(['합계', '금액', '시상', '지급 금액'].map(v => ({ v, s: 'hl' }))));
+  const hr = rows.length; body.forEach(r => rows.push(r));
+  rows.push([{ v: '합  계', s: 'tl' }].concat(dayT.map(v => ({ v: nz(v), s: 'tn' })), [{ v: nz(S), s: 'tn' }, { v: S * OPT.ot, s: 'tw' }, { v: nz(awU) + (awX ? ' + ' + awX.toLocaleString() + '원' : ''), s: 'tn' }, { v: payT, s: 'tw' }]));
+  rows.push([], [{ v: '연장 = 하루 ' + OPT.otMin + '유닛 이상인 날 (유닛 − ' + OPT.otBase + ') · 단가 ' + OPT.ot.toLocaleString() + '원 · 시상 = 🏆 시상의 「당월 지급 대상 · 시상 완료」 (1건 = ' + AW_PER + '실) · 지급 금액 = (연장 + 시상) × ' + OPT.ot.toLocaleString() + '원 + 추가 금액', s: 'sub' }]);
+  return { name: '연장근로', rows, merge: H.merge, heights: Object.assign(H.heights, { [hr - 1]: 30 }), cols: [13].concat(R.ds.map(() => 4.6), [7, 11.5, 10, 12.5]), freeze: hr, freezeCol: 1, rowH: 19 };
+}
+function shUnit(R) {
+  const T = k => R.C.reduce((a, c) => a + (c.U[k] || 0), 0);
+  const H = clHead(R, '유닛누계', [['정비수 · 패밀리', T('정비수:패밀리')], ['정비수 · 로얄', T('정비수:로얄')], ['정비수 · PLT', T('정비수:PLT')], ['미정비 (전체)', T('미정비:패밀리') + T('미정비:로얄') + T('미정비:PLT')]]);
+  const rows = H.rows; rows.push(clDays(R, [{ v: '구  분', s: 'hl' }, { v: '형태', s: 'hl' }]).concat([{ v: '합계', s: 'hl' }]));
+  const hr = rows.length, merge = H.merge.slice();
+  ['정비수', '미정비', '재실청소', '간단재실'].forEach(a => { merge.push('A' + (rows.length + 1) + ':A' + (rows.length + 3));
+    ['패밀리', '로얄', 'PLT'].forEach((b, j) => { const k = a + ':' + b, v = R.C.map(c => c.U[k] || 0);
+      rows.push([{ v: j ? '' : a, s: 'grp' }, { v: b, s: 'nm0' }].concat(v.map(x => ({ v: nz(x), s: 'yel' })), [{ v: nz(v.reduce((p, q) => p + q, 0)), s: 'em0' }])); }); });
+  rows.push([], [{ v: '노란 칸 = 결산 양식에 그대로 붙여 넣는 칸 (엑셀 유닛누계와 같은 배치) · 정비수 = 배정된 방 · 미정비 = 퇴실 · 이월 · 예정인데 배정 없는 방', s: 'sub' }]);
+  return { name: '유닛누계', rows, merge, heights: Object.assign(H.heights, { [hr - 1]: 30 }), cols: [11, 8].concat(R.ds.map(() => 4.6), [8]), freeze: hr, freezeCol: 2, rowH: 19 };
+}
+const CL_SH = { room: shRoom, bill: shBill, ot: shOt, unit: shUnit }, CL_NM = { room: '객실정비현황', bill: '청구금액', ot: '연장근로', unit: '유닛누계' };
+let X_ = null;
+async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = await import('../xlsxw.js'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.27-14'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
+    else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
     else {
       const R = drawClose({ m }), ds = R.ds, src = ds.map(srcOf), nE = src.filter(x => x !== '앱').length, nA = src.length - nE;
       const sub = '한화리조트 해운대 · 앱 계산 (' + ds.length + '일: 엑셀 사본 ' + nE + '일' + (nA ? ' · 앱 ' + nA + '일' : '') + ') · 정비 단가 ' + OPT.rate.toLocaleString() + '원 · 연장 ' + OPT.otMin + ' 이상 −' + OPT.otBase + ' × ' + OPT.ot.toLocaleString() + '원 · 교육생 청구 ' + (OPT.trainee ? '포함' : '제외');
       const kp = [['정비수 (청구 기준)', R.S], ['청구 금액 (원)', R.S * OPT.rate], ['연장근로 유닛', R.OT], ['연장근로 금액 (원)', R.OT * OPT.ot], ['로얄 (실)', R.roy], ['패밀리 정비수', R.fam], ['교육생 유닛 (청구 포함분)', R.trS], ['명단 (명)', R.names.length], ['날짜 수', ds.length]];
       const sum = { name: '요약', rows: [[{ v: ym + ' 객실 정비 결산', s: 'title' }], [{ v: sub, s: 'sub' }], []].concat(kp.map(([k, v]) => [{ v: k, s: 'kpil' }, { v, s: 'kpiv' }])).concat([[], [{ v: '날짜별 자료: ' + ds.map((x, i) => (+x.slice(8)) + '일 ' + src[i]).join(' · '), s: 'foot' }]]), cols: [26, 18] };
-      sheets = [sum, tableSheet('객실정비현황', ym + ' 객실정비현황', R.html.room, sub), tableSheet('청구금액', ym + ' 청구금액', R.html.bill, sub), tableSheet('연장근로', ym + ' 연장근로', R.html.ot, sub), tableSheet('유닛누계', ym + ' 유닛누계', R.html.unit, sub)]
+      sheets = [sum, shRoom(R), shBill(R), shOt(R), shUnit(R)]
         .concat([awardSheet(m, R)]).concat(ds.map(x => gridSheet(x, (+x.slice(8)) + '일')));
       fn = '정비결산_' + m + '.xlsx';
     }
@@ -1117,6 +1190,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.27-10"></script>
+<script type="module" src="jbr.js?v=2026.11.27-14"></script>
 </body>
 </html>
