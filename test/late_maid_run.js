@@ -64,8 +64,8 @@ async function ctxOf(browser, s, vp, anon) {
   await p.evaluate(async d => { const S = await import('./store.js'); await S.merge('meta/late_' + d, { rooms: { '1202': { at: '13:00', out: true, outAt: Date.now(), outHm: '12:41' } } }); }, DAY);
   await sleep(500);
   ok(await p.locator('.room.lateout[data-room="1202"]').count() === 1, '1202 보라 채움 · 깜빡임');
-  ok(/12:41 퇴실됐어요 · 바로 정비/.test(await p.textContent('[data-room="1202"]')), '1202 "12:41 퇴실됐어요 · 바로 정비"');
-  ok(/1202호 퇴실됐어요/.test(await p.textContent('.lateb.go')), '위 보라 띠 "1202호 퇴실됐어요"');
+  ok(/12:41 퇴실 · 정비 가능/.test(await p.textContent('[data-room="1202"]')), '1202 "12:41 퇴실 · 정비 가능"');
+  ok(/1202호 늦은 퇴실 손님이 퇴실하셨어요/.test(await p.textContent('.lateb.go')) && /정비 가능해요/.test(await p.textContent('.lateb.go')), '위 보라 띠 "1202호 늦은 퇴실 손님이 퇴실하셨어요 · 정비 가능해요"');
   const v = await p.evaluate(() => window.__vib), n = await p.evaluate(() => window.__notes);
   ok(v.length === 1 && Array.isArray(v[0]) && v[0].length === 5, '진동 한 번 (길게 3번)');
   ok(n.length === 1 && /1202호 퇴실/.test(n[0][0]), '휴대폰 알림 1건: ' + (n[0] || []).join(' / '));

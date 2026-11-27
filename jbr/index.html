@@ -900,7 +900,7 @@ document.addEventListener('click', e => {
   }
   if (t.dataset.lateout) { const r = t.dataset.lateout, i = P.rooms.indexOf(r), x = R().rooms[i];
     if (live(day) && x && x.st !== '1') apply([i], y => { y.st = '1'; });   // 그 방 = 1 퇴실
-    window.JBR.late.out(day, r, true); toast('🔔 ' + r + '호 퇴실 — ' + (x && x.nm ? x.nm + ' 님 휴대폰이 울려요' : '아직 배정된 메이드가 없어요')); return; }
+    window.JBR.late.out(day, r, true); toast('🔔 ' + r + '호 퇴실 — ' + (x && x.nm ? x.nm + ' 님 휴대폰에 「정비 가능해요」 알림' : '아직 배정된 메이드가 없어요')); return; }
   if (t.dataset.lateun) { window.JBR.late.out(day, t.dataset.lateun, false); toast(t.dataset.lateun + '호 퇴실 표시를 되돌렸어요 (방 상태는 그대로)'); return; }
   if (t.dataset.latedel) { window.JBR.late.del(day, t.dataset.latedel); toast(t.dataset.latedel + '호 늦은 퇴실을 뺐어요'); return; }
   if (t.dataset.preset) { preset1125(); draw(); return; }
