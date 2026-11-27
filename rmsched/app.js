@@ -419,9 +419,9 @@ function noticeHtml() {
   const w = S.w;
   let h = `<div class="tools"><button class="pri" data-copyimg="ntPaper">이미지 복사</button><button id="copyNt">카톡용 글 복사</button><span class="lbl">메이드님들 카톡방에 올리는 주간 휴무 공지</span></div>`;
   h += `<div class="scroll" style="border:0;background:none"><div class="paper ntc" id="ntPaper"><h2>${esc(C.weekTitle(w))} 룸메이드 휴무 공지</h2><div class="sub">${md(w.mon)} ~ ${md(addDays(w.mon, 6))} · 신청 = 신청 휴무 · 사유 = 사유 있는 휴무 · 휴 = 지정 휴무 · 빨간 테두리 = 휴무 취소(출근)</div>
-    <table class="g"><tr><th>신청순</th><th>직원성명</th>${DAYS.map((d, i) => `<th class="${i === 5 ? 'sat' : i === 6 ? 'sun' : ''}">${d}<br>${md(addDays(w.mon, i))}</th>`).join('')}<th>이번주</th></tr>
+    <table class="g"><tr><th>신청순</th><th>직원성명</th>${DAYS.map((d, i) => `<th class="${i === 5 ? 'sat' : i === 6 ? 'sun' : ''}">${d}<br>${md(addDays(w.mon, i))}</th>`).join('')}</tr>
     ${w.rows.filter(r => r.name).map(r => `<tr class="${r.group === '고정' ? 'fx' : ''}"><td class="${ordCls(r.ord) || 'nord'}" style="font-weight:700">${isNum(r.ord) ? r.ord : '미신청'}</td><td class="nm">${esc(r.name)}</td>
-      ${r.st.map(st => `<td class="${st ? 'st-' + st : ''}" style="font-weight:700;min-width:52px">${esc(st)}</td>`).join('')}<td style="font-weight:700">${C.rowCalc(w, r).cnt}</td></tr>`).join('')}
+      ${r.st.map(st => `<td class="${st ? 'st-' + st : ''}" style="font-weight:700;min-width:52px">${esc(st)}</td>`).join('')}</tr>`).join('')}
     </table><div style="margin-top:10px;font-size:12.5px;color:#5d6b80">문의 · 객실팀 사무실 051-749-5210 · 051-749-5211 · 카카오톡 '룸메이드 오더방'</div></div></div>`;
   h += `<div class="card" style="margin-top:14px"><h3>요일별 휴무 <small>요일을 누르면 명단이 보여요 · 고정 근무자 제외 · '카톡용 글 복사'는 아래 내용 그대로</small></h3><div class="nd">
     ${C.noticeDays(w).map(x => `<details><summary><b>${x.d} ${md(x.date)}</b><span>휴무 <em>${x.off.length}</em>명</span>${x.back.length ? `<span class="bk">취소 ${x.back.length}명</span>` : ''}</summary>
