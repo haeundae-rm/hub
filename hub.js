@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.27-17';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.27-17';
-import * as PIN from './pin.js?v=2026.11.27-17';
-import { setupClose } from './close.js?v=2026.11.27-17';
-import { setupClosing } from './closing.js?v=2026.11.27-17';
-import { supProgress } from './supcalc.js?v=2026.11.27-17';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.27-17';
-import { setupMeal } from './meal.js?v=2026.11.27-17';
-import * as BD from './bday.js?v=2026.11.27-17';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.27-19';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.27-19';
+import * as PIN from './pin.js?v=2026.11.27-19';
+import { setupClose } from './close.js?v=2026.11.27-19';
+import { setupClosing } from './closing.js?v=2026.11.27-19';
+import { supProgress } from './supcalc.js?v=2026.11.27-19';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.27-19';
+import { setupMeal } from './meal.js?v=2026.11.27-19';
+import * as BD from './bday.js?v=2026.11.27-19';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.27-17';
+const VER = '2026.11.27-19';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -725,7 +725,7 @@ let CL = null, CLG = null;   // CLG = 결산마감 특이사항 (closing.js · 2
 // ---------- 첫 화면 · 안쪽 화면 (2026-11-18-4)
 // 주소 끝 # 로 어느 화면인지 나눔: '' 첫 화면 · #work(/now|up|dirty) · #quality · #people · #assign · #apps
 const SECS = {
-  work: { ic: BROOM, t: '오늘 정비', tabs: [['now', '상황'], ['up', '보고서 올리기'], ['dirty', '더티 · 활동'], ['asg', '자동 배정']] },
+  work: { ic: BROOM, t: '오늘 정비', tabs: [['now', '상황'], ['up', '보고서 올리기'], ['dirty', '더티 · 활동']] },   // 11/27 소장님: 자동 배정 탭 뺌 → 📑 정비보고서 창의 「🧩 자동 배정」에서 (같은 화면을 ?embed=asg 로 엶)
   quality: { ic: '🔍', t: '품질 관리' },
   people: { ic: '👥', t: '인사' },
   field: { ic: '📱', t: '현장 관리' },
@@ -735,7 +735,7 @@ const SECS = {
   apps: { ic: '🔗', t: '현장 앱 열기' }
 };
 const TILES = [
-  { go: 'work', ic: BROOM, t: '오늘 정비', s: '메이드별 현황 · 보고서 올리기 · 더티 배분 · 활동판 · 자동 배정' },
+  { go: 'work', ic: BROOM, t: '오늘 정비', s: '메이드별 현황 · 보고서 올리기 · 더티 배분 · 활동판' },
   { href: './jbr/', win: 1, ic: '📑', t: '정비보고서', s: '객실 현황 · 입력 · 결산 · 시상 · 엑셀 (노트북은 새 창)' },   // 11/27 소장님: 하우스키퍼 안 → 메인 큰 버튼 (중요 · 자주 들어감)
   { go: 'quality', ic: '🔍', t: '품질 관리', s: '인스펙션 · 고객만족도 VOC' },
   { href: './leave/', ic: '📋', t: '룸메이드 연차 · 근무', s: '연차 현황 · 신청서 승인 · 휴대폰 승인' },
@@ -751,9 +751,18 @@ const TILES = [
 ];
 const FIELD = ['../rm/', '../dirty/', '../unies-contract/'];
 let route = { sec: '', tab: '' }, fromHome = false;
+// 🧩 정비보고서 창 안에서 여는 허브 (11/27): ?embed=asg | notes | blocks → 로그인되면 그 창을 바로 엶. 자동 배정을 사용자가 닫으면(올리는 중 아니면) 정비보고서 창에 알려서 겹창을 닫음
+const EMBQ = new URLSearchParams(location.search).get('embed') || '';
+let EMBED = EMBQ || (/^#(assign|work\/asg)/.test(location.hash) ? 'asg' : ''), embedDone = false;
+window.__hubBusy = () => !!(up && (up.sending || (up.res && !up.sent)));
+function embedOpen() {
+  if (!EMBED || embedDone || !admin) return; embedDone = true; if (EMBQ) document.body.classList.add('embed');
+  if (EMBED === 'notes') { openAsgNotes(); return; }
+  openAssignUI(EMBED === 'blocks' ? 'blocks' : '').then(() => { const o = new MutationObserver(() => { if (document.getElementById('asp') || document.querySelector('.vp')) return; if (!EMBQ || window.__hubBusy() || (up && up.sent && !up.sent.done)) return; o.disconnect(); try { window.parent.postMessage({ hub: 'embedclose' }, location.origin); } catch (e) {} }); o.observe(document.body, { childList: true }); });
+}
 function parseRoute() {
   const m = location.hash.replace(/^#/, '').split('/');
-  if (m[0] === 'assign') { m[0] = 'work'; m[1] = 'asg'; }   // 11/18-4 주소 (자동 배정 따로 쪽) 그대로 열리게
+  if (m[0] === 'assign' || (m[0] === 'work' && m[1] === 'asg')) { m[0] = 'work'; m[1] = 'up'; if (!EMBED) EMBED = 'asg'; }   // 예전 자동 배정 주소 → 자동 배정 창을 바로 엶 (11/27 탭 뺌)
   const sec = SECS[m[0]] && !((m[0] === 'people' || m[0] === 'close') && isHk()) ? m[0] : '';
   const tabs = sec && SECS[sec].tabs;
   let tab = tabs && tabs.some(t => t[0] === m[1]) ? m[1] : '';
@@ -907,6 +916,7 @@ function draw() {
     '<div class="foot">객실 통합 관리 시스템 ' + VER + ' · <button data-logout="1">로그아웃</button></div>';
 }
 window.addEventListener('hashchange', () => {
+  if (/^#(assign|work\/asg)/.test(location.hash)) { EMBED = 'asg'; embedDone = false; setTimeout(embedOpen, 0); }   // 예전 자동 배정 주소
   route = parseRoute();
   if (!route.sec) fromHome = false;
   draw(); window.scrollTo(0, 0);
@@ -1013,6 +1023,7 @@ S.onUser(u => {
   if (ML) ML.reset();
   draw();
   if (admin) reload(true);
+  if (admin) setTimeout(embedOpen, 0);
 });
 setInterval(() => { if (admin && document.visibilityState === 'visible') { head(); } }, 60000);
 draw();

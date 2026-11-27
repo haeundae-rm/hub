@@ -147,9 +147,8 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   }
   console.log('⑥ 정비 레포트 관리자 화면을 허브 안에서');
   await p.click('[data-go="work"]'); await sleep(300);
-  await p.click('[data-tab="asg"]'); await sleep(200);
-  ok(/자동 배정 열기/.test(await p.innerText('main')), '자동 배정은 오늘 정비 탭으로');
-  await p.click('[data-asg="notes"]'); await p.waitForSelector('#anp .an-list li', { timeout: 6000 }).catch(() => {});
+  ok(await p.locator('[data-tab="asg"]').count() === 0, '오늘 정비에 자동 배정 탭 없음 (11/27 → 📑 정비보고서 창의 🧩 자동 배정)');
+  await p.goto(BASE + 'hub/?embed=notes#work'); await p.waitForSelector('#anp .an-list li', { timeout: 8000 }).catch(() => {});
   const an = await p.innerText('#anp');
   ok(/질문 있어요/.test(an) && /1203 · 1205/.test(an) && /같은 분에게 줄까요/.test(an), '배정 의견: 지난 의견 · 질문 · 답 · 객실 번호');
   await p.click('#anp [data-an="re"]'); await sleep(150);
@@ -160,7 +159,8 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(/저장했어요/.test(await p.innerText('#anp')), '배정 의견: 저장 안내');
   await p.click('#anp [data-an="close"]'); await sleep(150);
   ok(await p.locator('#anp').count() === 0, '배정 의견: 닫기');
-  await p.click('[data-tab="now"]'); await sleep(200);
+  await p.goto(BASE + 'hub/#work/now'); await sleep(1500);
+  await p.click('[data-tab="now"]').catch(() => {}); await sleep(200);
   await p.click('[data-rm="today"]');
   const fr = () => p.frameLocator('#rmf');
   const okM = await fr().locator('[data-view]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
@@ -230,7 +230,8 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   ok(!(await p.evaluate(() => Object.keys(window.__seed).some(x => /^notices\/hub-/.test(x)))), '내리기 = 지움');
   await p.click('[data-home]'); await sleep(200);
   await p.goto(BASE + 'hub/#assign'); await sleep(800);
-  ok(/자동 배정 열기/.test(await p.innerText('main')), '예전 주소 #assign → 오늘 정비 · 자동 배정');
+  await p.waitForSelector('#asp', { timeout: 6000 }).catch(() => {});
+  ok(await p.locator('#asp').count() === 1, '예전 주소 #assign → 자동 배정 창 바로 열림 (11/27 탭 뺌)');
   await p.goto(BASE + 'hub/'); await sleep(800);
   console.log('⑧ 🔒 화면 비밀번호');
   const keep = () => p.evaluate(d => { window.__seed['uploads/hubpin'] = d; }, pd);   // 가짜 store 는 새로 열 때마다 처음 자료로 돌아가서 다시 넣음

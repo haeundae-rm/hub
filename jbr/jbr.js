@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.27-17';
+const VER = '2026.11.27-19';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -160,7 +160,7 @@ const SV = {
     const d = { date: ds, src: 'app', file: '', rooms: base.rooms.slice(), r, xl: {}, cards: [], groups: [], at: S.SERVER_TIME, by: by(), made: S.SERVER_TIME };
     if (ds < LIVE_FROM) Object.assign(d, { r0: r, g0: [], onAt: S.SERVER_TIME, onBy: by() });   // 연습: 「연습 끝내기」 가능
     save(ds, 'set', d, { k: 'new' });
-    window.JBR.toast('🌙 ' + +ds.slice(5, 7) + '/' + +ds.slice(8) + ' 초안을 만들었어요 — 전 객실 4(퇴실 예정). 연박 · 공실 · 재실을 표시한 뒤 허브 🧩 자동 배정에서 「📋 정비보고서 앱에서 불러오기」');
+    window.JBR.toast('🌙 ' + +ds.slice(5, 7) + '/' + +ds.slice(8) + ' 초안을 만들었어요 — 전 객실 4(퇴실 예정). 연박 · 공실 · 재실을 표시한 뒤 위 「🧩 자동 배정」에서 「📋 정비보고서 앱에서 불러오기」');
   },
   rooms(ds, ch) {
     const r = {}; Object.keys(ch).forEach(k => { r[k] = clip(ch[k].a); ch[k] = { b: clip(ch[k].b), a: r[k] }; });
