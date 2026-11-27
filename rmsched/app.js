@@ -372,7 +372,7 @@ function hkHtml() {
   //   하우스키퍼 계정은 HK 전파 (전체)만
   const P = S.hkOnly ? 'all' : (S.hkPart || 'all'), PL = { all: ['HK 전파 (전체)', 'HK전파'], rm: ['룸메이드 방배정표', '방배정표'], sup: ['정비보조 명단', '정비보조명단'] };
   let h = (S.hkOnly ? snapChips() : dayChips() + `<div class="tools"><span class="lbl">보낼 것</span><div class="seg">${Object.keys(PL).map(k => `<button data-hkp="${k}" class="${P === k ? 'on' : ''}">${PL[k][0]}</button>`).join('')}</div></div>`) + `
-    <div class="tools"><button class="pri" data-share="hkPaper" data-fn="${PL[P][1]}_${V.date}" data-ttl="${t} ${PL[P][0]}">카톡으로 공유</button><button id="saveImg" data-el="hkPaper" data-fn="${PL[P][1]}_${V.date}">이미지로 저장</button><button id="copyHk">카톡용 글 복사</button><span class="lbl">${S.hkOnly ? '보기 전용 · 소장 · 부소장님이 저장한 내용이에요' : P === 'sup' ? '정비보조 출근은 주간 스케줄 → 정비보조 출근에서 표시해요' : P === 'rm' ? '룸메이드 공지용 — 정비유닛 없이 순번 · 성함만 나가요' : '빨간 숫자 = 일일 스케줄 \'유닛 수정\'으로 기본보다 늘어난 유닛'}</span></div>`;
+    <div class="tools"><button class="pri" data-share="hkPaper" data-fn="${PL[P][1]}_${V.date}" data-ttl="${t} ${PL[P][0]}">카톡으로 공유</button><button id="saveImg" data-el="hkPaper" data-fn="${PL[P][1]}_${V.date}">이미지로 저장</button><button data-copyimg="hkPaper">이미지 복사</button><button id="copyHk">카톡용 글 복사</button><span class="lbl">${S.hkOnly ? '보기 전용 · 소장 · 부소장님이 저장한 내용이에요' : P === 'sup' ? '정비보조 출근은 주간 스케줄 → 정비보조 출근에서 표시해요' : P === 'rm' ? '룸메이드 공지용 — 정비유닛 없이 순번 · 성함만 나가요' : '빨간 숫자 = 일일 스케줄 \'유닛 수정\'으로 기본보다 늘어난 유닛'}</span></div>`;
   h += `<div class="scroll" style="border:0;background:none"><div class="paper hk ${P !== 'all' ? 'one' : ''}" id="hkPaper">
     ${P === 'sup' ? '' : `<div><div class="ttl">${t} RM 방배정표</div><table><tr><th>순번</th><th>성함</th>${P === 'rm' ? '' : '<th>정비유닛</th>'}</tr>
       ${Array.from({ length: n }, (_, i) => { const x = V.rm[i]; return `<tr><td>${x ? i + 1 : ''}</td><td class="nmc">${x ? esc(x.r.name) : ''}</td>${P === 'rm' ? '' : `<td class="uc ${x && x.up ? 'up' : ''}">${x ? x.u : ''}</td>`}</tr>`; }).join('')}
@@ -417,7 +417,7 @@ function hkText() {
 // =============== 공지용 ===============
 function noticeHtml() {
   const w = S.w;
-  let h = `<div class="tools"><button class="pri" data-share="ntPaper" data-fn="휴무공지_${w.mon}" data-ttl="${esc(C.weekTitle(w))} 휴무 공지">카톡으로 공유</button><button id="saveImg" data-el="ntPaper" data-fn="휴무공지_${w.mon}">이미지로 저장</button><button id="copyNt">카톡용 글 복사</button><span class="lbl">메이드님들 카톡방에 올리는 주간 휴무 공지</span></div>`;
+  let h = `<div class="tools"><button class="pri" data-share="ntPaper" data-fn="휴무공지_${w.mon}" data-ttl="${esc(C.weekTitle(w))} 휴무 공지">카톡으로 공유</button><button id="saveImg" data-el="ntPaper" data-fn="휴무공지_${w.mon}">이미지로 저장</button><button data-copyimg="ntPaper">이미지 복사</button><button id="copyNt">카톡용 글 복사</button><span class="lbl">메이드님들 카톡방에 올리는 주간 휴무 공지</span></div>`;
   h += `<div class="scroll" style="border:0;background:none"><div class="paper ntc" id="ntPaper"><h2>${esc(C.weekTitle(w))} 룸메이드 휴무 공지</h2><div class="sub">${md(w.mon)} ~ ${md(addDays(w.mon, 6))} · 신청 = 신청 휴무 · 사유 = 사유 있는 휴무 · 휴 = 지정 휴무 · 빨간 테두리 = 휴무 취소(출근)</div>
     <table class="g"><tr><th>신청순</th><th>직원성명</th>${DAYS.map((d, i) => `<th class="${i === 5 ? 'sat' : i === 6 ? 'sun' : ''}">${d}<br>${md(addDays(w.mon, i))}</th>`).join('')}<th>이번주</th></tr>
     ${w.rows.filter(r => r.name).map(r => `<tr class="${r.group === '고정' ? 'fx' : ''}"><td class="${ordCls(r.ord) || 'nord'}" style="font-weight:700">${isNum(r.ord) ? r.ord : '미신청'}</td><td class="nm">${esc(r.name)}</td>
@@ -484,6 +484,7 @@ $('view').addEventListener('click', e => {
     if (b.dataset.si != null) { S.si = +b.dataset.si; draw(); return; }
     if (b.dataset.hkp) { S.hkPart = b.dataset.hkp; draw(); return; }
     if (b.id === 'saveImg') { saveImg(b.dataset.el, b.dataset.fn); return; }
+    if (b.dataset.copyimg) { copyImg(b.dataset.copyimg); return; }
     if (b.dataset.share) { shareImg(b.dataset.share, b.dataset.fn, b.dataset.ttl); return; }
     if (b.id === 'copyHk') { copy(hkText()); return; }
     if (b.id === 'copyNt') { copy(C.noticeText(S.w)); return; }
@@ -949,6 +950,24 @@ async function shareImg(id, fn, title) {
     if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title }); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; }
   if (await download(fn + '.png', blob)) toast('이미지를 저장했어요 · 카톡 채팅방에서 사진으로 보내 주세요');
+}
+// 이미지 복사 (11/27): 팝업에 이미지를 띄우고 '복사' — PC는 클립보드로 바로(카톡 PC · 채팅창에 Ctrl+V), 휴대폰은 이미지를 길게 눌러 복사
+async function copyImg(id) {
+  toast('이미지 만드는 중…');
+  let blob; try { blob = await makePng(id); } catch (e) { toast('이미지를 만들지 못했어요: ' + (e.message || e)); return; }
+  const url = URL.createObjectURL(blob), canClip = !!(navigator.clipboard && window.ClipboardItem);
+  const m = dlg(`<h3>이미지 복사</h3>
+    <div style="max-height:62vh;overflow:auto;border:1px solid #e3e7ee;border-radius:10px;background:#f6f8fb;padding:6px;text-align:center"><img src="${url}" alt="복사할 이미지" style="max-width:100%;height:auto;display:inline-block"></div>
+    <p class="lbl" style="margin:8px 0 0">${canClip ? '‘복사하기’를 누른 뒤 카톡 채팅창에 붙여 넣으세요 (PC: Ctrl+V). ' : ''}휴대폰은 이미지를 <b>길게 눌러</b> 복사할 수도 있어요.</p>
+    <div class="acts"><button data-a="x">닫기</button>${canClip ? '<button class="pri" data-a="c">복사하기</button>' : ''}</div>`);
+  m.querySelector('.dlg').style.width = 'min(920px,100%)';
+  const done = () => { closeDlg(); URL.revokeObjectURL(url); };
+  m.querySelector('[data-a="x"]').onclick = done;
+  const cb = m.querySelector('[data-a="c"]');
+  if (cb) cb.onclick = async () => {
+    try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); done(); toast('이미지를 복사했어요 · 카톡에 붙여 넣으세요'); }
+    catch (e) { toast('이 기기에서는 바로 복사가 안 돼요 · 이미지를 길게 눌러 복사해 주세요'); }
+  };
 }
 async function copy(txt) { try { await navigator.clipboard.writeText(txt); toast('복사했어요 · 카톡에 붙여 넣으세요'); } catch (e) { dlg(`<h3>아래 글을 길게 눌러 복사하세요</h3><textarea style="min-height:300px">${esc(txt)}</textarea><div class="acts"><button onclick="document.getElementById('dlg').hidden=true">닫기</button></div>`); } }
 async function backupOut() {
