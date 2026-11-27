@@ -514,13 +514,14 @@ function barHtml(d) {
   h += '<span class="row qk" title="방을 누르지 않고 호실 번호만 쳐서 한 번에 처리 (프런트 퇴실 연락 받을 때)"><select class="inp" id="qst"><option value="1">1 퇴실</option><option value="2">2 재실</option><option value="done">완료</option></select><input class="inp num" id="quick" placeholder="호실 번호로: 1203 1205-1207 → Enter" autocomplete="off"></span></div>';
   return h;
 }
-// 우선정비는 4 퇴실 예정 · 3 미정비(이월) 방에만 (11/27 소장님: 끌어서 고를 때 연박 · 공실까지 지정되던 문제)
-const canPrio = x => !!x && !x.yl && (x.st === '4' || x.st === '3');
+// 우선정비는 1 퇴실 · 4 퇴실 예정 · 3 미정비(이월) 방에만 (11/27 소장님: 끌어서 고를 때 연박 · 공실까지 지정되던 문제)
+//   11/27 15:13 소장님: 퇴실된(1) 배정 방도 우선정비가 돼야 함 (3109 시험에서 막힘) → 1 추가. 연박 · 공실 · 재실(2) · 간단은 그대로 빠짐
+const canPrio = x => !!x && !x.yl && (x.st === '1' || x.st === '4' || x.st === '3');
 function sideHtml(d, c) {
   const n = [...sel].filter(i => canPrio(d.rooms[i])).length, nx = sel.size - n;
   let h = '<div class="stabs"><button class="on">' + (drawer === 'grp' ? '단체 현황' : '우선정비') + '</button><button data-drawer="" style="flex:none;width:44px" aria-label="닫기">✕</button></div>';
   if (drawer === 'prio') {
-  h += '<div class="box"><h3>우선정비로 지정</h3><div class="row"><input class="inp" id="pname" placeholder="예: 카이스트 HTL"><input class="inp num" id="ptime" style="width:84px" placeholder="16:00"></div><div class="row" style="margin-top:6px"><select class="inp" id="prank"><option value="1">1순위</option><option value="2">2순위</option><option value="3">3순위</option></select><button class="pbtn" data-mkprio="1"' + (n ? '' : ' disabled') + '>선택한 ' + n + '실 지정</button></div><p class="hint">' + (nx ? '<b style="color:#B26A00">고른 방 중 ' + nx + '실은 연박 · 공실 · 재실 등이라 빠져요</b> · ' : '') + '퇴실 예정(4) · 미정비(3) 방만 지정돼요. 지정한 방은 주황으로 빛나고, 메이드 휴대폰에 순서대로 떠요 (우선정비 탭)</p></div>';
+  h += '<div class="box"><h3>우선정비로 지정</h3><div class="row"><input class="inp" id="pname" placeholder="예: 카이스트 HTL"><input class="inp num" id="ptime" style="width:84px" placeholder="16:00"></div><div class="row" style="margin-top:6px"><select class="inp" id="prank"><option value="1">1순위</option><option value="2">2순위</option><option value="3">3순위</option></select><button class="pbtn" data-mkprio="1"' + (n ? '' : ' disabled') + '>선택한 ' + n + '실 지정</button></div><p class="hint">' + (nx ? '<b style="color:#B26A00">고른 방 중 ' + nx + '실은 연박 · 공실 · 재실 등이라 빠져요</b> · ' : '') + '퇴실(1) · 퇴실 예정(4) · 미정비(3) 방만 지정돼요. 지정한 방은 주황으로 빛나고, 메이드 휴대폰에 순서대로 떠요 (우선정비 탭)</p></div>';
     h += '<div class="box">' + (prioList().length ? prioList().map((p, k) => '<div class="grp"><span class="sw" style="background:var(--org)"></span><span><b>' + esc(p.name) + '</b> <small>' + esc(p.until) + '까지 · ' + p.rank + '순위</small></span><span class="num">' + p.rooms.length + '실 <button data-delp="' + k + '" style="border:0;background:none;color:var(--mute)">빼기</button></span></div>').join('') : '<p class="hint">지정된 우선정비가 없어요</p>') + '</div>';
   } else h += grpHtml(d);
   return h;
@@ -865,7 +866,7 @@ document.addEventListener('click', e => {
   if (t.dataset.mkprio) {
     const name = ($('#pname').value || '우선정비').trim(), until = ($('#ptime').value || '14:00').trim(), rank = +$('#prank').value;
     const d = R(), okI = idx.filter(i => canPrio(d.rooms[i])), skip = idx.length - okI.length;
-    if (!okI.length) { toast('퇴실 예정(4) · 미정비(3) 방만 우선정비로 지정할 수 있어요'); return; }
+    if (!okI.length) { toast('퇴실(1) · 퇴실 예정(4) · 미정비(3) 방만 우선정비로 지정할 수 있어요'); return; }
     prioList().push({ name, rooms: okI.map(i => P.rooms[i]), until, rank, note: '' }); toast(okI.length + '실을 「' + name + '」 ' + until + '까지로 지정했어요' + (skip ? ' · 연박 · 공실 등 ' + skip + '실은 뺐어요' : '')); draw(); return;
   }
   if (t.dataset.preset) { preset1125(); draw(); return; }
@@ -1155,7 +1156,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.27-14'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.27-15'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1190,6 +1191,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.27-14"></script>
+<script type="module" src="jbr.js?v=2026.11.27-15"></script>
 </body>
 </html>
