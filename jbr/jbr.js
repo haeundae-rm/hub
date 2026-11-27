@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.27-14';
+const VER = '2026.11.27-17';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -82,7 +82,7 @@ function tag() {
 }
 
 function watch() {
-  unsub.forEach(f => { try { f(); } catch (e) {} }); unsub = [];
+  unsub.forEach(f => { try { f(); } catch (e) {} }); unsub = []; Object.keys(ltSub).forEach(k => delete ltSub[k]); Object.keys(prSub).forEach(k => delete prSub[k]);
   const from = ym(TODAY, -1) + '-01';
   unsub.push(S.listenQuery('jbr', [['date', '>=', from]], (list, m) => { docs = list.map(x => x.data); meta.fromCache = !!(m && m.fromCache); push(); }, e => { $('#main').innerHTML = '<p style="padding:20px">자료를 읽지 못했어요: ' + esc(e && e.message || e) + ' (규칙 v32 게시 전이면 이렇게 보여요)</p>'; }));
   unsub.push(S.listenDoc('meta/rsync', x => { hb = x; tag(); }, () => {}));
@@ -204,7 +204,35 @@ const SV = {
     } catch (e) { box('<p style="color:#B23A48">기록을 읽지 못했어요: ' + esc(e && e.message || e) + '</p>'); }
   }
 };
-if (window.JBR) window.JBR.sv = SV;
+// 🟣 늦은 퇴실 (11/27): meta/late_{YYYY-MM-DD} = { rooms: { 호실: { at:'13:00', out:bool, outAt(ms), outHm, by } }, at, by }
+//   meta 는 로그인한 누구나 읽기 · 관리자 쓰기(규칙 그대로) → 메이드 레포트 앱이 그날 문서를 들어 보라 빛 · 퇴실 알림
+//   한 칸씩 merge (rooms.{호실}) — 두 사람이 다른 방을 고쳐도 안 덮음. 빼기는 그 방만 지움(deleteField 대신 null → 화면에서 null 은 없음으로)
+const LT = {}, ltSub = {};
+function ltWatch(ds) {
+  if (ltSub[ds] || !role) return; ltSub[ds] = 1;
+  unsub.push(S.listenDoc('meta/late_' + ds, x => { const r = (x && x.rooms) || {}; LT[ds] = {}; Object.keys(r).forEach(k => { if (r[k]) LT[ds][k] = r[k]; }); if (window.JBR && window.JBR.redraw) window.JBR.redraw(); }, () => {}));
+}
+const LATE = {
+  map(ds) { ltWatch(ds); return LT[ds] || {}; },
+  add(ds, rooms, at) { const r = {}; rooms.forEach(k => { r[k] = { at: at || '', out: false, outAt: 0, outHm: '', by: by(), set: Date.now() }; LT[ds] = LT[ds] || {}; LT[ds][k] = r[k]; });
+    track(S.merge('meta/late_' + ds, { date: ds, rooms: r, at: S.SERVER_TIME, by: by() })); if (window.JBR) window.JBR.redraw(); },
+  out(ds, k, on) { const l = Object.assign({}, (LT[ds] || {})[k] || {}, { out: !!on, outAt: on ? Date.now() : 0, outHm: on ? hm(Date.now()) : '', outBy: by() });
+    (LT[ds] = LT[ds] || {})[k] = l; track(S.merge('meta/late_' + ds, { date: ds, rooms: { [k]: l }, at: S.SERVER_TIME, by: by() })); if (window.JBR) window.JBR.redraw(); },
+  del(ds, k) { if (LT[ds]) delete LT[ds][k]; track(S.merge('meta/late_' + ds, { date: ds, rooms: { [k]: null }, at: S.SERVER_TIME, by: by() })); if (window.JBR) window.JBR.redraw(); }
+};
+// 🟠 우선정비 (11/27 15:34): meta/prio_{YYYY-MM-DD} = { date, list: [{ id, name, rooms[], until 'HH:MM', rank, note, at, upd }], at, by }
+//   메이드 레포트 앱이 읽어 주황 표시 + 지정 · 시간 바뀜 알림. 목록을 통째로 씀 (몇 줄뿐)
+const PRL = {}, prSub = {};
+function prWatch(ds) {
+  if (prSub[ds] || !role) return; prSub[ds] = 1; PRL[ds] = PRL[ds] || [];
+  unsub.push(S.listenDoc('meta/prio_' + ds, x => { PRL[ds] = ((x && x.list) || []).map(p => Object.assign({}, p, { rooms: (p.rooms || []).slice() })); if (window.JBR && window.JBR.redraw) window.JBR.redraw(); }, () => {}));
+}
+const PRIOS = {
+  save(ds, list) { const L = list.map(p => ({ id: p.id || 'p' + Math.random().toString(36).slice(2, 8), name: String(p.name || '우선정비').slice(0, 40), rooms: (p.rooms || []).map(String), until: p.until || '', rank: +p.rank || 1, note: String(p.note || '').slice(0, 60), at: p.at || Date.now(), upd: p.upd || 0 }));
+    PRL[ds] = L.map(p => Object.assign({}, p, { rooms: p.rooms.slice() }));
+    track(S.set('meta/prio_' + ds, { date: ds, list: L, at: S.SERVER_TIME, by: by() })); if (window.JBR) window.JBR.redraw(); }
+};
+if (window.JBR) { window.JBR.sv = SV; window.JBR.late = Object.assign(ds => (role ? LATE.map(ds) : null), LATE); window.JBR.prio = Object.assign(ds => { if (!role) return null; prWatch(ds); return PRL[ds]; }, PRIOS); }
 window.addEventListener('online', svPaint); window.addEventListener('offline', svPaint);
 window.addEventListener('beforeunload', e => { if (sv.pend) { e.preventDefault(); e.returnValue = ''; } });
 
