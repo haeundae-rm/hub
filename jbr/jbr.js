@@ -11,7 +11,7 @@
 //   12/1 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.27-3';
+const VER = '2026.11.27-5';
 const LIVE_FROM = '2026-12-01';   // 이날부터 앱이 원본 (저장 저절로 켜짐)
 const ROLES = [
   { label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
@@ -22,6 +22,7 @@ const $ = s => document.querySelector(s);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const seoul = (t = Date.now()) => new Date(t + 9 * 3600e3);
 const TODAY = seoul().toISOString().slice(0, 10);
+const addD = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 const ym = (d, n) => { const y = +d.slice(0, 4), m = +d.slice(5, 7) - 1 + n; return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7); };
 const hm = t => { if (!t) return ''; const d = seoul(Number(t)); return ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2); };
 
@@ -144,6 +145,18 @@ const SV = {
   canOn: ds => ds < LIVE_FROM && ds < TODAY && !!docOf(ds) && docOf(ds).src !== 'app',
   canOff: ds => ds < LIVE_FROM && !!docOf(ds) && docOf(ds).src === 'app' && !!docOf(ds).r0,
   status: svStatus,
+  // 🌙 새 날짜 초안 (11/27 소장님): 기존 엑셀처럼 전 객실 '4 금일 퇴실 예정'만 — 전날 연박 · 미정비는 안 넘김. 연박 · 공실은 하우스맨이 전산 보고 표시
+  //   오늘 · 내일 중 아직 없거나 엑셀 사본인 날. 12/1 전엔 연습(연습 끝내기로 되돌림), 메이드 휴대폰엔 안 감
+  newOk: ds => { const d = docOf(ds); return (ds === TODAY || ds === addD(TODAY, 1)) && (!d || d.src !== 'app'); },
+  newDay(ds) {
+    const base = docs.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).find(x => x.rooms && x.rooms.length);
+    if (!base) { window.JBR.toast('호실 목록을 찾지 못했어요 — 엑셀 사본이 하루라도 있어야 해요'); return; }
+    const r = {}; base.rooms.forEach(k => { r[k] = ['4', '', '', '', 0, 0]; });
+    const d = { date: ds, src: 'app', file: '', rooms: base.rooms.slice(), r, xl: {}, cards: [], groups: [], at: S.SERVER_TIME, by: by(), made: S.SERVER_TIME };
+    if (ds < LIVE_FROM) Object.assign(d, { r0: r, g0: [], onAt: S.SERVER_TIME, onBy: by() });   // 연습: 「연습 끝내기」 가능
+    save(ds, 'set', d, { k: 'new' });
+    window.JBR.toast('🌙 ' + +ds.slice(5, 7) + '/' + +ds.slice(8) + ' 초안을 만들었어요 — 전 객실 4(퇴실 예정). 연박 · 공실 · 재실을 표시한 뒤 허브 🧩 자동 배정에서 「📋 정비보고서 앱에서 불러오기」');
+  },
   rooms(ds, ch) {
     const r = {}; Object.keys(ch).forEach(k => { r[k] = clip(ch[k].a); ch[k] = { b: clip(ch[k].b), a: r[k] }; });
     save(ds, 'merge', { date: ds, r, src: 'app', at: S.SERVER_TIME, by: by() }, { k: 'room', n: Object.keys(ch).length, ch });
@@ -176,7 +189,7 @@ const SV = {
       const fmt = c => Object.keys(c).sort().map(k => { const b = c[k].b || [], a = c[k].a || [];
         const d = FLD.map((f, i) => (String(b[i] || '') === String(a[i] || '') ? '' : i >= 4 ? f + (a[i] ? ' ✓' : ' 풀림') : f + ' 「' + esc(b[i] || '') + '」→「' + esc(a[i] || '') + '」')).filter(Boolean);
         return '<b>' + k + '</b> ' + d.join(', '); }).join('<br>');
-      const what = x => x.k === 'room' ? fmt(x.ch || {}) : x.k === 'groups' ? '단체 ' + (x.g || []).map(g => esc(g.name) + ' ' + String(g.rooms || '').split(',').filter(Boolean).length + '실').join(' · ') : x.k === 'on' ? '💾 실제 저장 켬' : x.k === 'off' ? '연습 끝냄 (켜기 전 자료로)' : esc(x.k);
+      const what = x => x.k === 'room' ? fmt(x.ch || {}) : x.k === 'groups' ? '단체 ' + (x.g || []).map(g => esc(g.name) + ' ' + String(g.rooms || '').split(',').filter(Boolean).length + '실').join(' · ') : x.k === 'new' ? '🌙 초안 만듦 (전 객실 4)' : x.k === 'assign' ? '🧩 자동 배정 확정 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') + '<br>' + fmt(x.ch || {}) : x.k === 'on' ? '💾 실제 저장 켬' : x.k === 'off' ? '연습 끝냄 (켜기 전 자료로)' : esc(x.k);
       const t = x => { const d = seoul(Number(x.at || 0)); return hm(x.at) + ':' + ('0' + d.getUTCSeconds()).slice(-2); };
       box(L.length ? '<table style="width:100%;border-collapse:collapse;font-size:13px">' + L.slice(0, 300).map(x => '<tr style="border-top:1px solid #eee;text-align:left"><td style="padding:5px 8px;white-space:nowrap;vertical-align:top;text-align:left">' + t(x) + '</td><td style="padding:5px 8px;white-space:nowrap;vertical-align:top;text-align:left">' + esc(x.by) + '</td><td style="padding:5px 8px;text-align:left">' + what(x) + '</td></tr>').join('') + '</table>' + (L.length > 300 ? '<p class="hint">최근 300건만 보여요 (전체 ' + L.length + '건)</p>' : '') : '<p class="hint">아직 기록이 없어요</p>');
     } catch (e) { box('<p style="color:#B23A48">기록을 읽지 못했어요: ' + esc(e && e.message || e) + '</p>'); }
