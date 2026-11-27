@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.27-10';
+const VER = '2026.11.27-13';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -150,7 +150,9 @@ const SV = {
   status: svStatus,
   // 🌙 새 날짜 초안 (11/27 소장님): 기존 엑셀처럼 전 객실 '4 금일 퇴실 예정'만 — 전날 연박 · 미정비는 안 넘김. 연박 · 공실은 하우스맨이 전산 보고 표시
   //   오늘 · 내일 중 아직 없거나 엑셀 사본인 날. 11/28 전엔 연습(연습 끝내기로 되돌림), 메이드 휴대폰엔 안 감
-  newOk: ds => { const d = docOf(ds); return (ds === TODAY || ds === addD(TODAY, 1)) && (!d || d.src !== 'app'); },
+  //   (11/27 15:00 소장님) 버튼은 한 날짜만 = 다음 근무일. 09시 전(새벽 · 아침)엔 오늘, 09시부터는 내일 — 키퍼가 새벽에 초안을 짜므로
+  draftDay: () => { const h = new Date(Date.now() + 9 * 3600e3).getUTCHours(), t = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); return h < 9 ? t : addD(t, 1); },
+  newOk: ds => { const d = docOf(ds); return ds === SV.draftDay() && (!d || d.src !== 'app'); },
   newDay(ds) {
     const base = docs.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).find(x => x.rooms && x.rooms.length);
     if (!base) { window.JBR.toast('호실 목록을 찾지 못했어요 — 엑셀 사본이 하루라도 있어야 해요'); return; }
