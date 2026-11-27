@@ -102,7 +102,8 @@ const asp = p => p.innerText('#asp');
   await p.click('#asp [data-as="askyes"]');
   await p.waitForFunction(() => /배정안/.test(document.querySelector('#asp').innerText), null, { timeout: 120000 });
   t = await asp(p);
-  ok(/✅ 확정 → 정비보고서 \(연습/.test(t), '결과 · 확정 단추 (연습 — 메이드 휴대폰엔 안 보냄)');
+  const LIVE = T1 >= '2026-11-28';
+  ok(LIVE ? /✅ 확정 → 정비보고서 \+ 메이드 휴대폰/.test(t) : /✅ 확정 → 정비보고서 \(연습/.test(t), '결과 · 확정 단추 (' + (LIVE ? '11/28부터 = 메이드 휴대폰에도' : '연습') + ')');
   await p.screenshot({ path: '/tmp/jbr_shots/5_nightflow.png' });
 
   console.log('⑦ ✅ 확정 → 정비보고서에 저장');
@@ -115,8 +116,20 @@ const asp = p => p.innerText('#asp');
   ok(Object.keys(d.r).filter(k => Math.floor(k / 100) >= 8 && k !== '3001').every(k => !d.r[k][1]), '연박 · 공실 방엔 이름 없음');
   const logs = await p.evaluate(T1 => Object.keys(window.__seed).filter(k => k.startsWith('jbr/' + T1 + '/log/')).map(k => window.__seed[k]), T1);
   ok(logs.some(x => x.k === 'assign' && x.n === named.length + carry.length) && logs.some(x => x.k === 'new'), '변경 기록: 초안 · 자동 배정 확정');
-  ok(!(await p.evaluate(() => window.__up)), '연습이라 메이드 휴대폰 올리기 안 함');
-  ok(/연습 기간이라 메이드 휴대폰엔 안 보냈어요/.test(await asp(p)), '안내 문구');
+  const up = await p.evaluate(() => window.__up || null);
+  if (LIVE) {
+    ok(up && up.date === T1 && up.res.rows.length === named.length && /정비보고서 앱/.test(up.file), '메이드 휴대폰 올리기 (기존 길) — ' + (up ? up.res.rows.length + '줄 · ' + up.res.summary.maids + '명' : '없음'));
+    ok(up && up.res.rows.some(x => /테마/.test(x[3])) === named.some(k => ['3001', '1707', '2909'].includes(k)) && up.res.rows.every(x => !/미정비/.test(x[3])), '올린 줄: 미정비 방 없음 · 테마 표시');
+    await p.evaluate(() => { window.__up = null; });
+    await p.evaluate(async () => { const S = await import('../../rm/app/store.js'); const m = await import('../assignui.js');
+      const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const ymd = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+      m.openAssign({ S, esc, ymd, addDays, md: d => +d.slice(5, 7) + '/' + +d.slice(8), logErr: () => {}, admin: () => ({ label: '하우스키퍼' }), user: () => ({ uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' }), upload: o => { window.__up = o; } }); });
+    await p.waitForSelector('#asp [data-as="app"]'); await p.click('#asp [data-as="date"][data-v="' + T1 + '"]'); await p.click('#asp [data-as="app"]'); await sleep(600);
+  } else {
+    ok(!up, '연습이라 메이드 휴대폰 올리기 안 함');
+    ok(/연습 기간이라 메이드 휴대폰엔 안 보냈어요/.test(await asp(p)), '안내 문구');
+  }
 
   console.log('⑧ 확정 뒤: 체크리스트 · 오버/다운 · 카톡 요약');
   t = await asp(p);
@@ -139,6 +152,7 @@ const asp = p => p.innerText('#asp');
   ok(d.cards.length === 3 && !d.cards.find(c => c.n === '나래'), '카드 3명 (나래 빠짐)');
   ok(nareRooms.length > 0 && nareRooms.every(k => d.r[k][1] && d.r[k][1] !== '나래'), '나래 ' + nareRooms.length + '실 → 다른 분 (' + [...new Set(nareRooms.map(k => d.r[k][1]))].join(', ') + ')');
   ok(d.asg.noshow.includes('나래') && /노쇼 처리/.test(await asp(p)), '노쇼 기록 · 안내');
+  if (LIVE) { const u2 = await p.evaluate(() => window.__up || null); ok(u2 && u2.res.rows.every(x => x[1] !== '나래') && /노쇼/.test(u2.file), '노쇼 뒤 메이드 휴대폰에 다시 보냄 (나래 없음)'); }
   const named2 = Object.keys(d.r).filter(k => d.r[k][1]).length;
   ok(named2 === named.length, '다른 분 배정 · 전체 수 그대로 (' + named2 + '실)');
 

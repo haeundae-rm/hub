@@ -5,14 +5,15 @@
 //       xl:{정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단 · 총유닛 = 엑셀 요약 칸}, cards:[{n,u,in}], groups:[{name,time,rooms:'101,102'}], roster:[설정 시트 명단] }
 //   지난 날짜는 '엑셀로 채우기'(이 화면)로 한 번에 올림 — 이 브라우저에서 파일을 열어 날짜마다 저장 (src 'app' 인 날은 안 덮음)
 // 규칙 v32: 읽기 · 쓰기 관리자(소장 · 부소장 · 봇 · 하우스키퍼)
-// 💾 실제 저장 (11/27): 저장 켜진 날 = src 'app' 이거나 12/1 이후. 고칠 때마다
+// 💾 실제 저장 (11/27): 저장 켜진 날 = src 'app' (🌙 초안 만들기로 시작한 날 · 연습 켠 날). 고칠 때마다
 //   ① 바뀐 방 칸만 merge(r.{호실}) — 두 사람이 다른 방을 고쳐도 서로 안 덮음 ② jbr/{날}/log 에 전 · 후 기록 쌓기(지우기 없음)
 //   ③ 저장 대기 n건 표시 (오프라인이면 브라우저에 보관했다가 연결되면 자동 전송 — store.js 오프라인 보관) ④ 대기 중엔 자동 새로고침 안 함
-//   12/1 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
+//   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.27-7';
-const LIVE_FROM = '2026-12-01';   // 이날부터 앱이 원본 (저장 저절로 켜짐)
+const VER = '2026.11.27-8';
+const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
+const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
   { label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
   { label: '소장', email: 'unieshaeundae+admin@gmail.com', uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2' },
@@ -46,7 +47,7 @@ export function toP(list, sched) {
     if (d.roster && d.roster.length) M.roster = d.roster;
   }
   // 👥 명단 (11/27 소장님): 12월(앱 원본)부터는 룸메이드 스케줄표의 근래 주간 명단 (HK 전파 사본 rmsched_hk 의 all). 11월까지는 엑셀 설정 시트 명단 그대로
-  Object.keys(months).forEach(m => { const M = months[m]; if (m >= LIVE_FROM.slice(0, 7)) { const L = schedRoster(m, M.days, sched); if (L.length) { M.roster = L; M.rsrc = 'sched'; } } });
+  Object.keys(months).forEach(m => { const M = months[m]; if (m >= ROSTER_FROM) { const L = schedRoster(m, M.days, sched); if (L.length) { M.roster = L; M.rsrc = 'sched'; } } });
   // 명단이 없는 달은 그 달 카드 이름으로
   Object.values(months).forEach(M => { if (!M.roster.length) { const s = new Set(); Object.values(M.days).forEach(x => x.cards.forEach(c => c[0] && s.add(c[0]))); M.roster = [...s]; } });
   return { rooms, months };
@@ -77,7 +78,7 @@ function tag() {
   let s = t ? (t.src === 'app' ? '앱 저장 ' + hm(t.at) : '엑셀 ' + hm(t.at) + ' 읽음') : '오늘 사본 없음';
   s += hbOk ? ' · 연결 켜짐' : ' · <b style="color:#ffb4b4">연결 꺼짐</b>';
   if (meta.fromCache) s += ' · 오프라인';
-  el.innerHTML = s + ' · <b>' + (sv.pend ? '⏳ 저장 대기 ' + sv.pend + '건' : TODAY >= LIVE_FROM ? '💾 앱 원본' : '보기 · 연습') + '</b> <label class="fillb" style="cursor:pointer;text-decoration:underline;margin-left:6px">📥 엑셀로 채우기<input type="file" id="fillFile" accept=".xlsx" hidden></label>' + (fill ? ' <span>' + esc(fill) + '</span>' : '');
+  el.innerHTML = s + ' · <b>' + (sv.pend ? '⏳ 저장 대기 ' + sv.pend + '건' : (docOf(TODAY) && docOf(TODAY).src === 'app') ? '💾 앱 원본' : '엑셀 사본 · 보기') + '</b> <label class="fillb" style="cursor:pointer;text-decoration:underline;margin-left:6px">📥 엑셀로 채우기<input type="file" id="fillFile" accept=".xlsx" hidden></label>' + (fill ? ' <span>' + esc(fill) + '</span>' : '');
 }
 
 function watch() {
@@ -141,12 +142,12 @@ function save(ds, op, data, log) {
 }
 const by = () => (role && role.label) || '';
 const SV = {
-  live: ds => ds >= LIVE_FROM || !!(docOf(ds) && docOf(ds).src === 'app'),
+  live: ds => !!(docOf(ds) && docOf(ds).src === 'app'),   // 11/27: 앱 원본인 날만 (엑셀 사본인 날은 키를 잘못 눌러도 원본이 안 바뀜 → 엑셀 연결이 계속)
   canOn: ds => ds < LIVE_FROM && ds < TODAY && !!docOf(ds) && docOf(ds).src !== 'app',
   canOff: ds => ds < LIVE_FROM && !!docOf(ds) && docOf(ds).src === 'app' && !!docOf(ds).r0,
   status: svStatus,
   // 🌙 새 날짜 초안 (11/27 소장님): 기존 엑셀처럼 전 객실 '4 금일 퇴실 예정'만 — 전날 연박 · 미정비는 안 넘김. 연박 · 공실은 하우스맨이 전산 보고 표시
-  //   오늘 · 내일 중 아직 없거나 엑셀 사본인 날. 12/1 전엔 연습(연습 끝내기로 되돌림), 메이드 휴대폰엔 안 감
+  //   오늘 · 내일 중 아직 없거나 엑셀 사본인 날. 11/28 전엔 연습(연습 끝내기로 되돌림), 메이드 휴대폰엔 안 감
   newOk: ds => { const d = docOf(ds); return (ds === TODAY || ds === addD(TODAY, 1)) && (!d || d.src !== 'app'); },
   newDay(ds) {
     const base = docs.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).find(x => x.rooms && x.rooms.length);

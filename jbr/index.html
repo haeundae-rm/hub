@@ -311,7 +311,7 @@ td.x{color:var(--bad);font-weight:800;background:#FDECEC}td.trd{background:#FFF1
 </head>
 <body>
 <header>
-  <div class="hrow"><h1>정비보고서</h1><a class="tag" id="hubBtn" href="../" style="text-decoration:none;color:#fff;font-weight:800;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4)">‹ 허브</a><span class="tag" id="liveTag">불러오는 중</span><span class="mons" id="mons"></span><button class="fs" data-prt="1" title="A4 가로 인쇄">🖨 인쇄</button><button class="fs" data-pdf="1" title="A4 가로 PDF 파일로 바로 저장">⬇ PDF 저장</button><button class="fs" id="fsBtn" data-fs="1">⛶ 전체 화면</button>
+  <div class="hrow"><h1>정비보고서</h1><a class="tag" id="hubBtn" href="../" style="text-decoration:none;color:#fff;font-weight:800;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4)">‹ 허브</a><span class="tag" id="liveTag">불러오는 중</span><span class="mons" id="mons"></span><button class="fs" data-prt="1" title="A4 가로 인쇄">🖨 인쇄</button><button class="fs" data-pdf="1" title="A4 가로 PDF 파일로 바로 저장">⬇ PDF 저장</button><button class="fs" data-xld="1" title="이 날 정비보고서 엑셀 (격자 · 목록 · 출근 카드)">⬇ 엑셀</button><button class="fs" data-xlm="1" title="이 달 결산 4종 + 날마다 정비보고서 한 파일">⬇ 월 전체 엑셀</button><button class="fs" id="fsBtn" data-fs="1">⛶ 전체 화면</button>
     <div class="tabs" id="tabs"><button data-t="grid" class="on">객실 현황</button><button data-t="close">결산</button></div></div>
   <div class="days" id="days"></div>
 </header>
@@ -428,7 +428,7 @@ function svBar() {
   const lb = 'style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0"';
   if (live(day)) return '<div class="check svb"><b class="good">💾 저장 켜짐</b> — 고치는 즉시 저장소에 (방 하나씩) · <span id="svst">' + sv.status() + '</span> · <button data-jlog="1" ' + lb + '>📜 변경 기록</button>' +
     (sv.canOff(day) ? ' · <button data-joff="1" ' + lb + '>연습 끝내기 (켜기 전 엑셀 자료로)</button>' : '') + '</div>';
-  if (sv.canOn(day)) return '<div class="check svb"><span>이 날은 보기 · 연습만</span> · <button data-jon="1" ' + lb + '>💾 이 날짜로 실제 저장 연습 켜기</button> <small>(지난 날짜만 · 12/1부터는 저절로 켜짐)</small></div>';
+  if (sv.canOn(day)) return '<div class="check svb"><span>이 날은 보기 · 연습만</span> · <button data-jon="1" ' + lb + '>💾 이 날짜로 실제 저장 연습 켜기</button> <small>(11/28 전 지난 날짜만)</small></div>';
   return '';
 }
 function drawGrid() {
@@ -445,7 +445,7 @@ function drawGrid() {
     WTYPES.map(t => { const no = t[0] === 'RYL' || t[0] === 'PLT'; return '<tr' + (d.rooms.length && !wa.n[t[0]] ? ' class="z"' : '') + '><td><b>' + t[1] + '</b> <small>' + t[0] + ' · ' + t[2] + '</small></td><td class="r">' + wa.n[t[0]] + '</td><td class="r">' + wa.f[t[0]] + '</td><td class="r">' + (no ? '<small>제외</small>' : wa.n[t[0]] * WATER_PER) + '</td></tr>'; }).join('') +
     '</tbody></table><div class="wsum"><span>생수 사용<b>' + wa.total + '병</b></span><span>아직 정비 안 한 방<b>' + wa.left + '병</b></span></div><p class="hint">객실당 ' + WATER_PER + '병 · 로얄 · PLT 는 빼고 계산 (엑셀 정비보고서 표와 같은 기준)</p></div>';
   if (!c.asg) h += '<div class="check"><span class="warn">아직 입력 전인 날이에요</span> — 배정이 들어오면 엑셀과 같은 계산이 바로 나와요</div>';
-  else h += '<div class="check">' + (typos.length ? '<a data-typos="1">⚠ 명단에 없는 이름 ' + typos.length + '실 (' + esc([...new Set(typos.flatMap(([r, x]) => typoOf(r, x)))].join(', ')) + ') — 눌러서 고르기</a> · ' : '') + (d.edited ? '<span class="warn">연습 중 — 고친 내용은 저장되지 않아요</span> (위 「💾 저장 켜기」를 누른 날만 저장) · <button data-reset="1" style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">엑셀 자료로 되돌리기</button>' :
+  else h += '<div class="check">' + (typos.length ? '<a data-typos="1">⚠ 명단에 없는 이름 ' + typos.length + '실 (' + esc([...new Set(typos.flatMap(([r, x]) => typoOf(r, x)))].join(', ')) + ') — 눌러서 고르기</a> · ' : '') + (d.edited ? '<span class="warn">연습 중 — 고친 내용은 저장되지 않아요</span> (🌙 초안으로 시작한 날 · 「💾 저장 켜기」를 누른 날만 저장) · <button data-reset="1" style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">엑셀 자료로 되돌리기</button>' :
     (okN === 6 ? '<span class="good">엑셀 계산값과 같음 ' + okN + '/6</span> (금일 정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단)' : '<span class="warn">엑셀과 다른 칸 ' + (6 - okN) + '개</span> ' + same.filter(s => !s[3]).map(s => s[0] + ' 앱 ' + s[1] + ' / 엑셀 ' + s[2]).join(', '))) + '</div>';
   h += svBar();
   h += '<div class="cards">' + d.cards.map((k, i) => {
@@ -712,8 +712,8 @@ function phoneHtml(name) {
 }
 
 // ---------- 결산
-function drawClose() {
-  const m = monOf(day), M = P.months[m], X = M.xl, ds = Object.keys(P.days).filter(x => monOf(x) === m), C = ds.map(x => calc(x)), names = M.roster;
+function drawClose(only) {
+  const m = (only && only.m) || monOf(day), M = P.months[m], X = M.xl, ds = Object.keys(P.days).filter(x => monOf(x) === m), C = ds.map(x => calc(x)), names = M.roster;
   let dBad = 0, dN = 0; ds.forEach((x, k) => { const xl = P.days[x].xl || {}, c = C[k]; if (!c.asg || xl['정비수'] == null) return; dN++; if ([[c.fam, '정비수'], [c.roy, '로얄'], [c.ppl, '인원'], [c.mij, '미정비'], [c.jae, '재실'], [c.gan * 0.5, '간단']].some(([v, q]) => Math.abs(v - (+xl[q] || 0)) > 1e-9)) dBad++; });
   const N = ds.length, eq = (a, b) => { const A = (a === '' || a == null) ? 0 : +a, B = (b === '' || b == null || typeof b === 'string') ? 0 : +b; return typeof b === 'string' && b.startsWith('#') ? (a === '' || a == null) : Math.abs(A - B) < 1e-6; };
   let bad = 0, cells = 0, trd = 0; const td = (v, x, cls, trU) => { cells++; let ok = x === undefined || eq(v, x), tr = false;
@@ -754,6 +754,7 @@ function drawClose() {
       h += '<tr' + (j === 2 ? ' class="gap"' : '') + '><td class="n">' + (j ? '' : a) + '</td><td class="n2">' + b + '</td>' + v.map((x, i) => td(x, xr.d[i], 'yel')).join('') + td(v.reduce((p, q) => p + q, 0), xr.tot, 'b') + '</tr>'; }));
     html.unit = h + '</tbody></table><p class="hint">노란 칸 = 결산 양식에 그대로 붙여 넣는 칸 (엑셀 유닛누계와 같은 배치)</p>'; badOf.unit = bad - b0; }
   const S = tot.reduce((a, b) => a + b, 0), OT = names.reduce((a, n) => a + per(n).map(otv).reduce((p, q) => p + q, 0), 0);
+  if (only) return { html, S, OT, trS, ds, names, fam: C.reduce((a, c) => a + c.fam, 0), roy: C.reduce((a, c) => a + c.roy, 0) };   // ⬇ 엑셀 (화면과 같은 숫자)
   let h = '<div class="kpis">';
   h += '<div class="kpi"><small>' + (+m.slice(5)) + '월 정비수 (청구 기준)</small><b class="num">' + S.toLocaleString() + '</b><span class="v">' + (X.has === false ? '앱 계산' : eq(S, X.bill['합계']) ? '엑셀과 같음 ✓' : eq(S - trS, X.bill['합계']) ? '엑셀 ' + X.bill['합계'].toLocaleString() + ' + 교육생 ' + trS + ' (엑셀이 뺌)' : '엑셀 ' + X.bill['합계'].toLocaleString()) + '</span></div>';
   h += '<div class="kpi"><small>청구 금액 (× ' + OPT.rate.toLocaleString() + '원)</small><b class="num">' + (S * OPT.rate).toLocaleString() + '원</b><span class="v">' + (X.has === false ? '앱 계산' : eq(S * OPT.rate, X.bill['금액합']) ? '엑셀과 같음 ✓' : eq((S - trS) * OPT.rate, X.bill['금액합']) ? '엑셀보다 ' + (trS * OPT.rate).toLocaleString() + '원 많음 (교육생 몫)' : '엑셀 ' + X.bill['금액합'].toLocaleString() + '원') + '</span></div>';
@@ -837,12 +838,14 @@ document.addEventListener('click', e => {
   if (t.dataset.prt) { printReport(); return; }
   if (t.dataset.pdf) { savePdf(t); return; }
   if (t.dataset.water) { waterOpen = !waterOpen; draw(); return; }
+  if (t.dataset.xld) { xlOut('day', t); return; }
+  if (t.dataset.xlm) { xlOut('month', t); return; }
   if (t.dataset.reset) { window.JBR.reset(); toast('엑셀 자료로 되돌렸어요'); return; }
   if (t.dataset.jon) { if (confirm(day + ' 을(를) 실제 저장으로 켤까요?\n\n· 고치는 내용이 저장소에 바로 저장되고 기록이 남아요\n· 이 날은 이제 엑셀 사본이 덮지 않아요\n· 「연습 끝내기」로 켜기 전 자료로 되돌릴 수 있어요' + (R().edited ? '\n· 지금 연습으로 고친 내용은 버려요' : ''))) { delete ED[day]; window.JBR.sv.on(day); } return; }
   if (t.dataset.joff) { if (confirm(day + ' 저장 연습을 끝낼까요?\n\n켜기 전 엑셀 자료로 되돌리고 다시 보기 · 연습만 돼요. 변경 기록은 그대로 남아요.')) window.JBR.sv.off(day); return; }
   if (t.dataset.jlog) { window.JBR.sv.showLog(day); return; }
   if (t.dataset.jnew) { const x = t.dataset.jnew, ex = P.days[x];
-    if (confirm(x + ' 초안을 만들까요?\n\n· 전 객실 4(금일 퇴실 예정)로 시작해요 — 전날 연박 · 미정비는 안 넘겨요\n· 연박 · 공실 · 재실을 표시한 뒤 허브 🧩 자동 배정 → 「📋 정비보고서 앱에서 불러오기」' + (ex ? '\n· 이 날 엑셀 사본은 이 초안으로 바뀌어요 (이 날은 이제 엑셀이 안 덮어요)' : '') + (x < '2026-12-01' ? '\n· 12/1 전이라 연습이에요 — 메이드 휴대폰엔 안 가요' : ''))) { window.JBR.sv.newDay(x); day = x; delete ED[x]; } return; }
+    if (confirm(x + ' 초안을 만들까요?\n\n· 전 객실 4(금일 퇴실 예정)로 시작해요 — 전날 연박 · 미정비는 안 넘겨요\n· 연박 · 공실 · 재실을 표시한 뒤 허브 🧩 자동 배정 → 「📋 정비보고서 앱에서 불러오기」' + (ex ? '\n· 이 날 엑셀 사본은 이 초안으로 바뀌어요 (이 날은 이제 엑셀이 안 덮어요)' : '') + (x < '2026-11-28' ? '\n· 11/28 전이라 연습이에요 — 메이드 휴대폰엔 안 가요' : '\n· 이 날은 앱이 원본이에요 — 확정하면 메이드 휴대폰에 들어가고, 근무 중 고친 것도 정비보고서 연결 PC를 통해 넘어가요'))) { window.JBR.sv.newDay(x); day = x; delete ED[x]; } return; }
   if (t.dataset.clearp) { PRIO[day] = []; LATE[day] = {}; draw(); return; }
   if (t.dataset.delp != null) { prioList().splice(+t.dataset.delp, 1); draw(); return; }
   if (t.dataset.out) { const l = LATE[day][t.dataset.out]; l.out = !l.out; if (l.out) { const r = t.dataset.out, i = P.rooms.indexOf(r), x = R().rooms[i]; toast('🔔 ' + (x && x.nm ? x.nm + ' 님 휴대폰: ' : '') + r + '호 퇴실됐어요 — 바로 정비 시작'); } draw(); return; }
@@ -981,6 +984,69 @@ async function savePdf(btn) {
   const pv = document.getElementById('pv'); if (pv) pv.classList.remove('cap');
   btn.textContent = old; btn.disabled = false; pdfBusy = false;
 }
+// ---------- ⬇ 엑셀 (11/27 소장님: 새 디자인 · 숫자는 화면(앱 계산)과 같게). 결산 4종 = 결산 화면 표 그대로, 날마다 = 격자
+const STN = { 1: '퇴실', 2: '재실', 3: '이월', 4: '예정' };
+const stText = x => !x ? '' : x.yl && !x.st ? '연박' : /간단/.test(x.st) ? '간단' : x.st ? (STN[x.st] || x.st) + (x.yl ? '·연박' : '') : '공실';
+const dlab = ds => (+ds.slice(5, 7)) + '월 ' + (+ds.slice(8)) + '일(' + '일월화수목금토'[new Date(ds + 'T00:00:00').getDay()] + ')';
+const srcOf = ds => (P.days[ds] && P.days[ds].src === 'app' ? '앱' : '엑셀 사본');
+function sumLine(ds) { const c = calc(ds); return '금일 정비수 ' + c.fam + ' · 로얄 ' + c.roy + ' · 정비 인원 ' + c.ppl + ' · 인당 ' + c.avg.toFixed(1) + ' · 미정비 ' + c.mij + ' · 재실 ' + c.jae + ' · 간단 ' + c.gan * 0.5 + ' · 청구 정비수 ' + c.total + ' · 완료 ' + c.fin + '/' + c.asg + ' · 자료: ' + srcOf(ds); }
+function gridSheet(ds, name) {
+  const d = dayData(ds), fl = {}, rows = [];
+  P.rooms.forEach((r, i) => { const f = +r.slice(0, -2); (fl[f] = fl[f] || {})[+r.slice(-2)] = i; });
+  rows.push([{ v: dlab(ds) + ' 정비보고서 · 한화리조트 해운대', s: 'title' }], [{ v: sumLine(ds), s: 'sub' }], []);
+  rows.push([{ v: '층', s: 'head' }].concat(Array.from({ length: 17 }, (_, k) => ({ v: String(k + 1).padStart(2, '0') + '호', s: 'head' }))));
+  Object.keys(fl).map(Number).sort((a, b) => b - a).forEach(f => {
+    const a = [{ v: f + 'F', s: 'cellb' }], b = [{ v: '정비자', s: 'foot' }], m = [{ v: '메모', s: 'foot' }];
+    for (let k = 1; k <= 17; k++) { const i = fl[f][k]; if (i == null) { a.push({ v: '', s: 'cell' }); b.push({ v: '', s: 'cell' }); m.push({ v: '', s: 'cell' }); continue; }
+      const x = d.rooms[i], r = P.rooms[i];
+      a.push({ v: r + ' ' + stText(x), s: x && x.done ? 'done' : 'num' }); b.push({ v: (x && x.nm) || '', s: 'cellb' });
+      m.push({ v: [x && x.m1, x && x.m2].filter(Boolean).join(' · ') + (x && x.done ? (x.m1 || x.m2 ? ' ' : '') + '✓완료' : ''), s: 'foot' }); }
+    rows.push(a, b, m); });
+  rows.push([], [{ v: '상태: 퇴실(1) · 재실(2) · 이월(3, 전일 미정비) · 예정(4, 금일 퇴실 예정) · 간단 · 연박 · 공실 / 초록 = 완료', s: 'foot' }]);
+  return { name, rows, cols: [7].concat(Array(17).fill(11.5)), freeze: 4 };
+}
+function listSheet(ds) {
+  const d = dayData(ds), rows = [[{ v: dlab(ds) + ' 객실 목록', s: 'title' }], [{ v: sumLine(ds), s: 'sub' }], [],
+    ['호실', '층', '상태', '정비자', '메모1', '메모2', '완료', '연박', '유닛'].map(v => ({ v, s: 'head' }))];
+  P.rooms.forEach((r, i) => { const x = d.rooms[i]; if (!x) return;
+    rows.push([{ v: +r, s: 'num' }, { v: +r.slice(0, -2), s: 'num' }, { v: stText(x), s: 'num' }, { v: x.nm || '', s: 'cellb' }, { v: x.m1 || '', s: 'wrap' }, { v: x.m2 || '', s: 'wrap' }, { v: x.done ? '✓' : '', s: 'done' }, { v: x.yl ? '연박' : '', s: 'num' }, { v: x.nm ? unitOf(r, x) * (r === '2901' ? people(r, x).length : 1) : '', s: 'num' }]); });
+  return { name: '목록', rows, cols: [8, 6, 9, 14, 22, 22, 6, 6, 6], freeze: 4 };
+}
+function cardSheet(ds) {
+  const d = dayData(ds), c = calc(ds), rows = [[{ v: dlab(ds) + ' 출근 카드 · 배정 유닛', s: 'title' }], [{ v: sumLine(ds), s: 'sub' }], [], ['순번', '성함', '카드 유닛', '배정 유닛', 'IN'].map(v => ({ v, s: 'head' }))];
+  const seen = new Set(); d.cards.forEach((k, i) => { seen.add(k.n); rows.push([{ v: i + 1, s: 'num' }, { v: k.n, s: 'cellb' }, { v: isNaN(+k.u) || k.u === '' ? k.u : +k.u, s: 'num' }, { v: c.per[k.n] || 0, s: 'num' }, { v: k.in ? 'IN' : '', s: 'in' }]); });
+  Object.keys(c.per).filter(n => !seen.has(n)).forEach(n => rows.push([{ v: '', s: 'num' }, { v: n + ' (카드 없음)', s: 'cellb' }, { v: '', s: 'num' }, { v: c.per[n], s: 'num' }, { v: '', s: 'num' }]));
+  return { name: '출근 카드', rows, cols: [6, 16, 10, 10, 6], freeze: 4 };
+}
+function tableSheet(name, title, html, sub) {
+  const doc = new DOMParser().parseFromString(html, 'text/html'), rows = [[{ v: title, s: 'title' }], [{ v: sub, s: 'sub' }], []], num = t => /^-?[\d,]+(\.\d+)?$/.test(t) ? +t.replace(/,/g, '') : t;
+  doc.querySelectorAll('tr').forEach(tr => { const R = [], tot = tr.classList.contains('tot');
+    tr.querySelectorAll('th,td').forEach((c, j) => { const t = c.textContent.trim(); R.push(c.tagName === 'TH' ? { v: t, s: 'head' } : j === 0 || c.classList.contains('n2') ? { v: t, s: 'cellb' } : { v: num(t), s: tot ? 'tot' : /원|금액/.test(name) && typeof num(t) === 'number' && num(t) >= 1000 ? 'won' : 'num' });
+      for (let k = 1; k < (+c.getAttribute('colspan') || 1); k++) R.push({ v: '', s: 'cell' }); });
+    rows.push(R); });
+  const w = Math.max(...rows.map(r => r.length));
+  return { name, rows, cols: [14].concat(Array(Math.max(0, w - 1)).fill(7)), freeze: 4 };
+}
+async function xlOut(kind, btn) {
+  const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
+  try {
+    const X = await import('../xlsxw.js'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    let sheets, fn;
+    if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
+    else {
+      const R = drawClose({ m }), ds = R.ds, src = ds.map(srcOf), nE = src.filter(x => x !== '앱').length, nA = src.length - nE;
+      const sub = '한화리조트 해운대 · 앱 계산 (' + ds.length + '일: 엑셀 사본 ' + nE + '일' + (nA ? ' · 앱 ' + nA + '일' : '') + ') · 정비 단가 ' + OPT.rate.toLocaleString() + '원 · 연장 ' + OPT.otMin + ' 이상 −' + OPT.otBase + ' × ' + OPT.ot.toLocaleString() + '원 · 교육생 청구 ' + (OPT.trainee ? '포함' : '제외');
+      const kp = [['정비수 (청구 기준)', R.S], ['청구 금액 (원)', R.S * OPT.rate], ['연장근로 유닛', R.OT], ['연장근로 금액 (원)', R.OT * OPT.ot], ['로얄 (실)', R.roy], ['패밀리 정비수', R.fam], ['교육생 유닛 (청구 포함분)', R.trS], ['명단 (명)', R.names.length], ['날짜 수', ds.length]];
+      const sum = { name: '요약', rows: [[{ v: ym + ' 객실 정비 결산', s: 'title' }], [{ v: sub, s: 'sub' }], []].concat(kp.map(([k, v]) => [{ v: k, s: 'kpil' }, { v, s: 'kpiv' }])).concat([[], [{ v: '날짜별 자료: ' + ds.map((x, i) => (+x.slice(8)) + '일 ' + src[i]).join(' · '), s: 'foot' }]]), cols: [26, 18] };
+      sheets = [sum, tableSheet('객실정비현황', ym + ' 객실정비현황', R.html.room, sub), tableSheet('청구금액', ym + ' 청구금액', R.html.bill, sub), tableSheet('연장근로', ym + ' 연장근로', R.html.ot, sub), tableSheet('유닛누계', ym + ' 유닛누계', R.html.unit, sub)]
+        .concat(ds.map(x => gridSheet(x, (+x.slice(8)) + '일')));
+      fn = '정비결산_' + m + '.xlsx';
+    }
+    const a = document.createElement('a'), u = URL.createObjectURL(X.book(sheets)); a.href = u; a.download = fn; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000);
+    toast('⬇ ' + fn + ' 저장했어요 (다운로드 폴더)');
+  } catch (e) { toast('엑셀을 만들지 못했어요: ' + (e && e.message || e)); }
+  btn.textContent = old; btn.disabled = false;
+}
 window.JBR = {
   set(j) {
     const first = !P; P = j; P.days = {}; Object.values(j.months).forEach(M => Object.assign(P.days, M.days));
@@ -997,6 +1063,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.27-7"></script>
+<script type="module" src="jbr.js?v=2026.11.27-8"></script>
 </body>
 </html>

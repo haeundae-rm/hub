@@ -141,8 +141,8 @@ async function pick(p, room) { const i = await cellOf(p, room); await p.click('.
   ok(pr.length > 0 && pr.every(r => ['3', '4'].includes(d24.r[r][0]) && !d24.r[r][5]), '주황 빛 ' + pr.length + '실 모두 4 · 3 (' + pr.map(r => r + ':' + d24.r[r][0]).join(' ') + ')');
   ok(Object.keys(d24.r).filter(r => r.startsWith('12') && (d24.r[r][5] || !d24.r[r][0])).every(r => !pr.includes(r)), '연박 · 공실은 하나도 안 들어감');
 
-  console.log('⑫ 12/1부터 저절로 켜짐 · 오늘은 못 켬');
-  ok(await p.evaluate(() => window.JBR.sv.live('2026-12-01') && !window.JBR.sv.live('2026-11-24') && !window.JBR.sv.canOn(window.JBR.day() > '2026-11-30' ? '2099-01-01' : new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10))), 'live(12/1) · 오늘 canOn 없음');
+  console.log('⑫ 저장은 앱 원본인 날만 · 오늘은 연습 못 켬');
+  ok(await p.evaluate(() => !window.JBR.sv.live('2026-12-01') && !window.JBR.sv.live('2026-11-24') && !window.JBR.sv.canOn(new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10))), '앱 원본(src app)인 날만 저장 · 엑셀 사본 날은 키를 눌러도 안 바뀜 · 오늘 연습 켜기 없음');
   ok(!p.errs.length, '화면 오류 없음 ' + p.errs.slice(0, 3).join(' | '));
   await b.close();
   console.log('\n' + pass + ' 통과 / ' + fail + ' 실패'); process.exit(fail ? 1 : 0);
