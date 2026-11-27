@@ -78,7 +78,7 @@ function tag() {
   let s = t ? (t.src === 'app' ? '앱 저장 ' + hm(t.at) : '엑셀 ' + hm(t.at) + ' 읽음') : '오늘 사본 없음';
   s += hbOk ? ' · 연결 켜짐' : ' · <b style="color:#ffb4b4">연결 꺼짐</b>';
   if (meta.fromCache) s += ' · 오프라인';
-  el.innerHTML = s + ' · <b>' + (sv.pend ? '⏳ 저장 대기 ' + sv.pend + '건' : (docOf(TODAY) && docOf(TODAY).src === 'app') ? '💾 앱 원본' : '엑셀 사본 · 보기') + '</b> <label class="fillb" style="cursor:pointer;text-decoration:underline;margin-left:6px">📥 엑셀로 채우기<input type="file" id="fillFile" accept=".xlsx" hidden></label>' + (role && (window.JBR && window.JBR.day ? window.JBR.day() : TODAY) >= LIVE_FROM ? ' <label class="fillb" style="cursor:pointer;text-decoration:underline;margin-left:6px;color:#FFB35C" title="야간에 엑셀로 짠 날 → 그 날 시트 그대로 앱 정비보고서로 (이후 앱에서 고침)">📥 이 날 엑셀 → 앱 원본<input type="file" id="takeFile" accept=".xlsx" hidden></label>' : '') + '' + (fill ? ' <span>' + esc(fill) + '</span>' : '');
+  el.innerHTML = s + ' · <b>' + (sv.pend ? '⏳ 저장 대기 ' + sv.pend + '건' : (docOf(TODAY) && docOf(TODAY).src === 'app') ? '💾 앱 원본' : '엑셀 사본 · 보기') + '</b> <label class="fillb" style="cursor:pointer;text-decoration:underline;margin-left:6px">📥 엑셀로 채우기<input type="file" id="fillFile" accept=".xlsx" hidden></label>' + (fill ? ' <span>' + esc(fill) + '</span>' : '');
 }
 
 function watch() {

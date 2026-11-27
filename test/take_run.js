@@ -15,7 +15,7 @@ const MAIDS = ['가람', '나래', '다솜', '라온'];
 const SEED = {
   'meta/rsync': { on: true, at: Date.now() },
   ['jbr/' + Y1]: { date: Y1, src: 'excel', rooms: ROOMS, r: Object.fromEntries(ROOMS.map(r => [r, ['1', '가람', '', '', 1, 0]])), xl: {}, cards: [], groups: [], roster: MAIDS, at: Date.now() },
-  ['jbr/' + TODAY]: { date: TODAY, src: 'excel', rooms: ROOMS, r: Object.fromEntries(ROOMS.map(r => [r, ['4', '', '', '', 0, 0]])), xl: {}, cards: [], groups: [], roster: MAIDS, at: Date.now() },
+  ['jbr/' + TODAY]: { date: TODAY, src: 'app', rooms: ROOMS, r: Object.fromEntries(ROOMS.map(r => [r, ['4', '', '', '', 0, 0]])), xl: {}, cards: [], groups: [], roster: MAIDS, at: Date.now() },
   ['rmsched_hk/' + T1]: { date: T1, rm: MAIDS.map(n => ({ n, u: 9, up: false })), all: MAIDS.map(n => ({ n, d: '', out: false })), mon: T1, sum: {}, note: '', helpers: [] }
 };
 const ENGINE_STUB = `export async function readRoster() { return ['가람', '나래', '다솜', '라온']; }
@@ -49,7 +49,7 @@ const asp = p => p.innerText('#asp');
   const b = await chromium.launch();
   const p = await open(b);
   await p.locator('#days button', { hasText: (+TODAY.slice(8)) + '일' }).first().click().catch(() => {}); await sleep(300);
-  ok(await p.locator('#takeFile').count() === 1, '「📥 이 날 엑셀 → 앱 원본」 단추 (' + TODAY + ')');
+  ok(await p.locator('.svb #takeFile').count() === 1, '「📥 이 날 엑셀 → 앱 원본」 단추 (' + TODAY + ')');
   await p.setInputFiles('#takeFile', { name: '11월 정비보고서.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('x') });
   await sleep(1200);
   const d = await doc(p, 'jbr/' + TODAY);
