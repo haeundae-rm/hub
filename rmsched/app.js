@@ -97,7 +97,10 @@ function hkSnap(w, di) {
   const V = C.dailyView(w, di), s = V.sum, r1 = v => v == null ? null : Math.round(v * 10) / 10;
   return { date: V.date, rm: V.rm.map(x => ({ n: x.r.name, u: isNum(x.u) ? x.u : null, up: !!x.up })),
     sum: { res: nv(s.res) === '' ? null : s.res, co: nv(s.co) === '' ? null : s.co, jb: s.jb, ppl: s.ppl, coRe: nv(s.coRe) === '' ? null : s.coRe, per: r1(s.per), reent: r1(s.reent) },
-    note: V.D.note || '', helpers: V.helpers.map(x => x.name) };
+    note: V.D.note || '', helpers: V.helpers.map(x => x.name),
+    // 👥 명단 (11/27 소장님): 그 주 주간 스케줄 전체 명단 — 순번 = 줄 순서 · d = 그날 상태 · out = 메모에 '퇴사' (휴무 사유 메모 자체는 안 보냄)
+    //   하우스키퍼 '👥 명단' 탭 · 정비보고서 명단(카드 순서 · 명단 밖 이름 · 결산)이 이걸 씀
+    mon: w.mon, all: w.rows.filter(r => r.name).map(r => ({ n: r.name, d: r.st[di] || '', out: /퇴사/.test(r.memo || '') })) };
 }
 async function pushHk(w) {
   if (!w || Store.local) return;
@@ -135,7 +138,8 @@ async function start() {
 async function startHk() {
   if (S.started) return; S.started = true; S.hkOnly = true; S.tab = 'hk';
   try { const h = document.querySelector('.top h1'); if (h && h.firstChild) h.firstChild.textContent = '📣 HK 배정 · 인계사항'; document.body.classList.add('hkonly'); } catch (e) {}   // 11/26: 하우스키퍼 화면 제목 (휴대폰에서 '룸메이…'로 잘리던 것)
-  $('weekBar').hidden = true; $('tabs').hidden = true;
+  $('weekBar').hidden = true;
+  document.querySelectorAll('#tabs button').forEach(b => { b.hidden = !['hk', 'ros'].includes(b.dataset.tab); });   // 11/27: 하우스키퍼는 HK 전파 · 👥 명단 두 탭만
   try {
     const from = addDays(today(), -1);
     // 11/25 소장님: 소장 · 부소장이 고치면 하우스키퍼 화면에 바로 (실시간 구독) — 보고 있던 날짜는 그대로
@@ -194,11 +198,11 @@ function draw() {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
   drawUndo();
   const v = $('view');
-  if (S.hkOnly) { v.innerHTML = hkHtml(); return; }
+  if (S.hkOnly) { v.innerHTML = S.tab === 'ros' ? rosHtml() : hkHtml(); return; }
   if (S.tab === 'set') { v.innerHTML = setHtml(); return; }
   if (S.tab === 'hol') { v.innerHTML = holHtml(); return; }
   if (!S.w) { v.innerHTML = '<div class="empty"><b>아직 주차가 없어요</b>지금 쓰는 엑셀 스케줄표를 가져오거나 빈 주차를 만들어 시작하세요.<br><br><button class="pri" id="impX2">엑셀 가져오기</button> <button id="blankW">이번 주 빈 주차 만들기</button></div>'; return; }
-  v.innerHTML = S.tab === 'week' ? weekView() : S.tab === 'day' ? dayHtml() : S.tab === 'hk' ? hkHtml() : noticeHtml();
+  v.innerHTML = S.tab === 'week' ? weekView() : S.tab === 'day' ? dayHtml() : S.tab === 'hk' ? hkHtml() : S.tab === 'ros' ? rosHtml() : noticeHtml();
   syncScroll();
 }
 
@@ -379,6 +383,26 @@ function hkHtml() {
     ${P === 'rm' ? '' : `<div><div class="ttl">${t} 정비보조 출근자 명단</div><table><tr><th>순번</th><th>성함</th><th>비고</th></tr>
       ${Array.from({ length: Math.max(V.helpers.length, 8) }, (_, i) => { const x = V.helpers[i]; return `<tr><td>${x ? i + 1 : ''}</td><td class="nmc">${x ? esc(x.name) : ''}</td><td>${x ? 'HK지원' : ''}</td></tr>`; }).join('')}</table></div>`}
   </div></div>`;
+  return h;
+}
+// =============== 👥 명단 (11/27) ===============
+// 근래 주간 스케줄 명단 그대로 (순번 = 줄 순서). 하우스키퍼는 HK 전파 사본(all)으로, 소장 · 부소장은 지금 연 주차로
+function rosList() {
+  if (S.hkOnly) { const x = S.snaps[S.si]; return x && Array.isArray(x.all) ? { date: x.date, mon: x.mon, L: x.all } : null; }
+  const di = S.di || 0;
+  return { date: addDays(S.w.mon, di), mon: S.w.mon, L: S.w.rows.filter(r => r.name).map(r => ({ n: r.name, d: r.st[di] || '', out: /퇴사/.test(r.memo || '') })) };
+}
+function rosHtml() {
+  if (S.hkOnly && !S.snaps.length) return '<div class="empty"><b>아직 올라온 명단이 없어요</b>소장 · 부소장님이 스케줄을 저장하면 여기에 보여요.</div>';
+  const R = rosList(), chips = S.hkOnly ? snapChips() : dayChips();
+  if (!R) return chips + '<div class="empty"><b>이 날 사본엔 아직 명단이 없어요</b>소장 · 부소장님이 룸메이드 스케줄을 한 번 열거나 저장하면 들어와요.</div>';
+  const t = md(R.date) + ' (' + DAYS[C.dowIdx(R.date)] + ')', act = R.L.filter(x => !x.out), out = R.L.filter(x => x.out);
+  const stOf = x => x.out ? '퇴사' : ['휴', '신청', '사유'].includes(x.d) ? '휴무' : x.d === '교육' ? '교육' : '출근';
+  let h = chips + `<div class="tools"><span class="lbl">${md(R.mon)}~${md(addDays(R.mon, 6))} 주간 스케줄 명단 · 순번 = 주간 스케줄 줄 순서 · 정비보고서도 이 명단을 써요 · 메모에 '퇴사'가 있으면 빨간 줄</span></div>`;
+  h += `<div class="scroll" style="border:0;background:none"><div class="paper hk one" id="rosPaper"><div><div class="ttl">${t} 룸메이드 명단 · ${act.length}명${out.length ? ' (+ 퇴사 ' + out.length + ')' : ''}</div>
+    <table><tr><th>순번</th><th>성함</th><th>그날</th></tr>
+    ${R.L.map((x, i) => { const o = x.out ? ' style="color:#B23A48;text-decoration:line-through"' : ''; return `<tr><td${o}>${i + 1}</td><td class="nmc"${o}>${esc(x.n)}</td><td${o}>${stOf(x)}</td></tr>`; }).join('')}
+    </table></div></div></div>`;
   return h;
 }
 function hkText() {

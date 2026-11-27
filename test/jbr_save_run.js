@@ -129,6 +129,18 @@ async function pick(p, room) { const i = await cellOf(p, room); await p.click('.
   ok(!!(await p.$('[data-jon]')), '다시 켜기 단추');
   ok((await logs(p, D)).some(x => x.k === 'off'), '기록: 끝냄 (기록은 안 지움, ' + (await logs(p, D)).length + '건)');
 
+  console.log('⑬ 우선정비 끌어 지정: 퇴실 예정(4) · 미정비(3) 방만');
+  await p.click('#days [data-d="2026-11-24"]'); await sleep(200);
+  const i1 = await cellOf(p, '1201'), i2 = await cellOf(p, '1217');
+  await p.click('.c[data-i="' + i1 + '"]'); await p.click('.c[data-i="' + i2 + '"]', { modifiers: ['Shift'] }); await sleep(150);
+  await p.click('[data-drawer="prio"]'); await sleep(150);
+  ok(/빠져요/.test(await p.innerText('.box')), '고른 방 중 빠지는 수 안내: ' + ((await p.innerText('.box')).match(/고른 방 중 \d+실/) || [''])[0]);
+  await p.click('[data-mkprio]'); await sleep(200);
+  const pr = await p.$$eval('.c.pr[data-i]', cs => cs.map(c => c.innerText.match(/\d{3,4}/)[0]));
+  const d24 = await doc(p, '2026-11-24');
+  ok(pr.length > 0 && pr.every(r => ['3', '4'].includes(d24.r[r][0]) && !d24.r[r][5]), '주황 빛 ' + pr.length + '실 모두 4 · 3 (' + pr.map(r => r + ':' + d24.r[r][0]).join(' ') + ')');
+  ok(Object.keys(d24.r).filter(r => r.startsWith('12') && (d24.r[r][5] || !d24.r[r][0])).every(r => !pr.includes(r)), '연박 · 공실은 하나도 안 들어감');
+
   console.log('⑫ 12/1부터 저절로 켜짐 · 오늘은 못 켬');
   ok(await p.evaluate(() => window.JBR.sv.live('2026-12-01') && !window.JBR.sv.live('2026-11-24') && !window.JBR.sv.canOn(window.JBR.day() > '2026-11-30' ? '2099-01-01' : new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10))), 'live(12/1) · 오늘 canOn 없음');
   ok(!p.errs.length, '화면 오류 없음 ' + p.errs.slice(0, 3).join(' | '));
