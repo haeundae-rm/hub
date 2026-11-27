@@ -656,6 +656,8 @@ function exHtml() {
 // 입퇴사 앱(HrStaff.gs)이 1시간마다 staff/{id} 로 보내는 기본 정보만 씀. 서류·주민번호·사진은 입퇴사 앱에만 있음
 // 읽기 아끼기: 명단 전체를 받지 않고 '입사 진행'인 분 + 퇴사일이 최근 30일 이후인 분만 골라 읽음
 const HR_URL = '../unies-contract/';
+// 🙈 입퇴사 서류 버튼 잠시 숨김 (11/27 소장님: 모두 비노출, 소장님도) — 다시 보이게 할 땐 false 로
+const HR_HIDE = true;
 function hrLoad(d) {
   return Promise.all([
     safe(S.getQuery('staff', [['status', '==', '입사 진행']])),
@@ -674,7 +676,7 @@ function hrLoad(d) {
   });
 }
 function hrHtml(v) {
-  const open = '<a class="big-btn sec linkbtn" style="margin-top:12px" href="' + HR_URL + '" target="_blank" rel="noopener">🧾 입퇴사 서류 열기 <small style="font-weight:600;color:var(--muted);margin-left:6px">새 창</small></a>' +
+  const open = HR_HIDE ? '' : '<a class="big-btn sec linkbtn" style="margin-top:12px" href="' + HR_URL + '" target="_blank" rel="noopener">🧾 입퇴사 서류 열기 <small style="font-weight:600;color:var(--muted);margin-left:6px">새 창</small></a>' +
     '<p class="note">안 열리고 「현재 파일을 열 수 없습니다」가 나오면, 크롬 <b>시크릿 창</b>이나 <b>「해운대객실」 프로필</b>에서 열어 주세요. (크롬에 구글 계정이 여러 개 로그인돼 있으면 생기는 문제예요)</p>';
   let h = '<div class="card"><h2>🧾 입퇴사 진행 <small>1시간마다 갱신</small></h2>';
   const r = v.hr;
@@ -712,7 +714,7 @@ function hkSecHtml() {
 }
 function linksHtml() {
   return '<div class="card"><h2>현장 앱 <small>같은 로그인으로 열려요</small></h2><div class="go-grid">' +
-    LINKS.filter(l => FIELD.indexOf(l.href) >= 0 && !(isHk() && l.href === '../unies-contract/')).map(l => '<a class="go" href="' + l.href + '"' + (l.tab ? ' target="_blank" rel="noopener"' : '') + '><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
+    LINKS.filter(l => FIELD.indexOf(l.href) >= 0 && !((isHk() || HR_HIDE) && l.href === '../unies-contract/')).map(l => '<a class="go" href="' + l.href + '"' + (l.tab ? ' target="_blank" rel="noopener"' : '') + '><span class="ic">' + l.ic + '</span><b>' + esc(l.t) + '</b><span>' + esc(l.s) + '</span></a>').join('') + '</div></div>';
 }
 function staffHtml() {
   return '<div class="card"><h2>👥 전 파트 직원 명단</h2><p class="note" style="margin:0 0 12px">룸메이드 · 정비보조 · 미화 · 사우나 · 하우스맨 · 오더테이커를 한곳에서 봐요. 입사일 · 근속 · 재직/퇴사.<br>파트별 관리는 각 앱에서 해도 되고, 여기서 고쳐도 같은 명단이에요.</p>' +
@@ -744,7 +746,7 @@ const TILES = [
   { href: '../inventory/', ic: '📦', t: '재고조사', s: '객실 · 사우나 재고 (부소장)' },
   { go: 'field', ic: '📱', t: '현장 관리', s: '공지 올리기 · 공지 확인 · 2인 1조 · 휴대폰 등록' },
   { go: 'close', ic: '📊', t: '결산', s: '결산 특이사항 · 입퇴사 현황 · 출역표 · 연차 대장' },
-  { go: 'apps', ic: '🔗', t: '현장 앱 열기', s: '정비 레포트 · 정비 지원 · 입퇴사 서류', wide: 1 }
+  { go: 'apps', ic: '🔗', t: '현장 앱 열기', s: '정비 레포트 · 정비 지원' + (HR_HIDE ? '' : ' · 입퇴사 서류'), wide: 1 }
 ];
 const FIELD = ['../rm/', '../dirty/', '../unies-contract/'];
 let route = { sec: '', tab: '' }, fromHome = false;

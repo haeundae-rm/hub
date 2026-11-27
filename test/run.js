@@ -139,7 +139,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(OUT, n), fullPage: true })
   await p.click('[data-sb="close"]').catch(() => {}); await sleep(300);
   await p.click('[data-home]'); await sleep(300);
   ok(await p.locator('.hm-tile').count() === 11, '‹ 버튼 → 첫 화면');
-  for (const [g, re] of [['quality', /인스펙션[\s\S]*VOC/], ['field', /공지 확인[\s\S]*휴대폰 오류[\s\S]*오늘 1건/], ['apps', /정비 레포트[\s\S]*정비 지원[\s\S]*입퇴사 서류/]]) {
+  for (const [g, re] of [['quality', /인스펙션[\s\S]*VOC/], ['field', /공지 확인[\s\S]*휴대폰 오류[\s\S]*오늘 1건/], ['apps', /정비 레포트[\s\S]*정비 지원/]]) {
     await p.click('[data-go="' + g + '"]'); await sleep(250);
     ok(re.test(await p.innerText('main')), g + ' 안쪽 내용');
     if (g === 'quality') await shot(p, '5_품질관리.png');
