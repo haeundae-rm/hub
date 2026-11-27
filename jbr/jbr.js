@@ -206,5 +206,11 @@ S.onUser(u => {
   if (!role) { unsub.forEach(f => { try { f(); } catch (e) {} }); unsub = []; drawLogin(); }
 });
 window.__jbr = { ver: VER, toP, SV, sv };
+// 🪟 따로 창 (11/27): 허브에서 새 창으로 열렸으면 「‹ 허브」 대신 「✕ 창 닫기」 — 이 창에선 다른 메뉴로 못 넘어가게
+if (window.name === 'jbr_window') {
+  const hb = document.getElementById('hubBtn');
+  if (hb) { hb.textContent = '✕ 창 닫기'; hb.title = '허브는 원래 창에 그대로 있어요'; hb.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); if (sv.pend && !confirm('저장 대기 ' + sv.pend + '건이 남았어요. 그래도 닫을까요?')) return; try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch (er) {} window.close(); }, true); }
+  document.title = '📋 정비보고서';
+}
 // 🔄 쉬는 순간 자동 새로고침 — 연습으로 고친 날이 있으면 안 바꿈
 if (window.AutoReload) window.AutoReload.start({ key: 'jbr', url: '../version.json', safe: () => !sv.pend && !(window.JBR && window.JBR.edited()) && !/읽는 중/.test(fill) });
