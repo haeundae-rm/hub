@@ -327,6 +327,9 @@ const MCOL = { 재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: 
 const GCOL = ['#E53935', '#1E88E5', '#43A047', '#8E24AA', '#F4511E', '#00897B', '#6D4C41', '#3949AB', '#C0CA33', '#D81B60'];
 const TODAY = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 let waterOpen = false;
+// 💾 실제 저장 (11/27): 저장 켜진 날(live)은 고칠 때마다 바뀐 방만 저장소로 — jbr.js 가 window.JBR.sv 를 채움. 꺼진 날은 연습(저장 안 됨)
+const live = ds => !!(window.JBR && window.JBR.sv && window.JBR.sv.live(ds));
+const packX = x => x ? [x.st || '', x.nm || '', x.m1 || '', x.m2 || '', x.done ? 1 : 0, x.yl ? 1 : 0] : ['', '', '', '', 0, 0];
 let P = null, day = TODAY, tab = 'grid', ED = {}, sel = new Set(), cur = -1, undo = [], focus = '', lat = null, drag = null;
 const STYLES = [
   ['f6', '★ 추천: 네이비 접힘 + 빛바램', 'd-fold d-fade d-fnavy', '접힘'], ['f7', '작은 네이비 접힘 + 빛바램', 'd-fold d-fsm d-fade d-fnavy', '접힘'],
@@ -417,6 +420,15 @@ function drawHead() {
 }
 
 // ---------- 객실 현황 · 입력
+// 💾 저장 띠: 켜진 날 = 저장 상태 · 기록 / 연습 가능한 지난 날 = 켜기 단추
+function svBar() {
+  const sv = window.JBR && window.JBR.sv; if (!sv) return '';
+  const lb = 'style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0"';
+  if (live(day)) return '<div class="check svb"><b class="good">💾 저장 켜짐</b> — 고치는 즉시 저장소에 (방 하나씩) · <span id="svst">' + sv.status() + '</span> · <button data-jlog="1" ' + lb + '>📜 변경 기록</button>' +
+    (sv.canOff(day) ? ' · <button data-joff="1" ' + lb + '>연습 끝내기 (켜기 전 엑셀 자료로)</button>' : '') + '</div>';
+  if (sv.canOn(day)) return '<div class="check svb"><span>이 날은 보기 · 연습만</span> · <button data-jon="1" ' + lb + '>💾 이 날짜로 실제 저장 연습 켜기</button> <small>(지난 날짜만 · 12/1부터는 저절로 켜짐)</small></div>';
+  return '';
+}
 function drawGrid() {
   const d = R(), c = calc(day), gi = gIndex(d), pr = prioRooms();
   const xl = d.xl || {}, same = [['정비수', c.fam], ['로얄', c.roy], ['인원', c.ppl], ['미정비', c.mij], ['재실', c.jae], ['간단', c.gan * 0.5]].map(([k, v]) => [k, v, xl[k], xl[k] == null || Math.abs(v - xl[k]) < 1e-9]);
@@ -431,8 +443,9 @@ function drawGrid() {
     WTYPES.map(t => { const no = t[0] === 'RYL' || t[0] === 'PLT'; return '<tr' + (d.rooms.length && !wa.n[t[0]] ? ' class="z"' : '') + '><td><b>' + t[1] + '</b> <small>' + t[0] + ' · ' + t[2] + '</small></td><td class="r">' + wa.n[t[0]] + '</td><td class="r">' + wa.f[t[0]] + '</td><td class="r">' + (no ? '<small>제외</small>' : wa.n[t[0]] * WATER_PER) + '</td></tr>'; }).join('') +
     '</tbody></table><div class="wsum"><span>생수 사용<b>' + wa.total + '병</b></span><span>아직 정비 안 한 방<b>' + wa.left + '병</b></span></div><p class="hint">객실당 ' + WATER_PER + '병 · 로얄 · PLT 는 빼고 계산 (엑셀 정비보고서 표와 같은 기준)</p></div>';
   if (!c.asg) h += '<div class="check"><span class="warn">아직 입력 전인 날이에요</span> — 배정이 들어오면 엑셀과 같은 계산이 바로 나와요</div>';
-  else h += '<div class="check">' + (typos.length ? '<a data-typos="1">⚠ 명단에 없는 이름 ' + typos.length + '실 (' + esc([...new Set(typos.flatMap(([r, x]) => typoOf(r, x)))].join(', ')) + ') — 눌러서 고르기</a> · ' : '') + (d.edited ? '<span class="warn">연습 중 — 고친 내용은 저장되지 않아요</span> (12/1부터 저장) · <button data-reset="1" style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">엑셀 자료로 되돌리기</button>' :
+  else h += '<div class="check">' + (typos.length ? '<a data-typos="1">⚠ 명단에 없는 이름 ' + typos.length + '실 (' + esc([...new Set(typos.flatMap(([r, x]) => typoOf(r, x)))].join(', ')) + ') — 눌러서 고르기</a> · ' : '') + (d.edited ? '<span class="warn">연습 중 — 고친 내용은 저장되지 않아요</span> (위 「💾 저장 켜기」를 누른 날만 저장) · <button data-reset="1" style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">엑셀 자료로 되돌리기</button>' :
     (okN === 6 ? '<span class="good">엑셀 계산값과 같음 ' + okN + '/6</span> (금일 정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단)' : '<span class="warn">엑셀과 다른 칸 ' + (6 - okN) + '개</span> ' + same.filter(s => !s[3]).map(s => s[0] + ' 앱 ' + s[1] + ' / 엑셀 ' + s[2]).join(', '))) + '</div>';
+  h += svBar();
   h += '<div class="cards">' + d.cards.map((k, i) => {
     const st = /휴/.test(k.u) ? 'off' : k.u === '퇴사' ? 'quit' : k.in ? 'in' : '';
     const u = c.per[k.n] || 0;
@@ -543,11 +556,19 @@ function grpHtml(d) {
   }
   return h;
 }
+// 저장: 바뀐 방만 { 호실: { b: 전, a: 후 } } 로 넘김 (같으면 안 보냄)
+function saveRooms(ds, idxs, bef) {
+  const d = dayData(ds), ch = {};
+  idxs.forEach((i, k) => { const a = packX(d.rooms[i]), b = packX(JSON.parse(bef[k] || 'null')); if (JSON.stringify(a) !== JSON.stringify(b)) ch[P.rooms[i]] = { b, a }; });
+  if (Object.keys(ch).length) window.JBR.sv.rooms(ds, ch);
+}
+function saveGroups(d) { if (live(day)) window.JBR.sv.groups(day, d.groups); else d.edited = true; }
 function pushUndo(idxs) { const d = R(); undo.push({ ds: day, v: idxs.map(i => [i, JSON.stringify(d.rooms[i])]) }); if (undo.length > 200) undo.shift(); }
 function apply(idxs, fn) {
-  if (!idxs.length) return; const t0 = performance.now(), d = R(); pushUndo(idxs);
+  if (!idxs.length) return; const t0 = performance.now(), d = R(); pushUndo(idxs); const bef = undo[undo.length - 1].v.map(v => v[1]);
   idxs.forEach(i => { d.rooms[i] = d.rooms[i] || { st: '', nm: '', m1: '', m2: '', done: false, yl: false }; fn(d.rooms[i], i); });
-  d.edited = true; draw(); requestAnimationFrame(() => { lat = performance.now() - t0; const l = document.querySelector('.lat'); if (l) l.textContent = '반영 ' + lat.toFixed(1) + 'ms'; });
+  if (live(day)) saveRooms(day, idxs, bef); else d.edited = true;
+  draw(); requestAnimationFrame(() => { lat = performance.now() - t0; const l = document.querySelector('.lat'); if (l) l.textContent = '반영 ' + lat.toFixed(1) + 'ms'; });
 }
 // 상태 바꾸기 (한 곳)
 function setSt(idx, v, after) {
@@ -589,7 +610,7 @@ function toggleDone(idx) {
   apply(ok, (x, i) => { x.done = !all; if (!all) JD[day + P.rooms[i]] = Date.now(); else delete JD[day + P.rooms[i]]; });
   toast((all ? '완료를 풀었어요' : '완료 ✓ ' + ok.length + '실') + (no.length ? ' · 연박 · 공실 ' + no.length + '실은 건너뜀' : '') + (noName && !all ? ' · 정비자 없는 방 ' + noName + '실 포함' : ''));
 }
-function doUndo() { const u = undo.pop(); if (!u) { toast('되돌릴 것이 없어요'); return; } day = u.ds; const d = R(); u.v.forEach(([i, s]) => { d.rooms[i] = JSON.parse(s); }); draw(); toast('되돌렸어요'); }
+function doUndo() { const u = undo.pop(); if (!u) { toast('되돌릴 것이 없어요'); return; } day = u.ds; const d = R(), bef = u.v.map(([i]) => JSON.stringify(d.rooms[i])); u.v.forEach(([i, s]) => { d.rooms[i] = JSON.parse(s); }); if (live(day)) saveRooms(day, u.v.map(v => v[0]), bef); draw(); toast('되돌렸어요'); }
 function parseRooms(t) {   // 붙여 넣은 글에서 호실만: 1203 · 1205-1207 · 1512~17 · 401호
   const out = [], re = /(\d{3,4})(?:\s*[-~]\s*(\d{1,4}))?/g; let m;
   while ((m = re.exec(String(t)))) { const a = +m[1]; let b = m[2] ? +m[2] : a; if (b < 100) b = Math.floor(a / 100) * 100 + b; for (let x = a; x <= b && x - a < 40; x++) { const i = P.rooms.indexOf(String(x)); if (i >= 0) out.push(i); } }
@@ -635,7 +656,7 @@ function preset1125() {
   LATE[day] = {}; ['3111', '2701', '2703', '2501', '2503', '2510', '2417', '2101', '2102', '2001', '1907', '1813', '1601', '1610', '1401', '801'].forEach(r => { LATE[day][r] = { at: '', label: '곧 퇴실' }; });
   LATE[day]['1414'] = { at: '15:00', label: '15시 퇴실' };
   const order = r => { const s = +r.slice(-2); return s >= 12 ? 1 : s <= 4 ? 2 : 3; }; PRIO[day].order = order;
-  d.rooms.forEach(x => { if (x) x.done = false; }); clock = 10 * 60 + 30;   // 아침 10:30 상황으로 (완료 표시는 시험용으로 지움)
+  if (!live(day)) d.rooms.forEach(x => { if (x) x.done = false; }); clock = 10 * 60 + 30;   // 아침 10:30 상황으로 (완료 표시는 시험용으로 지움)
   toast('11/25 단톡방 안내 3장을 앱 지시로 불러왔어요 · 아침 10:30 상황으로 완료 표시를 지웠어요');
 }
 function maidRooms(name) {
@@ -778,12 +799,12 @@ document.addEventListener('click', e => {
   if (t.dataset.gnew) { gEdit = { k: -1, name: '', time: '', txt: sel.size ? compress([...sel].map(i => P.rooms[i])) : '' }; draw(); return; }
   if (t.dataset.gsel) { gEdit.name = $('#gname').value; gEdit.time = $('#gtime').value; const cur0 = parseRooms($('#grooms').value).map(i => P.rooms[i]); gEdit.txt = compress(cur0.concat([...sel].map(i => P.rooms[i]))); draw(); return; }
   if (t.dataset.gcancel) { gEdit = null; draw(); return; }
-  if (t.dataset.gdel) { const d = R(); d.groups.splice(gEdit.k, 1); d.edited = true; gEdit = null; draw(); toast('단체를 지웠어요'); return; }
+  if (t.dataset.gdel) { const d = R(); d.groups.splice(gEdit.k, 1); saveGroups(d); gEdit = null; draw(); toast('단체를 지웠어요'); return; }
   if (t.dataset.gsave) {
     const d = R(), name = $('#gname').value.trim(), time = $('#gtime').value.trim(), rooms = parseRooms($('#grooms').value).map(i => P.rooms[i]);
     if (!name) { toast('단체명을 적어 주세요'); return; } if (!rooms.length) { toast('호실을 넣어 주세요'); return; }
     const g = { name, time, rooms: [...new Set(rooms)] }; if (gEdit.k < 0) d.groups.push(g); else d.groups[gEdit.k] = g;
-    d.edited = true; gEdit = null; sel = new Set(g.rooms.map(r => P.rooms.indexOf(r))); draw(); toast('「' + name + '」 ' + g.rooms.length + '실 — 격자에 색 띠가 붙었어요'); return;
+    saveGroups(d); gEdit = null; sel = new Set(g.rooms.map(r => P.rooms.indexOf(r))); draw(); toast('「' + name + '」 ' + g.rooms.length + '실 — 격자에 색 띠가 붙었어요'); return;
   }
   if (t.dataset.card != null) { const k = R().cards[+t.dataset.card]; focus = focus === k.n ? '' : k.n; draw(); return; }
   const idx = [...sel];
@@ -811,6 +832,9 @@ document.addEventListener('click', e => {
   if (t.dataset.pdf) { savePdf(t); return; }
   if (t.dataset.water) { waterOpen = !waterOpen; draw(); return; }
   if (t.dataset.reset) { window.JBR.reset(); toast('엑셀 자료로 되돌렸어요'); return; }
+  if (t.dataset.jon) { if (confirm(day + ' 을(를) 실제 저장으로 켤까요?\n\n· 고치는 내용이 저장소에 바로 저장되고 기록이 남아요\n· 이 날은 이제 엑셀 사본이 덮지 않아요\n· 「연습 끝내기」로 켜기 전 자료로 되돌릴 수 있어요' + (R().edited ? '\n· 지금 연습으로 고친 내용은 버려요' : ''))) { delete ED[day]; window.JBR.sv.on(day); } return; }
+  if (t.dataset.joff) { if (confirm(day + ' 저장 연습을 끝낼까요?\n\n켜기 전 엑셀 자료로 되돌리고 다시 보기 · 연습만 돼요. 변경 기록은 그대로 남아요.')) window.JBR.sv.off(day); return; }
+  if (t.dataset.jlog) { window.JBR.sv.showLog(day); return; }
   if (t.dataset.clearp) { PRIO[day] = []; LATE[day] = {}; draw(); return; }
   if (t.dataset.delp != null) { prioList().splice(+t.dataset.delp, 1); draw(); return; }
   if (t.dataset.out) { const l = LATE[day][t.dataset.out]; l.out = !l.out; if (l.out) { const r = t.dataset.out, i = P.rooms.indexOf(r), x = R().rooms[i]; toast('🔔 ' + (x && x.nm ? x.nm + ' 님 휴대폰: ' : '') + r + '호 퇴실됐어요 — 바로 정비 시작'); } draw(); return; }
@@ -952,17 +976,19 @@ async function savePdf(btn) {
 window.JBR = {
   set(j) {
     const first = !P; P = j; P.days = {}; Object.values(j.months).forEach(M => Object.assign(P.days, M.days));
-    Object.keys(ED).forEach(k => { if (!ED[k].edited) delete ED[k]; });   // 연습으로 고친 날은 그대로, 나머지는 새 자료로
+    Object.keys(ED).forEach(k => { if (!ED[k].edited || live(k)) delete ED[k]; });   // 저장 켜진 날은 늘 저장소 값으로 (내가 방금 쓴 것도 들어 있음)   // 연습으로 고친 날은 그대로, 나머지는 새 자료로
     if (first || !P.days[day]) { const ds = Object.keys(P.days).sort(), le = ds.filter(x => x <= TODAY); day = P.days[TODAY] ? TODAY : (le[le.length - 1] || ds[0]); }
     draw();
   },
   edited: () => Object.values(ED).some(x => x.edited) || !!gEdit,
-  reset() { delete ED[day]; undo = undo.filter(u => u.ds !== day); draw(); }
+  reset() { delete ED[day]; undo = undo.filter(u => u.ds !== day); draw(); },
+  day: () => day, toast: m => toast(m), redraw: () => draw(),
+  sv: null
 };
 if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.26-4"></script>
+<script type="module" src="jbr.js?v=2026.11.27-1"></script>
 </body>
 </html>
