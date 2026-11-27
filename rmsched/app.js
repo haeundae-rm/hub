@@ -372,7 +372,7 @@ function hkHtml() {
   //   하우스키퍼 계정은 HK 전파 (전체)만
   const P = S.hkOnly ? 'all' : (S.hkPart || 'all'), PL = { all: ['HK 전파 (전체)', 'HK전파'], rm: ['룸메이드 방배정표', '방배정표'], sup: ['정비보조 명단', '정비보조명단'] };
   let h = (S.hkOnly ? snapChips() : dayChips() + `<div class="tools"><span class="lbl">보낼 것</span><div class="seg">${Object.keys(PL).map(k => `<button data-hkp="${k}" class="${P === k ? 'on' : ''}">${PL[k][0]}</button>`).join('')}</div></div>`) + `
-    <div class="tools"><button class="pri" data-share="hkPaper" data-fn="${PL[P][1]}_${V.date}" data-ttl="${t} ${PL[P][0]}">카톡으로 공유</button><button id="saveImg" data-el="hkPaper" data-fn="${PL[P][1]}_${V.date}">이미지로 저장</button><button data-copyimg="hkPaper">이미지 복사</button><button id="copyHk">카톡용 글 복사</button><span class="lbl">${S.hkOnly ? '보기 전용 · 소장 · 부소장님이 저장한 내용이에요' : P === 'sup' ? '정비보조 출근은 주간 스케줄 → 정비보조 출근에서 표시해요' : P === 'rm' ? '룸메이드 공지용 — 정비유닛 없이 순번 · 성함만 나가요' : '빨간 숫자 = 일일 스케줄 \'유닛 수정\'으로 기본보다 늘어난 유닛'}</span></div>`;
+    <div class="tools"><button class="pri" data-copyimg="hkPaper">이미지 복사</button><button id="copyHk">카톡용 글 복사</button><span class="lbl">${S.hkOnly ? '보기 전용 · 소장 · 부소장님이 저장한 내용이에요' : P === 'sup' ? '정비보조 출근은 주간 스케줄 → 정비보조 출근에서 표시해요' : P === 'rm' ? '룸메이드 공지용 — 정비유닛 없이 순번 · 성함만 나가요' : '빨간 숫자 = 일일 스케줄 \'유닛 수정\'으로 기본보다 늘어난 유닛'}</span></div>`;
   h += `<div class="scroll" style="border:0;background:none"><div class="paper hk ${P !== 'all' ? 'one' : ''}" id="hkPaper">
     ${P === 'sup' ? '' : `<div><div class="ttl">${t} RM 방배정표</div><table><tr><th>순번</th><th>성함</th>${P === 'rm' ? '' : '<th>정비유닛</th>'}</tr>
       ${Array.from({ length: n }, (_, i) => { const x = V.rm[i]; return `<tr><td>${x ? i + 1 : ''}</td><td class="nmc">${x ? esc(x.r.name) : ''}</td>${P === 'rm' ? '' : `<td class="uc ${x && x.up ? 'up' : ''}">${x ? x.u : ''}</td>`}</tr>`; }).join('')}
@@ -417,7 +417,7 @@ function hkText() {
 // =============== 공지용 ===============
 function noticeHtml() {
   const w = S.w;
-  let h = `<div class="tools"><button class="pri" data-share="ntPaper" data-fn="휴무공지_${w.mon}" data-ttl="${esc(C.weekTitle(w))} 휴무 공지">카톡으로 공유</button><button id="saveImg" data-el="ntPaper" data-fn="휴무공지_${w.mon}">이미지로 저장</button><button data-copyimg="ntPaper">이미지 복사</button><button id="copyNt">카톡용 글 복사</button><span class="lbl">메이드님들 카톡방에 올리는 주간 휴무 공지</span></div>`;
+  let h = `<div class="tools"><button class="pri" data-copyimg="ntPaper">이미지 복사</button><button id="copyNt">카톡용 글 복사</button><span class="lbl">메이드님들 카톡방에 올리는 주간 휴무 공지</span></div>`;
   h += `<div class="scroll" style="border:0;background:none"><div class="paper ntc" id="ntPaper"><h2>${esc(C.weekTitle(w))} 룸메이드 휴무 공지</h2><div class="sub">${md(w.mon)} ~ ${md(addDays(w.mon, 6))} · 신청 = 신청 휴무 · 사유 = 사유 있는 휴무 · 휴 = 지정 휴무 · 빨간 테두리 = 휴무 취소(출근)</div>
     <table class="g"><tr><th>신청순</th><th>직원성명</th>${DAYS.map((d, i) => `<th class="${i === 5 ? 'sat' : i === 6 ? 'sun' : ''}">${d}<br>${md(addDays(w.mon, i))}</th>`).join('')}<th>이번주</th></tr>
     ${w.rows.filter(r => r.name).map(r => `<tr class="${r.group === '고정' ? 'fx' : ''}"><td class="${ordCls(r.ord) || 'nord'}" style="font-weight:700">${isNum(r.ord) ? r.ord : '미신청'}</td><td class="nm">${esc(r.name)}</td>
