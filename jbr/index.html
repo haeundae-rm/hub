@@ -45,6 +45,7 @@ main{padding:10px max(2vw,12px) 40px}
 .wpop td.r,.wpop th:not(:first-child){text-align:right}.wpop td small{color:#8a93a0}.wpop tr.z td{color:#b4bac2}
 .wpop .wsum{display:flex;gap:10px;margin-top:8px}.wpop .wsum span{flex:1;background:#1B2A4A;color:#fff;border-radius:10px;padding:6px 12px;font-size:12.5px}.wpop .wsum span:last-child{background:#EEF6FC;color:#1D5E96}.wpop .wsum b{display:block;font:800 22px Inter,sans-serif}
 .check{font-size:12.5px;margin:-2px 0 10px;color:var(--mute)}
+.awb{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}.awb .kpi{flex:1;min-width:180px}.awt td{padding:3px 4px}.awt select,.awt input{font:inherit;padding:4px 6px;border:1px solid #ccd;border-radius:6px}.awt tr.awc td{background:#FFF6E5}td.aw{color:#9A3412;font-weight:800}
 .check .good{color:var(--ok);font-weight:700}.check .warn{color:var(--org);font-weight:700}
 .cards{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
 .card{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:5px 9px;display:flex;gap:6px;align-items:center;font-size:13px;min-height:34px}
@@ -347,6 +348,18 @@ let gal = false, doneStyle = 'orig',   // 11/26 소장님 확정: 처음 버전 
 const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 2600); };
 const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 const toMin = s => { const m = /(\d{1,2})\s*[:시]\s*(\d{0,2})/.exec(s || ''); return m ? +m[1] * 60 + (+m[2] || (/반/.test(s) ? 30 : 0)) : null; };
+
+// 🏆 시상 (11/27 소장님 — 6월부터 결산 자료에 함께 보내는 「룸메이드 시상 명단」 양식): jbr/cfg-YYYY-MM.awards
+//   교육생 유닛 = 그 달 시상 예산 · 1건 = 7실 × 연장 단가(7,400) = 51,800원 · 남은 예산 = 도급 수익 · 못 준 분은 이월 → 다음 달 맨 위로
+//   정비보고서 방 기록은 그대로(교육생 방은 교육생) — 연장근로 표에 '시상' 칸으로 더해 지급 (9실 미만인 분도 정확히 7실)
+let AWC = {};
+const AW_KINDS = ['특별 시상', '우수사원 시상', '분기 시상', '기타 시상'], AW_WHY = ['칭찬 VOC', '코칭점검 우수', '5S 점검 비상 대응 TF팀 노고 치하', '객실 정비 우수', '무결점 정비 달성', '악취 시상'], AW_ST = ['당월 지급 대상', '시상 완료', '이월'], AW_PER = 7;
+const awList = m => ((AWC[m] && AWC[m].awards) || []).map(a => Object.assign({}, a));
+const awPay = a => a.st === '당월 지급 대상' || a.st === '시상 완료';
+const awAmt = a => (Number(a.u) || 0) * OPT.ot + (Number(a.x) || 0);
+const prevM = m => { const d = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 2, 1)); return d.toISOString().slice(0, 7); };
+function awByName(m) { const o = {}; awList(m).filter(awPay).forEach(a => { const x = o[a.n] = o[a.n] || { u: 0, x: 0, c: 0 }; x.u += Number(a.u) || 0; x.x += Number(a.x) || 0; x.c += Number(a.c) || 0; }); return o; }
+function awSave(m, list) { if (window.JBR && window.JBR.sv && window.JBR.sv.awards) window.JBR.sv.awards(m, list); }
 
 // ---------- 자료
 function dayData(ds) {
@@ -721,7 +734,7 @@ function drawClose(only) {
     if (!ok) bad++; return '<td class="num' + (ok ? '' : ' x') + (tr ? ' trd' : '') + (cls ? ' ' + cls : '') + '"' + (ok && !tr ? '' : ' title="엑셀 ' + esc(x) + (tr ? ' — 엑셀은 교육생 ' + trU + '유닛을 뺐어요' : '') + '"') + '>' + (v === 0 || v === '' ? '' : (typeof v === 'number' ? +v.toFixed(2) : esc(v))) + '</td>'; };
   const per = n => C.map(c => c.per[n] || 0), tot = C.map(c => c.total), trU = C.map(c => OPT.trainee ? c.per[TRAINEE] || 0 : 0), trS = trU.reduce((a, b) => a + b, 0), cnt = C.map(c => names.filter(n => (c.per[n] || 0) > 0).length + (OPT.trainee && (c.per[TRAINEE] || 0) > 0 ? 0 : 0));
   const otv = u => u >= OPT.otMin ? u - OPT.otBase : 0, head = '<tr><th class="n">성명</th>' + ds.map(x => '<th>' + (+x.slice(8)) + '</th>').join('');
-  const tabs = [['room', '객실정비현황'], ['bill', '청구금액'], ['ot', '연장근로'], ['unit', '유닛누계']];
+  const tabs = [['room', '객실정비현황'], ['bill', '청구금액'], ['ot', '연장근로'], ['unit', '유닛누계'], ['award', '🏆 시상']];
   // 네 표를 모두 계산해서 다른 칸 수를 셈 (보이는 건 고른 표 하나)
   const html = {}, badOf = {};
   { let b0 = bad, h = '<table><thead>' + head + '<th>총정비수</th><th>정비일수</th><th>평균</th></tr></thead><tbody>';
@@ -742,19 +755,34 @@ function drawClose(only) {
     h += '<tr><td class="n">비고</td><td colspan="' + N + '" style="text-align:left">로얄 ' + roy + '실 ' + (X.has === false ? '' : roy === X.bill['로얄'] ? '✓' : '(엑셀 ' + X.bill['로얄'] + ')') + ' · 패밀리 ' + fam + ' ' + (X.has === false ? '' : fam === X.bill['패밀리'] ? '✓' : '(엑셀 ' + X.bill['패밀리'] + ')') + '</td><td></td></tr>';
     if (X.has !== false) { if (roy !== X.bill['로얄']) bad++; if (fam !== X.bill['패밀리']) bad++; cells += 2; }
     html.bill = h + '</tbody></table>'; badOf.bill = bad - b0; }
-  { let b0 = bad, h = '<table><thead>' + head + '<th>합계</th><th>금액</th></tr></thead><tbody>', dayT = ds.map(() => 0);
+  { let b0 = bad, AWN = awByName(m), awT = { u: 0, x: 0 }, payT = 0, h = '<table><thead>' + head + '<th>합계</th><th>금액</th><th>시상</th><th>지급 금액</th></tr></thead><tbody>', dayT = ds.map(() => 0);
+    const awTd = (n, s) => { const a = AWN[n] || { u: 0, x: 0 }; awT.u += a.u; awT.x += a.x; const pay = (s + a.u) * OPT.ot + a.x; payT += pay; return '<td class="num aw">' + (a.u ? a.u : '') + (a.x ? '<small> +' + a.x.toLocaleString() + '원</small>' : '') + '</td><td class="num b">' + (pay ? pay.toLocaleString() : '') + '</td>'; };
     names.forEach(n => { const o = per(n).map(otv), s = o.reduce((a, b) => a + b, 0), xr = X.ot[n] || { d: [], tot: 0, amt: 0 }; o.forEach((v, k) => { dayT[k] += v; });
-      if (!s && !xr.tot) { o.forEach((v, k) => td(v, xr.d[k])); return; }
-      h += '<tr><td class="n">' + esc(n) + '</td>' + o.map((v, k) => td(v, xr.d[k])).join('') + td(s, xr.tot, 'b') + td(s * OPT.ot, xr.amt) + '</tr>'; });
+      if (!s && !xr.tot && !AWN[n]) { o.forEach((v, k) => td(v, xr.d[k])); return; }
+      h += '<tr><td class="n">' + esc(n) + '</td>' + o.map((v, k) => td(v, xr.d[k])).join('') + td(s, xr.tot, 'b') + td(s * OPT.ot, xr.amt) + awTd(n, s) + '</tr>'; });
+    Object.keys(AWN).filter(n => !names.includes(n)).forEach(n => { h += '<tr><td class="n">' + esc(n) + ' <small>(명단 밖)</small></td>' + ds.map(() => '<td></td>').join('') + '<td></td><td></td>' + awTd(n, 0) + '</tr>'; });
     const S = dayT.reduce((a, b) => a + b, 0);
-    h += '<tr class="tot"><td class="n">합계</td>' + dayT.map((v, k) => td(v, X.otT.d[k])).join('') + td(S, X.otT.tot, 'b') + td(S * OPT.ot, X.otT.amt) + '</tr></tbody></table>';
+    h += '<tr class="tot"><td class="n">합계</td>' + dayT.map((v, k) => td(v, X.otT.d[k])).join('') + td(S, X.otT.tot, 'b') + td(S * OPT.ot, X.otT.amt) + '<td class="num">' + (awT.u || '') + (awT.x ? '<small> +' + awT.x.toLocaleString() + '원</small>' : '') + '</td><td class="num b">' + payT.toLocaleString() + '</td></tr></tbody></table>' +
+      (awT.u || awT.x ? '<p class="hint">시상 = 🏆 시상 탭의 「당월 지급 대상 · 시상 완료」 (1건 = ' + AW_PER + '실 × ' + OPT.ot.toLocaleString() + '원) · 지급 금액 = (연장 + 시상) × ' + OPT.ot.toLocaleString() + '원 + 추가 금액</p>' : '');
     html.ot = h; badOf.ot = bad - b0; }
   { let b0 = bad, h = '<table><thead><tr><th class="n">구분</th><th class="n2">형태</th>' + ds.map(x => '<th>' + (+x.slice(8)) + '일</th>').join('') + '<th>합계</th></tr></thead><tbody>';
     ['정비수', '미정비', '재실청소', '간단재실'].forEach(a => ['패밀리', '로얄', 'PLT'].forEach((b, j) => { const k = a + ':' + b, v = C.map(c => c.U[k]), xr = X.unit[k] || { d: [] };
       h += '<tr' + (j === 2 ? ' class="gap"' : '') + '><td class="n">' + (j ? '' : a) + '</td><td class="n2">' + b + '</td>' + v.map((x, i) => td(x, xr.d[i], 'yel')).join('') + td(v.reduce((p, q) => p + q, 0), xr.tot, 'b') + '</tr>'; }));
     html.unit = h + '</tbody></table><p class="hint">노란 칸 = 결산 양식에 그대로 붙여 넣는 칸 (엑셀 유닛누계와 같은 배치)</p>'; badOf.unit = bad - b0; }
+  { const L = awList(m), pm = prevM(m), carry = awList(pm).filter(a => a.st === '이월' && !a.moved), used = L.filter(awPay).reduce((s2, a) => s2 + (Number(a.u) || 0), 0), left = trS - used;
+    const sel = (i, f, opts, v) => '<select data-aw="' + i + ':' + f + '">' + opts.map(o => '<option' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select>';
+    const inp = (i, f, v, w, list) => '<input data-aw="' + i + ':' + f + '" value="' + esc(v == null ? '' : v) + '" style="width:' + w + 'px"' + (list ? ' list="' + list + '"' : '') + '>';
+    let h = '<div class="awb"><div class="kpi"><small>' + (+m.slice(5)) + '월 시상 예산 = 교육생 정비 유닛</small><b class="num">' + trS + '유닛</b></div><div class="kpi"><small>지급 (당월 지급 대상 · 시상 완료)</small><b class="num">' + used + '유닛 · ' + L.filter(awPay).reduce((s2, a) => s2 + awAmt(a), 0).toLocaleString() + '원</b></div>' +
+      '<div class="kpi"><small>' + (left >= 0 ? '남음 → 도급 수익 (교육생 그대로)' : '예산 넘음') + '</small><b class="num" style="color:' + (left >= 0 ? 'var(--ok)' : 'var(--bad)') + '">' + left + '유닛</b>' + (left < 0 ? '<span class="v">' + (-left) + '유닛만큼 「이월」로 바꿔 주세요</span>' : '') + '</div></div>';
+    if (carry.length) h += '<div class="warnbox">⏩ 지난달(' + (+pm.slice(5)) + '월) 이월 ' + carry.length + '명: ' + carry.map(a => esc(a.n) + ' (' + esc(a.why) + ')').join(', ') + ' — <button data-awcarry="1">이번 달 맨 위로 가져오기</button> (먼저 지급)</div>';
+    h += '<datalist id="awNames">' + names.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist><datalist id="awWhy">' + AW_WHY.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
+    h += '<table class="awt"><thead><tr><th>순번</th><th>시상 구분</th><th>성함</th><th>시상 사유</th><th>시상(건)</th><th>OT(수량)</th><th>추가 금액(원)</th><th>시상 금액</th><th>상태</th><th></th></tr></thead><tbody>' +
+      L.map((a, i) => '<tr class="' + (a.st === '이월' ? 'awc' : '') + '"><td class="num">' + (i + 1) + (a.from ? '<small> (' + (+a.from.slice(5)) + '월 이월)</small>' : '') + '</td><td>' + sel(i, 'k', AW_KINDS, a.k) + '</td><td>' + inp(i, 'n', a.n, 90, 'awNames') + '</td><td>' + inp(i, 'why', a.why, 220, 'awWhy') + '</td><td>' + inp(i, 'c', a.c, 44) + '</td><td>' + inp(i, 'u', a.u, 48) + '</td><td>' + inp(i, 'x', a.x || '', 90) + '</td><td class="num b">' + awAmt(a).toLocaleString() + '</td><td>' + sel(i, 'st', AW_ST, a.st) + '</td><td><button data-awdel="' + i + '" aria-label="지우기">✕</button></td></tr>').join('') +
+      '</tbody></table><div class="btns" style="margin-top:8px"><button class="pri" data-awadd="1">+ 시상 추가</button></div>' +
+      '<p class="hint">1건 = ' + AW_PER + '실 × ' + OPT.ot.toLocaleString() + '원 = ' + (AW_PER * OPT.ot).toLocaleString() + '원 · 건수를 바꾸면 OT 수량이 저절로 (건 × ' + AW_PER + ') · 추가 금액은 「+20만원」 같은 별도 금액 · 「당월 지급 대상 · 시상 완료」만 연장근로 표 \'시상\' 칸에 더해져요 · 정비보고서 방 기록은 그대로 (교육생 방은 교육생) · ⬇ 월 전체 엑셀에 「시상 명단」 시트로 들어가요</p>';
+    html.award = h; badOf.award = 0; }
   const S = tot.reduce((a, b) => a + b, 0), OT = names.reduce((a, n) => a + per(n).map(otv).reduce((p, q) => p + q, 0), 0);
-  if (only) return { html, S, OT, trS, ds, names, fam: C.reduce((a, c) => a + c.fam, 0), roy: C.reduce((a, c) => a + c.roy, 0) };   // ⬇ 엑셀 (화면과 같은 숫자)
+  if (only) return { m, html, S, OT, trS, ds, names, fam: C.reduce((a, c) => a + c.fam, 0), roy: C.reduce((a, c) => a + c.roy, 0) };   // ⬇ 엑셀 (화면과 같은 숫자)
   let h = '<div class="kpis">';
   h += '<div class="kpi"><small>' + (+m.slice(5)) + '월 정비수 (청구 기준)</small><b class="num">' + S.toLocaleString() + '</b><span class="v">' + (X.has === false ? '앱 계산' : eq(S, X.bill['합계']) ? '엑셀과 같음 ✓' : eq(S - trS, X.bill['합계']) ? '엑셀 ' + X.bill['합계'].toLocaleString() + ' + 교육생 ' + trS + ' (엑셀이 뺌)' : '엑셀 ' + X.bill['합계'].toLocaleString()) + '</span></div>';
   h += '<div class="kpi"><small>청구 금액 (× ' + OPT.rate.toLocaleString() + '원)</small><b class="num">' + (S * OPT.rate).toLocaleString() + '원</b><span class="v">' + (X.has === false ? '앱 계산' : eq(S * OPT.rate, X.bill['금액합']) ? '엑셀과 같음 ✓' : eq((S - trS) * OPT.rate, X.bill['금액합']) ? '엑셀보다 ' + (trS * OPT.rate).toLocaleString() + '원 많음 (교육생 몫)' : '엑셀 ' + X.bill['금액합'].toLocaleString() + '원') + '</span></div>';
@@ -799,6 +827,11 @@ document.addEventListener('click', e => {
   if (t.dataset.pickstyle) { doneStyle = t.dataset.pickstyle; gal = false; draw(); toast('완료 표시: ' + STYLES.find(x => x[0] === doneStyle)[1]); return; }
   if (t.dataset.unasg) { unassign([...sel]); focusCmd(); return; }
   if (t.dataset.ctab) { closeTab = t.dataset.ctab; draw(); return; }
+  if (t.dataset.awadd) { const m = monOf(day), L = awList(m); L.push({ id: 'a' + Date.now().toString(36), k: '우수사원 시상', n: '', why: '칭찬 VOC', c: 1, u: AW_PER, x: 0, st: '당월 지급 대상' }); awSave(m, L); return; }
+  if (t.dataset.awdel != null) { const m = monOf(day), L = awList(m), a = L[+t.dataset.awdel]; if (a && confirm((a.n || '이 줄') + ' 시상을 지울까요?')) { L.splice(+t.dataset.awdel, 1); awSave(m, L); } return; }
+  if (t.dataset.awcarry) { const m = monOf(day), pm = prevM(m), P0 = awList(pm), L = awList(m), C = P0.filter(a => a.st === '이월' && !a.moved);
+    awSave(m, C.map(a => Object.assign({}, a, { id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), st: '당월 지급 대상', from: a.from || pm })).concat(L));
+    awSave(pm, P0.map(a => (a.st === '이월' && !a.moved ? Object.assign({}, a, { moved: m }) : a))); toast('지난달 이월 ' + C.length + '명을 맨 위로 가져왔어요'); return; }
   if (t.dataset.drawer != null) { drawer = drawer === t.dataset.drawer ? '' : t.dataset.drawer; gEdit = null; draw(); return; }
   if (t.dataset.gk != null) { const g = R().groups[+t.dataset.gk]; gEdit = { k: +t.dataset.gk, name: g.name, time: g.time, txt: compress(g.rooms) }; sel = new Set(g.rooms.map(r => P.rooms.indexOf(r)).filter(i => i >= 0)); draw(); return; }
   if (t.dataset.gnew) { gEdit = { k: -1, name: '', time: '', txt: sel.size ? compress([...sel].map(i => P.rooms[i])) : '' }; draw(); return; }
@@ -861,6 +894,10 @@ document.addEventListener('mouseover', e => { if (drag == null) return; const c 
 document.addEventListener('compositionend', e => { if (e.target.id !== 'cmd' || !pendEnter) return; pendEnter = false; setTimeout(() => { const c = $('#cmd'); if (c) { cmdVal = c.value; if (cmdVal.trim()) assignTyped(cmdVal); } }, 0); });
 document.addEventListener('mouseup', e => { const was = drag != null || e.target.closest('.c[data-i]'); drag = null; if (was && tab === 'grid') { cmdVal = ''; focusCmd(); } });
 document.addEventListener('change', e => {
+  const aw = e.target.dataset && e.target.dataset.aw;
+  if (aw) { const [i, f] = aw.split(':'), m = monOf(day), L = awList(m), a = L[+i]; if (!a) return; let v = e.target.value;
+    if (['c', 'u', 'x'].includes(f)) v = Math.max(0, Number(String(v).replace(/[^\d.]/g, '')) || 0);
+    a[f] = v; if (f === 'c') a.u = v * AW_PER; awSave(m, L); return; }
   if (e.target.id === 'phm') { phMaid = e.target.value; draw(); return; }
   if (e.target.id === 'o_tr') { OPT.trainee = e.target.checked; draw(); return; }
   if (/^o_/.test(e.target.id)) { const v = parseFloat(e.target.value); if (!isNaN(v)) { if (e.target.id === 'o_rate') OPT.rate = v; if (e.target.id === 'o_ot') OPT.ot = v; if (e.target.id === 'o_min') OPT.otMin = v; draw(); } }
@@ -1028,6 +1065,21 @@ function tableSheet(name, title, html, sub) {
   const w = Math.max(...rows.map(r => r.length));
   return { name, rows, cols: [14].concat(Array(Math.max(0, w - 1)).fill(7)), freeze: 4 };
 }
+// 🏆 시상 명단 시트 — 소장님 「룸메이드 시상 명단」 양식 (위 = 메이드 전파용, 아래 = 내부 관리용)
+function awardSheet(m, R) {
+  const L = awList(m), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월', rows = [], pay = L.filter(a => a.st === '당월 지급 대상'), done = L.filter(a => a.st === '시상 완료'), cr = L.filter(a => a.st === '이월');
+  rows.push([{ v: '   ' + ym + '  룸메이드 시상 명단', s: 'title' }], [{ v: '   현장에서 노력해주시는 메이드분들께 진심으로 감사드립니다. 축하드립니다.', s: 'sub' }], []);
+  rows.push(['순번', '시상 구분', '성  함', '시   상   사   유', '시상(건)', 'OT(수량)', '시 상 금 액', '상  태'].map(v => ({ v, s: 'head' })));
+  L.forEach((a, i) => rows.push([{ v: i + 1, s: 'num' }, { v: a.k, s: 'num' }, { v: a.n, s: 'cellb' }, { v: a.why + (a.x ? ' + ' + Number(a.x).toLocaleString() + '원' : '') + (a.from ? ' (' + (+a.from.slice(5)) + '월 이월)' : ''), s: 'wrap' }, { v: Number(a.c) || 0, s: 'num' }, { v: Number(a.u) || 0, s: 'num' }, { v: awAmt(a), s: 'won' }, { v: a.st, s: a.st === '이월' ? 'carry' : a.st === '시상 완료' ? 'done' : 'num' }]));
+  const sum = (A, k) => A.reduce((s2, a) => s2 + (k === 'amt' ? awAmt(a) : Number(a[k]) || 0), 0);
+  rows.push([]);
+  [['당월 지급 대상', pay], ['시상 완료', done], ['이  월', cr]].forEach(([k, A]) => rows.push([{ v: k, s: 'cellb' }, { v: A.length + '명', s: 'num' }, { v: '', s: 'cell' }, { v: '', s: 'cell' }, { v: sum(A, 'c'), s: 'num' }, { v: sum(A, 'u'), s: 'num' }, { v: sum(A, 'amt'), s: 'won' }, { v: '', s: 'cell' }]));
+  rows.push([], [{ v: '     시상금은 OT 수당으로 지급됩니다.      1건 =  ' + OPT.ot.toLocaleString() + '원 × ' + AW_PER + '실 = ' + (OPT.ot * AW_PER).toLocaleString() + '원\n     이월 대상자는 익월 예산에서 우선 지급됩니다.', s: 'foot' }], []);
+  rows.push([{ v: '▼  아래는 내부 관리용입니다 — 메이드 전파(스크린샷) 시 제외하세요', s: 'sec' }]);
+  const used = sum(pay.concat(done), 'u');
+  [['당월 배정 예산 (교육생 정비 유닛)', R.trS + '유닛'], ['지급 (당월 지급 대상 · 시상 완료)', used + '유닛 · ' + sum(pay.concat(done), 'amt').toLocaleString() + '원'], ['잔  액 (도급 수익)', (R.trS - used) + '유닛'], ['이월 (다음 달 우선 지급)', cr.length + '명']].forEach(([k, v]) => rows.push([{ v: k, s: 'kpil' }, { v, s: 'kpiv' }]));
+  return { name: '시상 명단', rows, cols: [16, 14, 10, 34, 9, 9, 13, 14], heights: { [rows.length - 6]: 34 } };
+}
 async function xlOut(kind, btn) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
@@ -1040,7 +1092,7 @@ async function xlOut(kind, btn) {
       const kp = [['정비수 (청구 기준)', R.S], ['청구 금액 (원)', R.S * OPT.rate], ['연장근로 유닛', R.OT], ['연장근로 금액 (원)', R.OT * OPT.ot], ['로얄 (실)', R.roy], ['패밀리 정비수', R.fam], ['교육생 유닛 (청구 포함분)', R.trS], ['명단 (명)', R.names.length], ['날짜 수', ds.length]];
       const sum = { name: '요약', rows: [[{ v: ym + ' 객실 정비 결산', s: 'title' }], [{ v: sub, s: 'sub' }], []].concat(kp.map(([k, v]) => [{ v: k, s: 'kpil' }, { v, s: 'kpiv' }])).concat([[], [{ v: '날짜별 자료: ' + ds.map((x, i) => (+x.slice(8)) + '일 ' + src[i]).join(' · '), s: 'foot' }]]), cols: [26, 18] };
       sheets = [sum, tableSheet('객실정비현황', ym + ' 객실정비현황', R.html.room, sub), tableSheet('청구금액', ym + ' 청구금액', R.html.bill, sub), tableSheet('연장근로', ym + ' 연장근로', R.html.ot, sub), tableSheet('유닛누계', ym + ' 유닛누계', R.html.unit, sub)]
-        .concat(ds.map(x => gridSheet(x, (+x.slice(8)) + '일')));
+        .concat([awardSheet(m, R)]).concat(ds.map(x => gridSheet(x, (+x.slice(8)) + '일')));
       fn = '정비결산_' + m + '.xlsx';
     }
     const a = document.createElement('a'), u = URL.createObjectURL(X.book(sheets)); a.href = u; a.download = fn; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000);
@@ -1058,12 +1110,13 @@ window.JBR = {
   edited: () => Object.values(ED).some(x => x.edited) || !!gEdit,
   reset() { delete ED[day]; undo = undo.filter(u => u.ds !== day); draw(); },
   day: () => day, toast: m => toast(m), redraw: () => draw(),
+  setCfg(m, d) { AWC[m] = d || null; if (tab === 'close') draw(); },
   sv: null
 };
 if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.27-9"></script>
+<script type="module" src="jbr.js?v=2026.11.27-10"></script>
 </body>
 </html>
