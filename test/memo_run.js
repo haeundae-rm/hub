@@ -138,9 +138,11 @@ const asp = p => p.innerText('#asp');
   lt = await doc(p, 'meta/late_' + TODAY); ok(lt.rooms['803'].out === true && (await doc0('803'))[0] === '1', '🔔 퇴실했어요 → 퇴실 · 방 1');
   await cell('803').click(); await p.click('[data-memo="늦은퇴실"]'); await sleep(150); await p.click('#mpop [data-mpx="del"]'); await sleep(400);
   lt = await doc(p, 'meta/late_' + TODAY); ok(lt.rooms['803'] === null, '해제');
-  ok(/🟠 우선정비 \d/.test(await p.innerText('[data-drawer="prio"]')) && /🟣 늦은퇴실 0/.test(await p.innerText('[data-drawer="late"]')), '오른쪽 위 = 🟠 우선정비 · 🟣 늦은퇴실 목록 단추 따로');
-  await p.click('[data-drawer="prio"]'); await sleep(200); ok(!(await p.$('#pname')) && /카이스트 HTL/.test(await p.innerText('.side')), '우선정비 목록 (지정 칸 없음 · 메모 줄 단추로)');
-  await p.click('[data-drawer="prio"]'); await sleep(150);
+  ok(/🟠 우선정비 \d/.test(await p.innerText('[data-memo="우선"]')) && /🟣 늦은퇴실 0/.test(await p.innerText('[data-memo="늦은퇴실"]')), '메모 줄 🟠 우선정비 · 🟣 늦은퇴실 단추에 수');
+  ok(await p.locator('[data-drawer="prio"],[data-drawer="late"]').count() === 0, '오른쪽 위 우선정비 · 늦은퇴실 단추 없음 (전부 합쳐 단추 2개)');
+  { const eb = await p.locator('.ebar').boundingBox(); for (const w of [1366, 1920]) { await p.setViewportSize({ width: w, height: 900 }); await sleep(250); const e2 = await p.locator('.ebar').boundingBox(); await p.screenshot({ path: '/tmp/ebar_' + w + '.png', clip: { x: 0, y: e2.y, width: w, height: e2.height + 4 } }); } await p.setViewportSize({ width: 1500, height: 950 }); await sleep(200); }
+  await p.click('[data-memo="우선"]'); await sleep(150); if (await p.$('#mpop [data-mpx="list"]')) await p.click('#mpop [data-mpx="list"]'); await sleep(200); ok(!(await p.$('#pname')) && /카이스트 HTL/.test(await p.innerText('.side')), '우선정비 목록 (지정 칸 없음 · 메모 줄 단추로)');
+  await p.click('[data-memo="우선"]'); await sleep(150); if (await p.$('#mpop [data-mpx="list"]')) await p.click('#mpop [data-mpx="list"]'); await sleep(150);
   console.log('⑤-1b 끝난 일 단추');
   await cell('404').click(); await p.click('[data-memo="악취"]'); await sleep(150);
   ok(await p.locator('#mpop [data-mpraw]').count() === 2, '악취 창: ✓ 해제 · ✓ 탈취완료');
