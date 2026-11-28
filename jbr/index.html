@@ -117,6 +117,10 @@ main{padding:10px max(2vw,12px) 40px}
 .wrap.one{grid-template-columns:minmax(0,1fr)}
 .ebar{position:sticky;top:0;z-index:6;background:var(--bg);padding:6px 0 6px;display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--line);margin-bottom:6px}
 .eb1,.eb2{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.eb2{flex-wrap:nowrap}.eb2>.btns{flex:none;flex-wrap:nowrap}.eb2 #fmemo{flex:1 1 160px;min-width:120px;max-width:none}   /* 11/28 소장님 (테트리스): 메모 줄 = 메모 단추 · 🟠🟣 · 메모 칸 한 줄 */
+.eb2 .btns.pl button{font-weight:800}.eb2 .btns.pl b{font-family:Inter,sans-serif;margin-left:2px}
+@media (max-width:1180px){.eb2{flex-wrap:wrap}.eb2 #fmemo{flex-basis:100%}}
+#mpop .mpl{border:0;background:none;color:var(--mute);text-decoration:underline;font-size:12.5px;text-align:left;padding:0;cursor:pointer}
 .ebar .btns{gap:4px}.ebar .btns button{min-height:34px;padding:3px 9px}
 .eb2 .btns button{min-height:30px;padding:2px 8px;font-size:13px}
 .plate{display:flex;align-items:baseline;gap:7px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--navy);border-radius:9px;padding:5px 12px 5px 10px;min-width:150px;min-height:38px}
@@ -605,10 +609,10 @@ function barHtml(d) {
     [['', '공실', '']].map(b => '<button class="' + b[2] + '" data-st=""' + dis + '>' + b[1] + '</button>').join('') + '</span>';
   h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 이름 · 초성 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
   h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
-  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-drawer="prio"' + (drawer === 'prio' ? ' class="on"' : '') + '>🟠 우선정비 ' + prioList().length + '</button><button data-drawer="late"' + (drawer === 'late' ? ' class="on"' : '') + '>🟣 늦은퇴실 ' + Object.values(lateMap()).filter(l => !l.out).length + '</button></span></div>';
+  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button></span></div>';   // 11/28 소장님: 우선정비 · 늦은퇴실은 아래 줄 단추 하나씩 (목록도 그 단추로)
   { const r1 = one ? P.rooms[[...sel][0]] : '', onPr = !!(one && (memoKind(one.m1) === '우선' || memoKind(one.m2) === '우선' || prioList().some(q => q.rooms.includes(r1)))), onLt = !!(one && lateOf(r1));
     h += '<div class="eb2"><span class="btns">' + MEMOS.filter(m => m !== '우선').map(m => '<button data-memo="' + m + '"' + (one && (memoKind(one.m1) === m || memoKind(one.m2) === m) ? ' class="on"' : '') + dis + '>' + m + '</button>').join('') +
-      '<button data-memo="우선" class="mpr' + (onPr ? ' on' : '') + '"' + dis + '>🟠 우선정비</button><button data-memo="늦은퇴실" class="mlt' + (onLt ? ' on' : '') + '"' + dis + '>🟣 늦은퇴실</button></span>'; }
+      '</span><span class="btns pl"><button data-memo="우선" class="mpr' + (onPr || drawer === 'prio' ? ' on' : '') + '" title="방을 고르고 누르면 지정 · 해제 / 방을 안 고르고 누르면 목록">🟠 우선정비 <b class="num">' + prioList().reduce((a, q) => a + q.rooms.length, 0) + '</b></button><button data-memo="늦은퇴실" class="mlt' + (onLt || drawer === 'late' ? ' on' : '') + '" title="방을 고르고 누르면 지정 · 퇴실 · 해제 / 방을 안 고르고 누르면 목록">🟣 늦은퇴실 <b class="num">' + Object.values(lateMap()).filter(l => !l.out).length + '</b></button></span>'; }
   { const fv = one ? freeMemo(one) : ''; h += '<textarea class="inp" id="fmemo" rows="' + Math.min(3, Math.max(1, fv.split('\n').length)) + '" autocomplete="off" placeholder="' + (n ? '메모 → Enter 저장 · Shift+Enter 다음 줄' : '메모') + '"' + dis + '>' + esc(fv) + '</textarea>'; }   // 11/26 기존 메모 두고 다음 줄에 추가
   h += '</div>';   // 11/28 소장님: 「호실 번호로 → 퇴실 · 재실 · 완료」 칸 뺌 — 방 고르고 Space 가 더 빠름
   return h;
@@ -629,7 +633,7 @@ const lateOf = r => lateMap()[r];
 function lateHtml(d) {
   const L = lateMap(), ks = Object.keys(L).sort((a, b) => (L[a].out ? 1 : 0) - (L[b].out ? 1 : 0) || String(L[a].at || '99').localeCompare(String(L[b].at || '99')) || +a - +b);
   const nl = [...sel].filter(i => canLate(d.rooms[i])).length, nx = sel.size - nl, on = !!(window.JBR && window.JBR.late);
-  let h = '<div class="box" style="margin-top:10px;border-left:4px solid #7C3AED"><p class="hint" style="margin-top:0">지정 · 해제 = 방을 고르고 아래 메모 줄 <b>🟣 늦은퇴실</b> 단추. 프런트에서 퇴실 연락이 오면 여기 「퇴실」(또는 그 방 🟣 단추의 「🔔 퇴실했어요」) → 1(퇴실)로 바뀌고 담당 메이드 휴대폰이 울려요' + (on ? '' : ' · 로그인 전이라 지정할 수 없어요') + '</p>';
+  let h = '<div class="box" style="margin-top:10px;border-left:4px solid #7C3AED"><p class="hint" style="margin-top:0">지정 · 해제 = 방을 고르고 <b>🟣 늦은퇴실</b> 단추. 프런트에서 퇴실 연락이 오면 여기 「퇴실」(또는 그 방 🟣 단추의 「🔔 퇴실했어요」) → 1(퇴실)로 바뀌고 담당 메이드 휴대폰이 울려요' + (on ? '' : ' · 로그인 전이라 지정할 수 없어요') + '</p>';
   h += ks.length ? ks.map(r => { const l = L[r], i = P.rooms.indexOf(r), x = d.rooms[i] || {};
     return '<div class="ltl' + (l.out ? ' out' : '') + '"><span class="sw"></span><span><b class="num">' + r + '</b> <small>' + (l.out ? '퇴실 ' + esc(l.outHm || '') : l.at ? esc(l.at) + ' 예정' : '시각 미정') + ' · ' + (x.nm ? esc(x.nm) : '배정 없음') + '</small></span>' +
       (l.out ? '<button data-lateun="' + r + '" style="border:0;background:none;color:var(--mute);text-decoration:underline">되돌리기</button>' : '<button class="lbtn" data-lateout="' + r + '">퇴실</button>') +
@@ -640,7 +644,7 @@ function sideHtml(d, c) {
   const n = [...sel].filter(i => canPrio(d.rooms[i])).length, nx = sel.size - n;
   let h = '<div class="stabs"><button class="on">' + (drawer === 'grp' ? '단체 현황' : drawer === 'late' ? '🟣 늦은 퇴실' : '🟠 우선정비') + '</button><button data-drawer="" style="flex:none;width:44px" aria-label="닫기">✕</button></div>';
   if (drawer === 'prio') {
-    h += '<p class="hint" style="margin:0 0 8px">지정 · 해제 = 방을 고르고 아래 메모 줄 <b>🟠 우선정비</b> 단추. 여기선 목록 · 시각 고치기(Enter) · 빼기</p>';
+    h += '<p class="hint" style="margin:0 0 8px">지정 · 해제 = 방을 고르고 <b>🟠 우선정비</b> 단추. 여기선 목록 · 시각 고치기(Enter) · 빼기</p>';
     h += '<div class="box">' + (prioList().length ? prioList().map((p, k) => '<div class="grp"><span class="sw" style="background:var(--org)"></span><span><b>' + esc(p.name) + '</b> <small>' + ptimeIn(k) + '까지 · ' + p.rank + '순위 · ' + esc(p.rooms.slice(0, 8).join(' ')) + (p.rooms.length > 8 ? ' …' : '') + '</small></span><span class="num">' + p.rooms.length + '실 <button data-delp="' + k + '" style="border:0;background:none;color:var(--mute)">빼기</button></span></div>').join('') : '<p class="hint">지정된 우선정비가 없어요</p>') + '</div>';
   } else if (drawer === 'late') h += lateHtml(d); else h += grpHtml(d);
   return h;
@@ -667,6 +671,7 @@ function drawMpop(btn) {
     (mpop.kind === '우선' ? prNow() + '<div class="mpr2"><input class="inp" id="mpname" maxlength="20" placeholder="이름 (선택) · 예: 카이스트 HTL" value="' + esc(prCur() ? (prCur().name === '우선' ? '' : prCur().name) : '') + '"><select class="inp" id="mprank">' + [1, 2, 3].map(k => '<option value="' + k + '"' + ((prCur() ? prCur().rank : 1) === k ? ' selected' : '') + '>' + k + '순위</option>').join('') + '</select></div><small>지정하면 주황으로 빛나고 메이드 휴대폰에 알림 · 퇴실 · 퇴실 예정 · 이월 방만</small>' : '') +
     (mpop.kind === '늦은퇴실' ? ltNow() : '') +
     (DONE_BTN[mpop.kind] ? '<div class="mpd">' + DONE_BTN[mpop.kind].map(([v, l]) => '<button data-mpraw="' + v + '"' + (curM === v ? ' class="on"' : '') + '>✓ ' + l + '</button>').join('') + '</div>' : '') +
+    (mpop.kind === '우선' || mpop.kind === '늦은퇴실' ? '<button class="mpl" data-mpx="list">📋 ' + (mpop.kind === '우선' ? '우선정비' : '늦은 퇴실') + ' 목록 보기</button>' : '') +
     '<div class="mpb">' + (curM || (mpop.kind === '우선' && prCur()) || (mpop.kind === '늦은퇴실' && ltCur()) ? '<button data-mpx="del" class="del">' + (mpop.kind === '우선' || mpop.kind === '늦은퇴실' ? '해제' : '지우기') + '</button>' : '') + (mpop.kind === '늦은퇴실' && ltCur() && !ltCur().out ? '<button data-mpx="lout" class="lout">🔔 퇴실했어요</button>' : '') + '<button data-mpx="esc">닫기</button><button data-mpx="ok" class="ok">저장</button></div>';
   document.body.appendChild(o);
   const r = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 100, bottom: 100 };
@@ -687,6 +692,7 @@ function lsGet2(k) { try { return localStorage.getItem(k) || ''; } catch (e) { r
 function mpSave(how, val) {
   if (!mpop) return; const kind = mpop.kind, idx = mpop.idx;
   if (how === 'esc') { mpop = null; drawMpop(); focusCmd(); return; }
+  if (how === 'list') { drawer = kind === '우선' ? 'prio' : 'late'; mpop = null; drawMpop(); draw(); return; }
   if (kind === '늦은퇴실') {   // 🟣 메모 없이 meta/late_{날} 만 (11/27 늦은 퇴실 그대로)
     const rs = idx.map(i => P.rooms[i]), d = R(), on = !!(window.JBR && window.JBR.late);
     if (!on) { toast('로그인 전이라 늦은 퇴실을 쓸 수 없어요'); return; }
@@ -1105,6 +1111,7 @@ document.addEventListener('click', e => {
     if (a.length) { apply(a, x => { const o = otherMemo(x); x.m1 = x.nm; x.m2 = '미정비' + (o ? ' · ' + o : ''); x.nm = ''; x.done = false; }); toast('미정비 ' + a.length + '실 — 정비자는 한 칸 아래로 (정비수 · 유닛에서 빠짐)'); return; }
     if (b.length) { apply(b, x => { x.nm = x.m1; x.m1 = x.m2.replace(/^미정비( · )?/, ''); x.m2 = ''; }); toast('미정비를 되돌렸어요'); return; }
   }
+  if ((t.dataset.memo === '우선' || t.dataset.memo === '늦은퇴실') && !idx.length) { const w = t.dataset.memo === '우선' ? 'prio' : 'late'; drawer = drawer === w ? '' : w; gEdit = null; draw(); return; }
   if (t.dataset.memo && DETAIL[t.dataset.memo] && idx.length) { mpop = { kind: t.dataset.memo, idx: idx.slice() }; drawMpop(t); return; }
   if (t.dataset.memo) { const m = t.dataset.memo; let moved = 0;
     apply(idx, x => { if (x.m1 === m) x.m1 = ''; else if (x.m2 === m) x.m2 = ''; else { if (!x.m1) x.m1 = m; else x.m2 = m;

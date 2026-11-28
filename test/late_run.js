@@ -64,11 +64,11 @@ async function pick(p, room) { const i = await cellOf(p, room); await p.click('.
   ok(/몇 시쯤 나가세요/.test(await p.innerText('#mpop')), '🟣 늦은퇴실 창 (' + r4 + ' ' + seedDoc.r[r4][1] + ')');
   await p.fill('#mpin', '1시'); await sleep(100); ok(/오후 1시 \(13:00\) 예정/.test(await p.innerText('#mpst')), '「1시」 → 오후 1시 (13:00) 예정');
   await p.keyboard.press('Enter'); await sleep(300);
-  await p.click('[data-drawer="late"]'); await sleep(150);
+  await p.click('[data-memo="늦은퇴실"]'); await sleep(150); if (await p.$('#mpop [data-mpx="list"]')) await p.click('#mpop [data-mpx="list"]'); await sleep(150);
   let m = await p.evaluate(d => window.__seed['meta/late_' + d], D);
   ok(m && m.rooms[r4] && m.rooms[r4].at === '13:00' && m.rooms[r4].out === false, 'meta/late_' + D + ' 저장: ' + r4 + ' 13:00');
   ok(await p.evaluate(i => document.querySelector('.c[data-i="' + i + '"]').classList.contains('lt'), await cellOf(p, r4)), '격자 ' + r4 + ' 보라 빛');
-  ok(/🟣 늦은퇴실 1/.test(await p.innerText('[data-drawer="late"]')), '오른쪽 위 「🟣 늦은퇴실 1」 (우선정비와 따로)');
+  ok(/🟣 늦은퇴실 1/.test(await p.innerText('[data-memo="늦은퇴실"]')), '메모 줄 「🟣 늦은퇴실 1」');
   ok((await p.innerText('.ltl')).includes(seedDoc.r[r4][1]), '목록에 담당 메이드 이름');
   console.log('② 퇴실');
   await p.click('[data-lateout="' + r4 + '"]'); await sleep(400);
@@ -90,7 +90,7 @@ async function pick(p, room) { const i = await cellOf(p, room); await p.click('.
   await p.click('[data-memo="우선"]'); await sleep(150);
   ok(/우선정비 — 몇 시까지/.test(await p.innerText('#mpop')), '메모 줄 🟠 우선정비 단추 → 창');
   await p.fill('#mpname', '시험 우선'); await p.fill('#mpin', '15'); await p.keyboard.press('Enter'); await sleep(300);
-  await p.click('[data-drawer="prio"]'); await sleep(150);
+  await p.click('[data-memo="우선"]'); await sleep(150); if (await p.$('#mpop [data-mpx="list"]')) await p.click('#mpop [data-mpx="list"]'); await sleep(150);
   let pr = await p.evaluate(d => window.__seed['meta/prio_' + d], D);
   ok(pr && pr.list.length === 1 && pr.list[0].rooms.includes(r1) && pr.list[0].until === '15:00' && pr.list[0].name === '시험 우선', 'meta/prio_' + D + ' 저장: ' + r1 + ' 15:00 (「15」 → 15:00)');
   ok(await p.evaluate(i => document.querySelector('.c[data-i="' + i + '"]').classList.contains('pr'), await cellOf(p, r1)), '격자 주황 빛');
