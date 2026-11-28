@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.28-29';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.28-29';
-import * as PIN from './pin.js?v=2026.11.28-29';
-import { setupClose } from './close.js?v=2026.11.28-29';
-import { setupClosing } from './closing.js?v=2026.11.28-29';
-import { supProgress } from './supcalc.js?v=2026.11.28-29';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.28-29';
-import { setupMeal } from './meal.js?v=2026.11.28-29';
-import * as BD from './bday.js?v=2026.11.28-29';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.28-30';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.28-30';
+import * as PIN from './pin.js?v=2026.11.28-30';
+import { setupClose } from './close.js?v=2026.11.28-30';
+import { setupClosing } from './closing.js?v=2026.11.28-30';
+import { supProgress } from './supcalc.js?v=2026.11.28-30';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.28-30';
+import { setupMeal } from './meal.js?v=2026.11.28-30';
+import * as BD from './bday.js?v=2026.11.28-30';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.28-29';
+const VER = '2026.11.28-30';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -975,8 +975,9 @@ document.addEventListener('click', e => {
       return;
     } }
   if (e.target.closest && e.target.closest('[data-hkleave]')) { import('./hkleave.js?v=' + VER).then(m => m.open()).catch(err => { console.warn(err); alert('연차 현황을 열지 못했어요. 새로 고침 후 다시 해 주세요.'); }); return; }
-  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-sup],[data-actclose],[data-actlogin],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"]');
+  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-sup],[data-actclose],[data-actlogin],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"],a[href="./insp/"]');
   if (!t || (t.closest && t.closest('#dz'))) return;
+  if (t.matches('a[href="./insp/"]') && !PIN.passed('insp')) { e.preventDefault(); PIN.gate('🔍 인스펙션', 'insp').then(ok => { if (ok) location.href = './insp/'; }); return; }   // 11/28 소장님: 인스펙션도 4자리
   if (t.matches('a[href="./leave/"]') && !PIN.passed()) { e.preventDefault(); PIN.gate('룸메이드 연차 · 근무').then(ok => { if (ok) location.href = './leave/'; }); return; }
   if (t.matches('a[href="./leave/"]')) return;
   if (t.hasAttribute('data-unlock')) { PIN.gate('인사').then(ok => { if (ok) draw(); }); return; }
