@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.28-11';
+const VER = '2026.11.28-12';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -140,6 +140,37 @@ async function takeFrom(file, ds) {
   } catch (e) { say('❌ ' + (e && e.message || e)); }
 }
 
+// ---------- 🛟 복구 (11/28 11:31 사고: 작업 중이던 오늘 보고서를 「초안 처음으로」) — 엑셀 파일(아침 그대로) + 변경 기록을 순서대로 다시 적용
+//   기준 = 이 엑셀 파일의 그날 시트 · 그 위에 마지막 「엑셀 → 앱 원본」(take) 뒤 ~ 마지막 「초안 만듦/처음으로」(new) 전 사이의 방 고침 · 단체 기록을 시간 순서대로
+//   (take 기록이 없으면 처음 기록부터) · 결과 저장 = 통째로(set) + 기록 k:'restore'
+async function restoreFrom(file, ds) {
+  const say = m => { fill = m; tag(); };
+  try {
+    const v = new URLSearchParams(location.search).get('v') || VER;
+    const eng = await import('../../rm/app/engine.js?v=' + v), rs = await import('../../rm/app/rsync.js?v=' + v);
+    say('기록 읽는 중…');
+    const L = (await S.getQuery('jbr/' + ds + '/log', [])).map(x => x.data).filter(x => x && x.at).sort((a, b) => Number(a.at) - Number(b.at));
+    const news = L.filter(x => x.k === 'new'), tNew = news.length ? Number(news[news.length - 1].at) : Infinity;
+    const takes = L.filter(x => x.k === 'take' && Number(x.at) < tNew), tTake = takes.length ? Number(takes[takes.length - 1].at) : 0;
+    const win = L.filter(x => Number(x.at) > tTake && Number(x.at) < tNew);
+    say(ds.slice(5) + ' 엑셀 읽는 중…');
+    const buf = new Uint8Array(await file.arrayBuffer()), roster = await eng.readRoster(buf), r0 = await eng.buildFromXlsx(buf, ds);
+    const snap = rs.snapOf(r0, roster, ds, file.name);
+    let nRoom = 0, nG = 0;
+    win.forEach(x => { if (x.k === 'room' && x.ch) Object.keys(x.ch).forEach(k => { const a = x.ch[k] && x.ch[k].a; if (Array.isArray(a)) { snap.r[k] = a.slice(0, 6); nRoom++; } });
+      if (x.k === 'groups' && Array.isArray(x.g)) { snap.groups = x.g; nG++; } });
+    const named = Object.keys(snap.r).filter(k => snap.r[k][1]).length, done = Object.keys(snap.r).filter(k => snap.r[k][4]).length;
+    if (!confirm('🛟 ' + ds + ' 복구\n\n· 기준: ' + file.name + ' 의 ' + ds.slice(8) + '일 시트 (정비자 ' + Object.keys(snap.r).filter(k => r0.data.rooms.find(y => String(y.room) === k && y.name)).length + '실)\n· 그 위에 오늘 고친 기록 ' + win.filter(x => x.k === 'room').length + '번 (' + nRoom + '칸)' + (nG ? ' · 단체 ' + nG + '번' : '') + ' 을 순서대로\n· 결과: 정비자 ' + named + '실 · 완료 ' + done + '실\n\n이대로 복구할까요?')) { say('복구 취소'); return; }
+    await save(ds, 'set', Object.assign(snap, { src: 'app', took: S.SERVER_TIME, at: S.SERVER_TIME, by: (role && role.label) || '', restored: S.SERVER_TIME }), { k: 'restore', file: file.name.slice(0, 80), n: nRoom, named, done });
+    say('✅ 복구했어요 — 정비자 ' + named + '실 · 완료 ' + done + '실 (기록 ' + nRoom + '칸 다시 적용)');
+  } catch (e) { say('❌ 복구 실패: ' + (e && e.message || e)); }
+}
+document.addEventListener('change', e => {
+  if (e.target.id !== 'restFile' || !e.target.files[0]) return;
+  const f = e.target.files[0], ds = window.JBR && window.JBR.day ? window.JBR.day() : TODAY; e.target.value = '';
+  restoreFrom(f, ds);
+});
+
 // ---------- 💾 실제 저장
 const docOf = ds => docs.find(x => x.date === ds);
 const FLD = ['상태', '정비자', '메모1', '메모2', '완료', '연박'];
@@ -178,7 +209,7 @@ const SV = {
   draftDay: () => { const h = new Date(Date.now() + 9 * 3600e3).getUTCHours(), t = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); return h < 9 ? t : addD(t, 1); },
   newOk: ds => { const d = docOf(ds); return ds === SV.draftDay() && (!d || d.src !== 'app'); },
   // ↺ 초안 처음으로 (11/28 소장님: 초안에서 눌러 보다가 처음으로 못 돌아감) — 앱 원본 · 오늘이나 앞날 · 자동 배정을 아직 안 넣은 날 (넣었으면 자동 배정 창 「확정 취소」 먼저)
-  canReset: ds => { const d = docOf(ds); return !!d && d.src === 'app' && ds >= TODAY && !d.asg && !d.r0; },
+  canReset: ds => { const d = docOf(ds); return !!d && d.src === 'app' && ds > TODAY && !d.asg && !d.r0; },   // 11/28 11:31 사고: 오늘(작업 중) 보고서를 되돌림 → 오늘은 아예 안 됨, 앞날만
   newDay(ds) {
     const base = docs.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).find(x => x.rooms && x.rooms.length);
     if (!base) { window.JBR.toast('호실 목록을 찾지 못했어요 — 엑셀 사본이 하루라도 있어야 해요'); return; }
@@ -224,7 +255,7 @@ const SV = {
       const fmt = c => Object.keys(c).sort().map(k => { const b = c[k].b || [], a = c[k].a || [];
         const d = FLD.map((f, i) => (String(b[i] || '') === String(a[i] || '') ? '' : i >= 4 ? f + (a[i] ? ' ✓' : ' 풀림') : f + ' 「' + esc(b[i] || '') + '」→「' + esc(a[i] || '') + '」')).filter(Boolean);
         return '<b>' + k + '</b> ' + d.join(', '); }).join('<br>');
-      const what = x => x.k === 'room' ? fmt(x.ch || {}) : x.k === 'groups' ? '단체 ' + (x.g || []).map(g => esc(g.name) + ' ' + String(g.rooms || '').split(',').filter(Boolean).length + '실').join(' · ') : x.k === 'new' ? '🌙 초안 만듦 (전 객실 4)' : x.k === 'awards' ? '🏆 시상 명단 저장 (' + (x.n || 0) + '줄)' : x.k === 'take' ? '📥 엑셀 → 앱 원본 (' + esc(x.file || '') + ' · ' + (x.n || 0) + '실)' : x.k === 'back' ? '⚠ 엑셀로 돌아감 (비상)' : x.k === 'unassign' ? '↩ 확정 취소 · ' + (x.n || 0) + '실 지움 · ' + esc(x.why || '') : x.k === 'noshow' ? '🚫 노쇼 ' + esc(x.who || '') + ' → ' + esc(x.got || '') : x.k === 'assign' ? '🧩 자동 배정 → 정비보고서에 넣음 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') + '<br>' + fmt(x.ch || {}) : x.k === 'send' ? '📱 메이드 휴대폰 ' + (x.again ? '다시 ' : '') + '보냄 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') : x.k === 'on' ? '💾 실제 저장 켬' : x.k === 'off' ? '연습 끝냄 (켜기 전 자료로)' : esc(x.k);
+      const what = x => x.k === 'room' ? fmt(x.ch || {}) : x.k === 'groups' ? '단체 ' + (x.g || []).map(g => esc(g.name) + ' ' + String(g.rooms || '').split(',').filter(Boolean).length + '실').join(' · ') : x.k === 'new' ? '🌙 초안 만듦 (전 객실 4)' : x.k === 'awards' ? '🏆 시상 명단 저장 (' + (x.n || 0) + '줄)' : x.k === 'restore' ? '🛟 복구 (' + esc(x.file || '') + ' + 기록 ' + (x.n || 0) + '칸 · 정비자 ' + (x.named || 0) + '실)' : x.k === 'take' ? '📥 엑셀 → 앱 원본 (' + esc(x.file || '') + ' · ' + (x.n || 0) + '실)' : x.k === 'back' ? '⚠ 엑셀로 돌아감 (비상)' : x.k === 'unassign' ? '↩ 확정 취소 · ' + (x.n || 0) + '실 지움 · ' + esc(x.why || '') : x.k === 'noshow' ? '🚫 노쇼 ' + esc(x.who || '') + ' → ' + esc(x.got || '') : x.k === 'assign' ? '🧩 자동 배정 → 정비보고서에 넣음 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') + '<br>' + fmt(x.ch || {}) : x.k === 'send' ? '📱 메이드 휴대폰 ' + (x.again ? '다시 ' : '') + '보냄 · ' + (x.n || 0) + '실 · 카드 ' + esc(x.cards || '') : x.k === 'on' ? '💾 실제 저장 켬' : x.k === 'off' ? '연습 끝냄 (켜기 전 자료로)' : esc(x.k);
       const t = x => { const d = seoul(Number(x.at || 0)); return hm(x.at) + ':' + ('0' + d.getUTCSeconds()).slice(-2); };
       box(L.length ? '<table style="width:100%;border-collapse:collapse;font-size:13px">' + L.slice(0, 300).map(x => '<tr style="border-top:1px solid #eee;text-align:left"><td style="padding:5px 8px;white-space:nowrap;vertical-align:top;text-align:left">' + t(x) + '</td><td style="padding:5px 8px;white-space:nowrap;vertical-align:top;text-align:left">' + esc(x.by) + '</td><td style="padding:5px 8px;text-align:left">' + what(x) + '</td></tr>').join('') + '</table>' + (L.length > 300 ? '<p class="hint">최근 300건만 보여요 (전체 ' + L.length + '건)</p>' : '') : '<p class="hint">아직 기록이 없어요</p>');
     } catch (e) { box('<p style="color:#B23A48">기록을 읽지 못했어요: ' + esc(e && e.message || e) + '</p>'); }
