@@ -393,10 +393,10 @@ const memoKind = m => { m = String(m || ''); return MEMOS.includes(m) ? m : /^�
 const isBtnMemo = m => !!memoKind(m);
 let mpop = null;   // { kind, idx:[] }
 const MCOL = { '🚧': '#FFE2B8', '📌': '#D7E8FF',  재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
-// 🎨 계속 챙길 메모 (11/28 소장님): 르씨엘 = 💧 아이콘만 · 악취 = 진한 강조만, 글자는 기존 그대로. 둘 다 완료여도 흐려지지 않음 (.loud)
+// 🎨 계속 챙길 메모 (11/28 소장님): 르씨엘 = 💧 + 진한 파랑 · 악취 = 진한 보라, 글자는 기존 그대로. 둘 다 완료여도 흐려지지 않음 (.loud)
 //   악취해제 · 악취탈취완료는 예전 연한 색 (흐려짐도 그대로)
 const LOUD = [
-  { re: /르씨엘/, ic: '💧 ' },
+  { re: /르씨엘/, ic: '💧 ', bg: '#0B6FB8', fg: '#fff' },   // 11/28 소장님: 💧 + 파란 강조 유지
   { re: /악취(?!.*(해제|탈취완료))/, bg: '#6A2FB0', fg: '#fff' },
 ];
 const mcolOf = m => MCOL[Object.keys(MCOL).find(k => m.includes(k))] || '#eef0f3';
@@ -1474,7 +1474,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-19'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-20'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1522,6 +1522,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-19"></script>
+<script type="module" src="jbr.js?v=2026.11.28-20"></script>
 </body>
 </html>
