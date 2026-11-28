@@ -83,6 +83,7 @@ main{padding:10px max(2vw,12px) 40px}
 .c .mm{flex-wrap:nowrap;flex-direction:column;align-items:flex-start;max-height:27px;overflow:hidden}
 #mpop{position:absolute;z-index:70;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #0003;padding:10px 12px;width:300px;display:flex;flex-direction:column;gap:6px}#mpop b{font-size:15px}#mpop small,#mpop .mph{font-size:12px;color:var(--mute)}#mpop .inp{width:100%;font-size:16px}
 #mpop .mpc{display:flex;flex-wrap:wrap;gap:4px}#mpop .mpc button{border:1px solid #D6C6F0;background:#F4EEFC;color:#4B2C82;border-radius:8px;padding:4px 10px;font-weight:700}
+#mpop .mpn{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;background:#FFF4E8;border:1px solid #F7C99A;border-radius:8px;padding:6px 8px;cursor:pointer}#mpop .mpn small{color:var(--mute);font-weight:500}
 #mpop .mpd{display:flex;gap:6px;padding-top:2px;border-top:1px dashed var(--line)}#mpop .mpd button{flex:1;border:1px solid #A8D8BB;background:#EAF7EF;color:#1E6B3E;border-radius:8px;padding:5px 8px;font-weight:800}#mpop .mpd button.on{background:#1E7F4D;color:#fff}
 #mpop .mpb{display:flex;gap:6px;justify-content:flex-end}#mpop .mpb button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 12px;font-weight:700}#mpop .mpb .ok{background:var(--navy);color:#fff;border-color:var(--navy)}#mpop .mpb .del{color:var(--bad);margin-right:auto}
 .c.s1{background:var(--s1)}.c.s2{background:var(--s2)}.c.s3{background:var(--s3)}.c.s4{background:var(--s4)}
@@ -636,6 +637,7 @@ function drawMpop(btn) {
   o.innerHTML = '<b>' + K.q + '</b><small>' + (mpop.idx.length > 1 ? mpop.idx.length + '실 · ' : P.rooms[mpop.idx[0]] + '호 · ') + 'Enter 저장 · 비우고 Enter = 「' + mpop.kind + '」만 · Esc 닫기</small>' +
     (chips.length ? '<div class="mpc">' + chips.map(x => '<button data-mpv="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>' : '') +
     (multi ? '<p class="mph">여러 방은 호실 없이 「룸체」만 — 방 하나씩 고르면 호실을 적을 수 있어요</p>' : '<input id="mpin" class="inp' + (mpop.kind === '룸체' ? ' num' : '') + '" autocomplete="off" placeholder="' + K.ph + '" value="' + esc(curV) + '"' + (mpop.kind === '룸체' ? ' inputmode="numeric" maxlength="4"' : ' maxlength="30"') + '><span id="mpst" class="mph"></span>') +
+    (mpop.kind === '우선' ? '<label class="mpn"><input type="checkbox" id="mpnoti"' + (lsGet2('jbr_pnoti') === '1' ? ' checked' : '') + '> 📣 메이드에게 알림도 보내기 <small>(🟠 우선정비로 같이 등록)</small></label>' : '') +
     (DONE_BTN[mpop.kind] ? '<div class="mpd">' + DONE_BTN[mpop.kind].map(([v, l]) => '<button data-mpraw="' + v + '"' + (curM === v ? ' class="on"' : '') + '>✓ ' + l + '</button>').join('') + '</div>' : '') +
     '<div class="mpb">' + (curM ? '<button data-mpx="del" class="del">지우기</button>' : '') + '<button data-mpx="esc">닫기</button><button data-mpx="ok" class="ok">저장</button></div>';
   document.body.appendChild(o);
@@ -653,12 +655,15 @@ function mpCheck() {   // 룸체 호실: 있는 방인지 · 그 방 지금 상�
   const y = R().rooms[k] || {}, sts = { '1': '퇴실', '2': '재실', '3': '이월', '4': '퇴실 예정' }[y.st] || (y.yl ? '연박' : '공실');
   st.textContent = v + ' · ' + sts + (y.nm ? ' · ' + y.nm : ''); return true;
 }
+function lsGet2(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
 function mpSave(how, val) {
   if (!mpop) return; const kind = mpop.kind, idx = mpop.idx;
   if (how === 'esc') { mpop = null; drawMpop(); focusCmd(); return; }
   let v = val != null ? val : ((document.getElementById('mpin') || {}).value || '').trim();
   if (how === 'ok' && (kind === '룸체' || kind === '우선') && v && val == null && !mpCheck()) return;
-  if (kind === '우선' && v) { const o = parseHM(v); if (!o) { toast('시간을 못 읽었어요'); return; } v = o.h + '시' + (o.mi ? ' ' + o.mi + '분' : ''); }
+  let noti = null;   // 📣 🟠 우선정비로도 (11/28 소장님): 체크하면 같은 방 · 같은 시각으로 우선정비 등록 → 메이드 휴대폰 알림
+  if (kind === '우선' && v) { const o = parseHM(v); if (!o) { toast('시간을 못 읽었어요'); return; } v = o.h + '시' + (o.mi ? ' ' + o.mi + '분' : '');
+    const cb = document.getElementById('mpnoti'); if (cb) { try { localStorage.setItem('jbr_pnoti', cb.checked ? '1' : '0'); } catch (e) {} if (cb.checked) noti = ('0' + o.h).slice(-2) + ':' + ('0' + o.mi).slice(-2); } }
   if (how === 'ok' && kind === '악취' && v && !SMELLS.includes(v)) { try { const rec = JSON.parse(localStorage.getItem('jbr_smell') || '[]').filter(x => x !== v); rec.unshift(v); localStorage.setItem('jbr_smell', JSON.stringify(rec.slice(0, 4))); } catch (e) {} }
   const text = how === 'raw' ? v : how === 'del' ? '' : !v || (kind === '룸체' && idx.length > 1) ? kind : kind === '룸체' ? '룸체→' + v : kind === '우선' ? '우선 ' + v + '까지' : kind + '(' + v + ')';
   let moved = 0;
@@ -674,7 +679,15 @@ function mpSave(how, val) {
     const drop = old.filter(k => k !== tgt); if (drop.length) apply(drop, y => { if (isLink(y.m1)) y.m1 = ''; if (isLink(y.m2)) y.m2 = ''; if (!y.m1 && y.m2) { y.m1 = y.m2; y.m2 = ''; } });
     if (tgt >= 0 && !old.includes(tgt)) apply([tgt], y => { if (!y.m1) y.m1 = link; else if (!y.m2) y.m2 = link; });
   }
+  let notiMsg = '';
+  if (noti) { const d = R(), okI = idx.filter(i => canPrio(d.rooms[i])), skip = idx.length - okI.length;
+    if (!okI.length) notiMsg = ' · 📣 알림은 못 보냄 (퇴실 · 퇴실 예정 · 이월 방만)';
+    else { const rs = okI.map(i => P.rooms[i]), L = prioList();
+      L.forEach(q => { q.rooms = q.rooms.filter(r => !rs.includes(r)); }); for (let k = L.length - 1; k >= 0; k--) if (!L[k].rooms.length) L.splice(k, 1);   // 같은 방이 다른 우선정비에 있으면 새 시각으로 옮김
+      L.push({ id: 'p' + Date.now().toString(36), name: '우선', rooms: rs, until: noti, rank: 1, note: '', at: Date.now() }); prioSave();
+      notiMsg = ' · 📣 메이드 휴대폰에 알림 (🟠 우선정비 ' + noti + ')' + (skip ? ' · ' + skip + '실은 연박 · 공실 등이라 뺌' : ''); } }
   mpop = null; drawMpop();
+  if (notiMsg) { toast(idx.map(i => P.rooms[i]).slice(0, 3).join(', ') + (idx.length > 3 ? ' 외' : '') + ' → ' + text + notiMsg); focusCmd(); return; }
   toast(text ? idx.map(i => P.rooms[i]).slice(0, 3).join(', ') + (idx.length > 3 ? ' 외' : '') + ' → ' + text + (moved ? ' · 연박 ' + moved + '실 퇴실(1)로' : '') : kind + ' 메모를 지웠어요');
   focusCmd();
 }
