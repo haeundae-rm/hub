@@ -6,8 +6,10 @@
 import * as S from '../../rm/app/store.js';
 import * as XW from '../xlsxw.js?v=2026.11.22-2';
 import { CATS, DONE, KEEP, ACTS, isDone, isValuable, ageDays, todo, valuables, excel, check, byTime } from './lostcalc.js?v=2026.11.22-2';
+import { readBook, parseLedger } from './lostxl.js?v=2026.11.28-1';
 
-const VER = '2026.11.22-2';
+const VER = '2026.11.28-1';
+const START_YM = '2026-11';   // 월 단추는 이 달부터 (앱 대장 시작 · 11월은 엑셀에서 옮김)
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
   { k: 'boss', label: '소장', email: 'unieshaeundae+admin@gmail.com', uid: 'iw2orXgIgPgTbLUQa0b41XJ9Dvd2' },
@@ -26,7 +28,7 @@ function toast(t) { const el = document.createElement('div'); el.className = 'to
 const errOf = e => /permission/i.test(String(e && (e.code || e.message))) ? '권한이 없어요 (규칙 v27 게시 전이면 아직 저장이 안 돼요).' : String(e && (e.code || e.message) || e);
 
 let user = null, role = null, login = { who: 0, err: '', busy: false };
-let date = ymd(), tab = 'day', list = [], from = '', busy = false, msg = '', ed = null, pics = {}, loadedAt = 0;
+let date = ymd(), tab = 'day', list = [], from = '', busy = false, msg = '', ed = null, pics = {}, loadedAt = 0, cal = false, imp = null;
 
 function roleOf(u) { if (!u || u.anon) return null; return ROLES.filter(r => r.uid === u.uid || r.email === u.email)[0] || null; }
 
@@ -109,6 +111,57 @@ function downloadExcel() {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
+// ---------- 📥 옛 엑셀 대장 가져오기 (11/28): 1일~31일 시트 → 어제까지. 같은 날 · 같은 객실이 이미 있으면 건너뜀(앱 접수와 겹침 방지)
+async function impFile(f) {
+  imp = { busy: true, name: f.name }; draw();
+  try {
+    const R = parseLedger(await readBook(new Uint8Array(await f.arrayBuffer())), ymd());
+    if (!R.rows.length) { imp = { err: '가져올 줄을 못 찾았어요. 「객실 습득물 관리 대장」 엑셀(1일~31일 시트)인지 확인해 주세요.' }; draw(); return; }
+    const first = R.rows[0].date, last = R.rows[R.rows.length - 1].date;
+    if (from > first) { date = first; await load(true); }   // 옛 달이면 그 달까지 읽고 겹침 확인
+    const have = new Set(list.filter(x => !/_e[0-9a-z]+$/.test(x.id)).map(x => x.date + '|' + x.room));
+    const mine = new Set(list.map(x => x.id));
+    const dup = R.rows.filter(x => have.has(x.date + '|' + x.room)), go = R.rows.filter(x => !have.has(x.date + '|' + x.room));
+    imp = { name: f.name, first, last, go, dup, again: go.filter(x => mine.has(x.id)).length, skip: R.skip };
+  } catch (e) { imp = { err: '읽지 못했어요: ' + (e && e.message || e) }; }
+  draw();
+}
+async function impRun() {
+  const L = imp.go.slice(); imp.busy = true; imp.done = 0; draw();
+  const doc = x => { const o = Object.assign({}, x); delete o.id; delete o.k;
+    const [y, m, d] = x.date.split('-').map(Number); o.clientAt = new Date(Date.UTC(y, m - 1, d, 0, 0) + x.k * 60e3); o.at = S.SERVER_TIME; o.uid = user.uid;
+    if (o.chk) { o.chkBy = '엑셀'; o.chkAt = o.clientAt; } o.upd = S.SERVER_TIME; o.updBy = role.label + ' (엑셀 옮김)'; return o; };
+  try {
+    for (let i = 0; i < L.length; i += 100) { const part = L.slice(i, i + 100); await S.batch(part.map(x => ({ op: 'set', path: 'lost/' + x.id, data: doc(x) }))); imp.done = i + part.length; draw(); }
+    const n = L.length; imp = null; toast('엑셀 대장 ' + n + '건을 옮겼어요'); await load(true);
+  } catch (e) { imp.busy = false; imp.err = '옮기다 멈췄어요 (' + imp.done + '건까지 저장): ' + errOf(e) + ' — 다시 누르면 이어서 덮어써요'; draw(); }
+}
+function impHtml() {
+  const I = imp;
+  return '<div class="scrim" data-impx="1"><div class="panel" data-panel="1"><h2>📤 엑셀 대장 옮기기</h2>' +
+    (I.busy && !I.go ? '<p class="note">읽는 중…</p>' : '') +
+    (I.go ? '<p><b>' + esc(I.name) + '</b><br>' + md(I.first) + ' ~ ' + md(I.last) + ' · <b>' + I.go.length + '건</b> 옮김 (오늘 것은 빼요 — 앱에서 접수)</p>' +
+      '<div class="sumline">' + Object.entries(I.go.reduce((a, x) => (a[x.cat] = (a[x.cat] || 0) + 1, a), {})).map(([k, v]) => '<span>' + esc(k) + ' <b>' + v + '</b></span>').join('') + '<span>· 조치 완료 <b>' + I.go.filter(isDone).length + '</b></span><span>· 확인 안 됨 <b>' + I.go.filter(x => !x.chk).length + '</b></span></div>' +
+      (I.dup.length ? '<p class="note">⚠ 같은 날 · 같은 객실이 앱에 이미 있어 건너뜀 ' + I.dup.length + '건: ' + esc(I.dup.slice(0, 8).map(x => md(x.date) + ' ' + x.room + ' ' + x.item).join(', ')) + (I.dup.length > 8 ? ' …' : '') + '</p>' : '') +
+      (I.again ? '<p class="note">이미 옮긴 줄 ' + I.again + '건은 같은 자리에 덮어써요 (두 번 생기지 않아요).</p>' : '') +
+      '<p class="note">엑셀의 「확인」 표시(1 · ㅇ 등)는 확인으로, 조치는 앱 단추 말로 맞춰요 (습냉 → 습득물 냉장고 · 파손위험 보관함 → 파손주의 보관함). 못 맞춘 조치 · 특이사항은 특이사항 칸에 그대로 남겨요. 접수자는 「수기」로 보여요.</p>' : '') +
+    (I.busy && I.go ? '<p class="note">저장 중… ' + (I.done || 0) + ' / ' + I.go.length + '</p>' : '') +
+    (I.err ? '<p class="err">' + esc(I.err) + '</p>' : '') +
+    '<div class="g2"><button class="big sec" data-impx="1"' + (I.busy ? ' disabled' : '') + '>닫기</button>' + (I.go && I.go.length ? '<button class="big" data-imprun="1"' + (I.busy ? ' disabled' : '') + '>' + I.go.length + '건 옮기기</button>' : '') + '</div></div></div>';
+}
+
+// ---------- 📅 달 · 날 고르기 (11/28 소장님: 좌우로만 넘기면 달이 쌓일수록 오래 걸림)
+const monthsList = () => { const out = [], end = ymd().slice(0, 7); let m = [START_YM, date.slice(0, 7)].sort()[0]; while (m <= end) { out.push(m); const [y, mo] = m.split('-').map(Number); m = mo === 12 ? (y + 1) + '-01' : y + '-' + String(mo + 1).padStart(2, '0'); } return out; };
+const lastDay = ym => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).toISOString().slice(0, 10);
+function goDate(d) { const t = ymd(); date = d > t ? t : d; history.replaceState(null, '', '#' + date); load(); }
+function calHtml() {
+  const ym = date.slice(0, 7), t = ymd(), n = +lastDay(ym).slice(8), w0 = new Date(ym + '-01T00:00:00Z').getUTCDay(), cnt = {};
+  list.forEach(x => { if (x.date && x.date.slice(0, 7) === ym) cnt[x.date] = (cnt[x.date] || 0) + 1; });
+  let h = '<div class="cal">' + DAYS.map(d => '<b>' + d + '</b>').join('') + '<span></span>'.repeat(w0);
+  for (let i = 1; i <= n; i++) { const d = ym + '-' + String(i).padStart(2, '0'); h += '<button data-cd="' + d + '"' + (d > t ? ' disabled' : '') + (d === date ? ' class="on"' : '') + '>' + i + (cnt[d] ? '<i>' + cnt[d] + '</i>' : '') + '</button>'; }
+  return h + '</div>';
+}
+
 // ---------- 그리기
 function badges(x) {
   return '<i class="badge' + (isValuable(x) ? ' v' : '') + '">' + esc(x.cat) + '</i>' + (x.police ? '<i class="badge v">🚨 경찰</i>' : '') +
@@ -158,11 +211,13 @@ function draw() {
   if (msg) h += '<div class="card"><p class="err" style="margin:0">' + esc(msg) + '</p></div>';
   if (tab === 'day') {
     const L = list.filter(x => x.date === date).sort(byTime);
-    h += '<div class="card"><div class="datebar"><button data-d="-1" aria-label="전날">‹</button><div class="d"><b>' + md(date) + (date === today ? ' 오늘' : '') + '</b><small>' + L.length + '건 · 확인 ' + L.filter(x => x.chk).length + ' · 조치 완료 ' + L.filter(isDone).length + '</small></div>' +
-      '<button data-d="1" aria-label="다음 날"' + (date >= today ? ' disabled' : '') + '>›</button></div></div>' +
+    const ML = monthsList();
+    h += '<div class="card"><div class="mons">' + ML.map(m => '<button data-mon="' + m + '" aria-pressed="' + (m === date.slice(0, 7)) + '">' + (m.slice(0, 4) !== today.slice(0, 4) || ML[0].slice(0, 4) !== today.slice(0, 4) ? m.slice(2, 4) + '년 ' : '') + Number(m.slice(5)) + '월</button>').join('') + (date !== today ? '<button data-today="1">오늘</button>' : '') + '</div>' +
+      '<div class="datebar"><button data-d="-1" aria-label="전날">‹</button><button class="d" data-cal="1" title="눌러서 날짜 고르기"><b>' + md(date) + (date === today ? ' 오늘' : '') + ' <span class="cv">📅' + (cal ? '▲' : '▼') + '</span></b><small>' + L.length + '건 · 확인 ' + L.filter(x => x.chk).length + ' · 조치 완료 ' + L.filter(isDone).length + '</small></button>' +
+      '<button data-d="1" aria-label="다음 날"' + (date >= today ? ' disabled' : '') + '>›</button></div>' + (cal ? calHtml() : '') + '</div>' +
       '<div class="card"><h2>습득물 ' + L.length + '건 <small><button class="add" data-add="1">+ 수기 기재</button></small></h2>' +
       (busy ? '<p class="note">읽는 중…</p>' : L.length ? L.map(x => rowHtml(x, false)).join('') : '<p class="note">이날 접수된 습득물이 없어요. 앱을 안 쓴 접수는 [+ 수기 기재]로 적어 주세요.</p>') + '</div>' +
-      '<div class="card"><div class="g2"><button class="big sec" data-xls="1">📥 ' + Number(date.slice(5, 7)) + '월 엑셀 내려받기</button><button class="big sec" data-ref="1">↻ 새로 읽기</button></div>' +
+      '<div class="card"><div class="g3 tools"><button class="big sec" data-xls="1">📥 ' + Number(date.slice(5, 7)) + '월 엑셀</button><label class="big sec">📤 대장 옮기기<input type="file" id="impf" accept=".xlsx" hidden></label><button class="big sec" data-ref="1">↻ 새로</button></div>' +
       '<p class="note">메이드가 정비 레포트 🧳 습득물로 접수하면 여기에 저절로 들어와요. 실물을 받으면 [확인], 처리하면 줄을 눌러 조치를 골라 주세요 (조치일은 자동).</p></div>';
   } else if (tab === 'val') {
     const open = V.filter(x => !isDone(x)).length;
@@ -176,7 +231,7 @@ function draw() {
       sec('✋ 확인 안 한 접수', '오늘 · 어제 — 실물을 받았으면 [확인]', T.unchecked);
   }
   $('#main').innerHTML = h;
-  $('#sheet').innerHTML = ed ? editHtml() : '';
+  $('#sheet').innerHTML = imp ? impHtml() : ed ? editHtml() : '';
 }
 
 // ---------- 누르기
@@ -187,6 +242,7 @@ document.addEventListener('click', e => {
     if (t.hasAttribute('data-login')) { doLogin(); return; }
     return;
   }
+  if (imp) { if (t.classList.contains('scrim') && e.target !== t) return; if (t.hasAttribute('data-impx') && !imp.busy) { imp = null; draw(); return; } if (t.hasAttribute('data-imprun') && !imp.busy) { impRun(); return; } return; }
   if (ed) {
     if (t.classList.contains('scrim') && e.target !== t) return;
     if (t.hasAttribute('data-edx')) { ed = null; draw(); return; }
@@ -200,6 +256,10 @@ document.addEventListener('click', e => {
   if (t.hasAttribute('data-open')) { openEdit(t.getAttribute('data-open')); return; }
   if (t.hasAttribute('data-tab')) { tab = t.getAttribute('data-tab'); draw(); return; }
   if (t.hasAttribute('data-d')) { const n = addDays(date, Number(t.getAttribute('data-d'))); if (n <= ymd()) { date = n; history.replaceState(null, '', '#' + date); load(); } return; }
+  if (t.hasAttribute('data-mon')) { const m = t.getAttribute('data-mon'); cal = true; goDate(m === ymd().slice(0, 7) ? ymd() : lastDay(m)); return; }   // 달 → 그 달 끝날(이번 달은 오늘) + 달력 펼침
+  if (t.hasAttribute('data-today')) { cal = false; goDate(ymd()); return; }
+  if (t.hasAttribute('data-cal')) { cal = !cal; draw(); return; }
+  if (t.hasAttribute('data-cd')) { cal = false; goDate(t.getAttribute('data-cd')); return; }
   if (t.hasAttribute('data-add')) { openEdit(''); return; }
   if (t.hasAttribute('data-ref')) { load(true); return; }
   if (t.hasAttribute('data-xls')) { downloadExcel(); return; }
@@ -214,6 +274,7 @@ async function doLogin() {
   login.busy = false; draw();
 }
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pw') doLogin(); });
+document.addEventListener('change', e => { if (e.target.id === 'impf' && e.target.files[0]) { impFile(e.target.files[0]); e.target.value = ''; } });
 const h0 = /^#(\d{4}-\d{2}-\d{2})$/.exec(location.hash); if (h0 && h0[1] <= ymd()) date = h0[1];
 if (/^#todo$/.test(location.hash)) tab = 'todo';
 S.onUser(u => {
@@ -221,5 +282,5 @@ S.onUser(u => {
   if (u && !u.anon && !role) login.err = '지금 로그인된 계정은 습득물 대장을 볼 수 없어요. 아래에서 다시 들어가 주세요.';
   if (role) load(true); else draw();
 });
-document.addEventListener('visibilitychange', () => { if (role && !ed && document.visibilityState === 'visible' && Date.now() - loadedAt > 120000) load(true); });   // 2분 넘게 지나 다시 볼 때만 (읽기 아끼기)
+document.addEventListener('visibilitychange', () => { if (role && !ed && !imp && document.visibilityState === 'visible' && Date.now() - loadedAt > 120000) load(true); });   // 2분 넘게 지나 다시 볼 때만 (읽기 아끼기)
 window.__lost = { ver: VER };
