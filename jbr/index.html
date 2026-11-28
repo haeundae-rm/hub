@@ -395,9 +395,9 @@ let mpop = null;   // { kind, idx:[] }
 const MCOL = { '🚧': '#FFE2B8', '📌': '#D7E8FF',  재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
 // 🎨 계속 챙길 메모 (11/28 소장님): 르씨엘 = 💧 + 연파랑 · 악취 = 처음 연보라, 글자는 기존 그대로. 둘 다 완료여도 흐려지지 않음 (.loud)
 //   악취해제 · 악취탈취완료는 예전 연한 색 (흐려짐도 그대로)
-const LOUD = [   // 11/28 15:02 소장님 확정: 연한 색 + 검정 글씨 (르씨엘 연파랑 + 💧 · 악취 처음 연보라), 완료여도 안 흐려짐
-  { re: /르씨엘/, ic: '💧 ', bg: '#BCD7F2', fg: '#111' },
-  { re: /악취(?!.*(해제|탈취완료))/, bg: '#DCCBF3', fg: '#111' },
+const LOUD = [   // 11/28 15:02 소장님 확정: 연한 색 + 검정 글씨 (15:08 두 단계 진하게: 르씨엘 #8CB6E5 + 💧 · 악취 #BA9CE4), 완료여도 안 흐려짐
+  { re: /르씨엘/, ic: '💧 ', bg: '#8CB6E5', fg: '#111' },
+  { re: /악취(?!.*(해제|탈취완료))/, bg: '#BA9CE4', fg: '#111' },
 ];
 const mcolOf = m => MCOL[Object.keys(MCOL).find(k => m.includes(k))] || '#eef0f3';
 const mchip = m => { const L = LOUD.find(x => x.re.test(m));
