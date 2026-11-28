@@ -83,6 +83,7 @@ main{padding:10px max(2vw,12px) 40px}
 .c .mm{flex-wrap:nowrap;flex-direction:column;align-items:flex-start;max-height:27px;overflow:hidden}
 #mpop{position:absolute;z-index:70;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #0003;padding:10px 12px;width:300px;display:flex;flex-direction:column;gap:6px}#mpop b{font-size:15px}#mpop small,#mpop .mph{font-size:12px;color:var(--mute)}#mpop .inp{width:100%;font-size:16px}
 #mpop .mpc{display:flex;flex-wrap:wrap;gap:4px}#mpop .mpc button{border:1px solid #D6C6F0;background:#F4EEFC;color:#4B2C82;border-radius:8px;padding:4px 10px;font-weight:700}
+#mpop .mpd{display:flex;gap:6px;padding-top:2px;border-top:1px dashed var(--line)}#mpop .mpd button{flex:1;border:1px solid #A8D8BB;background:#EAF7EF;color:#1E6B3E;border-radius:8px;padding:5px 8px;font-weight:800}#mpop .mpd button.on{background:#1E7F4D;color:#fff}
 #mpop .mpb{display:flex;gap:6px;justify-content:flex-end}#mpop .mpb button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 12px;font-weight:700}#mpop .mpb .ok{background:var(--navy);color:#fff;border-color:var(--navy)}#mpop .mpb .del{color:var(--bad);margin-right:auto}
 .c.s1{background:var(--s1)}.c.s2{background:var(--s2)}.c.s3{background:var(--s3)}.c.s4{background:var(--s4)}
 .c .gb{position:absolute;left:0;right:0;top:0;height:4px}
@@ -350,6 +351,7 @@ const MEMOS = ['VIP', '르씨엘', '룸체', '당직', '악취', '조기퇴실',
 const DETAIL = { 룸체: { q: '어디로 룸체인지하나요?', ph: '호실 (예: 2603)' }, 악취: { q: '무슨 냄새인가요?', ph: '직접 쓰기 (예: 페인트)' },
   시설: { q: '어떤 시설 문제인가요?', ph: '예: 에어컨 고장 · 욕실 누수' }, 우선: { q: '몇 시까지 정비할까요?', ph: '예: 2시 · 오후 8시 · 20:00 · 3시 반' } };   // 11/28 시설 · 우선도
 const PRIO_CHIPS = ['12시', '14시', '15시', '16시'];
+const DONE_BTN = { 악취: [['악취해제', '해제'], ['악취탈취완료', '탈취완료']], 시설: [['시설작업완료', '완료']] };   // 11/28 소장님: 끝난 일 단추 — 메이드 휴대폰엔 주의 표시 없이 글만 (rm engine DONE_WORDS)
 // ⏰ 시간 읽기 (11/28 소장님 「8시 / 오후 8시 / 20:00 / 20시 다」): 오전·오후 없으면 1~8시 = 오후 (근무 중 마감), 9~12시 = 그대로 → { h, mi } 또는 null
 function parseHM(v) {
   let t = String(v || '').replace(/\s+/g, ''); if (!t) return null;
@@ -362,7 +364,7 @@ function parseHM(v) {
 }
 const hmText = o => (o.h < 12 ? '오전 ' + o.h : o.h === 12 ? '낮 12' : '오후 ' + (o.h - 12)) + '시' + (o.mi ? ' ' + o.mi + '분' : '') + ' (' + ('0' + o.h).slice(-2) + ':' + ('0' + o.mi).slice(-2) + ')';
 const SMELLS = ['담배', '생선', '음식', '하수구', '향수', '화장품냄새'];   // 11/28 소장님 변경
-const memoKind = m => { m = String(m || ''); return MEMOS.includes(m) ? m : /^룸체(→|\s|$)/.test(m) ? '룸체' : /^악취(\(|\s|$)/.test(m) ? '악취' : /^시설(\(|\s|$)/.test(m) ? '시설' : /^우선(\s|$)/.test(m) ? '우선' : ''; };   // 버튼으로 넣은 메모 (자세히 붙은 것 포함)
+const memoKind = m => { m = String(m || ''); return MEMOS.includes(m) ? m : /^룸체(→|\s|$)/.test(m) ? '룸체' : /^악취/.test(m) ? '악취' : /^시설/.test(m) ? '시설' : /^우선(\s|$)/.test(m) ? '우선' : ''; };   // 버튼으로 넣은 메모 (자세히 붙은 것 포함)
 const isBtnMemo = m => !!memoKind(m);
 let mpop = null;   // { kind, idx:[] }
 const MCOL = { 재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
@@ -626,7 +628,7 @@ function sideHtml(d, c) {
 function drawMpop(btn) {
   let o = document.getElementById('mpop'); if (o) o.remove(); if (!mpop) return;
   const K = DETAIL[mpop.kind], d = R(), one = mpop.idx.length === 1 ? d.rooms[mpop.idx[0]] : null;
-  const curM = one ? [one.m1, one.m2].find(m => memoKind(m) === mpop.kind) || '' : '', curV = curM.replace(/^(룸체→?|악취\(?|시설\(?|우선)\s*|\)$|까지$/g, '').trim();
+  const curM = one ? [one.m1, one.m2].find(m => memoKind(m) === mpop.kind) || '' : '', curV = /해제|탈취완료|작업완료/.test(curM) ? '' : curM.replace(/^(룸체→?|악취\(?|시설\(?|우선)\s*|\)$|까지$/g, '').trim();
   let rec = []; try { rec = JSON.parse(localStorage.getItem('jbr_smell') || '[]'); } catch (e) {}
   const chips = mpop.kind === '악취' ? SMELLS.concat(rec.filter(x => !SMELLS.includes(x))).slice(0, 10) : mpop.kind === '우선' ? PRIO_CHIPS : [];
   const multi = mpop.kind === '룸체' && mpop.idx.length > 1;
@@ -634,6 +636,7 @@ function drawMpop(btn) {
   o.innerHTML = '<b>' + K.q + '</b><small>' + (mpop.idx.length > 1 ? mpop.idx.length + '실 · ' : P.rooms[mpop.idx[0]] + '호 · ') + 'Enter 저장 · 비우고 Enter = 「' + mpop.kind + '」만 · Esc 닫기</small>' +
     (chips.length ? '<div class="mpc">' + chips.map(x => '<button data-mpv="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>' : '') +
     (multi ? '<p class="mph">여러 방은 호실 없이 「룸체」만 — 방 하나씩 고르면 호실을 적을 수 있어요</p>' : '<input id="mpin" class="inp' + (mpop.kind === '룸체' ? ' num' : '') + '" autocomplete="off" placeholder="' + K.ph + '" value="' + esc(curV) + '"' + (mpop.kind === '룸체' ? ' inputmode="numeric" maxlength="4"' : ' maxlength="30"') + '><span id="mpst" class="mph"></span>') +
+    (DONE_BTN[mpop.kind] ? '<div class="mpd">' + DONE_BTN[mpop.kind].map(([v, l]) => '<button data-mpraw="' + v + '"' + (curM === v ? ' class="on"' : '') + '>✓ ' + l + '</button>').join('') + '</div>' : '') +
     '<div class="mpb">' + (curM ? '<button data-mpx="del" class="del">지우기</button>' : '') + '<button data-mpx="esc">닫기</button><button data-mpx="ok" class="ok">저장</button></div>';
   document.body.appendChild(o);
   const r = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 100, bottom: 100 };
@@ -657,7 +660,7 @@ function mpSave(how, val) {
   if (how === 'ok' && (kind === '룸체' || kind === '우선') && v && val == null && !mpCheck()) return;
   if (kind === '우선' && v) { const o = parseHM(v); if (!o) { toast('시간을 못 읽었어요'); return; } v = o.h + '시' + (o.mi ? ' ' + o.mi + '분' : ''); }
   if (how === 'ok' && kind === '악취' && v && !SMELLS.includes(v)) { try { const rec = JSON.parse(localStorage.getItem('jbr_smell') || '[]').filter(x => x !== v); rec.unshift(v); localStorage.setItem('jbr_smell', JSON.stringify(rec.slice(0, 4))); } catch (e) {} }
-  const text = how === 'del' ? '' : !v || (kind === '룸체' && idx.length > 1) ? kind : kind === '룸체' ? '룸체→' + v : kind === '우선' ? '우선 ' + v + '까지' : kind + '(' + v + ')';
+  const text = how === 'raw' ? v : how === 'del' ? '' : !v || (kind === '룸체' && idx.length > 1) ? kind : kind === '룸체' ? '룸체→' + v : kind === '우선' ? '우선 ' + v + '까지' : kind + '(' + v + ')';
   let moved = 0;
   apply(idx, x => {
     const slot = memoKind(x.m1) === kind ? 'm1' : memoKind(x.m2) === kind ? 'm2' : '';
@@ -675,8 +678,8 @@ function mpSave(how, val) {
   toast(text ? idx.map(i => P.rooms[i]).slice(0, 3).join(', ') + (idx.length > 3 ? ' 외' : '') + ' → ' + text + (moved ? ' · 연박 ' + moved + '실 퇴실(1)로' : '') : kind + ' 메모를 지웠어요');
   focusCmd();
 }
-document.addEventListener('click', e => { const o = document.getElementById('mpop'); if (!o) return; const b = e.target.closest('[data-mpx],[data-mpv]');
-  if (b && o.contains(b)) { e.stopPropagation(); if (b.dataset.mpv) mpSave('ok', b.dataset.mpv); else mpSave(b.dataset.mpx); return; }
+document.addEventListener('click', e => { const o = document.getElementById('mpop'); if (!o) return; const b = e.target.closest('[data-mpx],[data-mpv],[data-mpraw]');
+  if (b && o.contains(b)) { e.stopPropagation(); if (b.dataset.mpraw) mpSave('raw', b.dataset.mpraw); else if (b.dataset.mpv) mpSave('ok', b.dataset.mpv); else mpSave(b.dataset.mpx); return; }
   if (!o.contains(e.target) && !e.target.closest('[data-memo]')) { mpop = null; drawMpop(); } }, true);
 document.addEventListener('keydown', e => { if (!document.getElementById('mpop')) return;
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); mpSave('esc'); return; }
@@ -949,17 +952,17 @@ function drawClose(only) {
     html.award = h; badOf.award = 0; }
   { // 🫧 악취 기록 (11/28 소장님): 이번 달 악취 메모가 있던 방 · 정비한 분 · 냄새 → 「악취 시상」 근거 + 같은 방 반복 = 시설 점검 후보
     const rec = []; ds.forEach(x => { const d = dayData(x); d.rooms.forEach((y, i) => { if (!y) return; const mm = [y.m1, y.m2].find(v => /악취/.test(String(v || ''))); if (!mm) return;
-      const room = P.rooms[i], what = (/악취\(([^)]*)\)/.exec(mm) || [])[1] || String(mm).replace(/악취/, '').trim(), who = y.nm ? people(room, y) : (downKind(y) ? [] : []);
-      rec.push({ d: x, room, what, who, done: !!y.done }); }); });
+      const room = P.rooms[i], stt = /탈취\s*완료/.test(mm) ? '탈취완료' : /해제/.test(mm) ? '해제' : '', what = stt ? '' : (/악취\(([^)]*)\)/.exec(mm) || [])[1] || String(mm).replace(/악취/, '').trim(), who = y.nm ? people(room, y) : (downKind(y) ? [] : []);
+      rec.push({ d: x, room, what, stt, who, done: !!y.done }); }); });
     const byW = {}; rec.forEach(r => r.who.forEach(n => { (byW[n] = byW[n] || []).push(r); }));
     const byR = {}; rec.forEach(r => { (byR[r.room] = byR[r.room] || []).push(r); });
     const rep2 = Object.keys(byR).filter(k => new Set(byR[k].map(r => r.d)).size >= 2).sort((a, b) => byR[b].length - byR[a].length);
     const aw = awList(m), has = n => aw.some(a => a.n === n && /악취/.test(a.why || ''));
     const dd = x => (+x.slice(5, 7)) + '/' + (+x.slice(8));
-    let h = '<div class="awb"><div class="kpi"><small>' + (+m.slice(5)) + '월 악취 객실</small><b class="num">' + rec.length + '건</b></div><div class="kpi"><small>정비한 분</small><b class="num">' + Object.keys(byW).length + '명</b></div><div class="kpi"><small>같은 방 반복 (2일 이상)</small><b class="num" style="color:' + (rep2.length ? 'var(--bad)' : 'var(--ok)') + '">' + rep2.length + '실</b>' + (rep2.length ? '<span class="v">시설 점검 후보</span>' : '') + '</div></div>';
+    let h = '<div class="awb"><div class="kpi"><small>' + (+m.slice(5)) + '월 악취 객실</small><b class="num">' + rec.length + '건</b>' + (rec.some(r => r.stt) ? '<span class="v">탈취완료 ' + rec.filter(r => r.stt === '탈취완료').length + ' · 해제 ' + rec.filter(r => r.stt === '해제').length + '</span>' : '') + '</div><div class="kpi"><small>정비한 분</small><b class="num">' + Object.keys(byW).length + '명</b></div><div class="kpi"><small>같은 방 반복 (2일 이상)</small><b class="num" style="color:' + (rep2.length ? 'var(--bad)' : 'var(--ok)') + '">' + rep2.length + '실</b>' + (rep2.length ? '<span class="v">시설 점검 후보</span>' : '') + '</div></div>';
     h += '<h3 style="margin:10px 0 4px">정비한 분 <small style="color:var(--mute);font-weight:500">— 🏆 누르면 시상 탭에 「악취 시상」 줄이 생겨요</small></h3><table><thead><tr><th class="n">성함</th><th>건수</th><th class="n">객실 (날짜 · 냄새)</th><th></th></tr></thead><tbody>' +
-      (Object.keys(byW).length ? Object.keys(byW).sort((a, b) => byW[b].length - byW[a].length).map(n => '<tr><td class="n">' + esc(n) + '</td><td class="num b">' + byW[n].length + '</td><td class="n">' + byW[n].map(r => esc(dd(r.d) + ' ' + r.room + (r.what ? ' ' + r.what : '') + (r.done ? '' : ' (미완료)'))).join(' · ') + '</td><td>' + (has(n) ? '<small>시상 명단에 있음</small>' : '<button data-awsmell="' + esc(n) + '" data-awc="' + byW[n].length + '">🏆 시상에 넣기</button>') + '</td></tr>').join('') : '<tr><td colspan="4" class="n" style="color:var(--mute)">이번 달 악취 기록이 없어요</td></tr>') + '</tbody></table>';
-    if (rep2.length) h += '<h3 style="margin:14px 0 4px;color:var(--bad)">같은 방 반복 — 시설 점검 후보</h3><table><thead><tr><th class="n">객실</th><th>횟수</th><th class="n">날짜 · 냄새</th></tr></thead><tbody>' + rep2.map(k => '<tr><td class="n b">' + k + '</td><td class="num">' + byR[k].length + '</td><td class="n">' + byR[k].map(r => esc(dd(r.d) + (r.what ? ' ' + r.what : ''))).join(' · ') + '</td></tr>').join('') + '</tbody></table>';
+      (Object.keys(byW).length ? Object.keys(byW).sort((a, b) => byW[b].length - byW[a].length).map(n => '<tr><td class="n">' + esc(n) + '</td><td class="num b">' + byW[n].length + '</td><td class="n">' + byW[n].map(r => esc(dd(r.d) + ' ' + r.room + (r.what ? ' ' + r.what : '') + (r.stt ? ' ' + r.stt : '') + (r.done ? '' : ' (미완료)'))).join(' · ') + '</td><td>' + (has(n) ? '<small>시상 명단에 있음</small>' : '<button data-awsmell="' + esc(n) + '" data-awc="' + byW[n].length + '">🏆 시상에 넣기</button>') + '</td></tr>').join('') : '<tr><td colspan="4" class="n" style="color:var(--mute)">이번 달 악취 기록이 없어요</td></tr>') + '</tbody></table>';
+    if (rep2.length) h += '<h3 style="margin:14px 0 4px;color:var(--bad)">같은 방 반복 — 시설 점검 후보</h3><table><thead><tr><th class="n">객실</th><th>횟수</th><th class="n">날짜 · 냄새</th></tr></thead><tbody>' + rep2.map(k => '<tr><td class="n b">' + k + '</td><td class="num">' + byR[k].length + '</td><td class="n">' + byR[k].map(r => esc(dd(r.d) + (r.what ? ' ' + r.what : '') + (r.stt ? ' ' + r.stt : ''))).join(' · ') + '</td></tr>').join('') + '</tbody></table>';
     html.smell = h + '<p class="hint">정비보고서 메모에 「악취」가 있던 방 (「악취(생선)」처럼 냄새를 적으면 함께 보여요) · 정비한 분 = 그날 정비자 이름</p>'; badOf.smell = 0; }
   const S = tot.reduce((a, b) => a + b, 0), OT = names.reduce((a, n) => a + per(n).map(otv).reduce((p, q) => p + q, 0), 0);
   if (only) return { m, html, S, OT, trS, ds, names, C, per, tot, cnt, otv, fam: C.reduce((a, c) => a + c.fam, 0), roy: C.reduce((a, c) => a + c.roy, 0) };   // ⬇ 엑셀 (화면과 같은 숫자)
@@ -1357,7 +1360,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-4'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-5'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1405,6 +1408,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-4"></script>
+<script type="module" src="jbr.js?v=2026.11.28-5"></script>
 </body>
 </html>
