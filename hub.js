@@ -626,7 +626,7 @@ function assignCardHtml() {
 // 🔍 객실 인스펙션 (2026-11-15 ① 새 구조) — 따로 쪽(insp/): 찍고 → 사진마다 지적 → 카톡 한 장 이미지. 점검자 공용 계정도 들어옴
 function inspCardHtml() {
   return '<div class="card"><h2>🔍 객실 인스펙션</h2><p class="note" style="margin:0 0 12px">사진을 찍고 사진마다 지적 한 줄 → 수정완료/재정비 → 카톡에 사진+글 한 장 이미지로 공유. 메이드별 지적이 쌓여요. 파트장·하우스맨은 점검자 공용 비밀번호로 같은 주소에 들어와요.</p>' +
-    '<a class="big-btn linkbtn" href="./insp/">인스펙션 열기</a></div>';
+    '<a class="big-btn linkbtn" href="./insp/">인스펙션 열기</a>' + (admin && !admin.hk ? '<button class="big-btn sec" style="margin-top:8px" data-pinchg="insp">🔒 인스펙션 비밀번호 바꾸기</button>' : '') + '</div>';
 }
 function vocCardHtml() {
   return '<div class="card"><h2>📣 고객만족도 VOC</h2><p class="note" style="margin:0 0 12px">카톡으로 받은 고객만족도 공유 글을 붙여넣으면 건별로 나누고 마지막 정비자를 찾아 메이드별 칭찬·불만 누계를 내요. 정비 레포트 VOC 메뉴와 같은 자료예요.</p>' +
@@ -981,7 +981,7 @@ document.addEventListener('click', e => {
   if (t.matches('a[href="./leave/"]') && !PIN.passed()) { e.preventDefault(); PIN.gate('룸메이드 연차 · 근무').then(ok => { if (ok) location.href = './leave/'; }); return; }
   if (t.matches('a[href="./leave/"]')) return;
   if (t.hasAttribute('data-unlock')) { PIN.gate('인사').then(ok => { if (ok) draw(); }); return; }
-  if (t.hasAttribute('data-pinchg')) { PIN.change(); return; }
+  if (t.hasAttribute('data-pinchg')) { PIN.change(t.getAttribute('data-pinchg') === 'insp' ? 'insp' : ''); return; }
   if (t.hasAttribute('data-go') && t.getAttribute('data-go').split('/')[0] === 'people' && !PIN.passed()) { PIN.gate('인사').then(ok => { if (ok) goSec('people', ''); }); return; }
   if (t.hasAttribute('data-rm')) { openRm(t.getAttribute('data-rm')); return; }
   if (t.hasAttribute('data-rmclose')) { closeRm(); return; }

@@ -53,6 +53,13 @@ async function open(browser, TODAY, url) {
   await p.goBack(); await sleep(1200);
   const pm = await p.evaluate(async () => { const m = await import('/hub/pin.js'); return [m.passed('insp'), m.passed()]; });
   ok(pm[0] === true && pm[1] === false, '인사 비밀번호와 따로 (인스펙션 통과해도 인사는 다시 물음)');
+  console.log('비밀번호 바꾸기');
+  await p.evaluate(() => { import('/hub/pin.js').then(m => { window.__chg = m.change('insp'); }); }); await p.waitForSelector('.pn-in');
+  await p.fill('.pn-in', '1901'); await sleep(200); await p.fill('.pn-in', '2468'); await sleep(200); await p.fill('.pn-in', '2468'); await sleep(600);
+  ok(await p.evaluate(() => !!(window.__seed['uploads/hubpin_insp'] && window.__seed['uploads/hubpin_insp'].h)), '새 비밀번호 저장 (uploads/hubpin_insp)');
+  await p.evaluate(() => { sessionStorage.setItem('hub_pin_ok_insp', '0'); }); await p.click('a[href="./insp/"]'); await sleep(300);
+  await p.fill('.pn-in', '1901'); await sleep(300); ok(/맞지 않아요/.test(await p.innerText('.pn-bg')), '바꾼 뒤 1901 은 안 됨');
+  await p.fill('.pn-in', '2468'); await sleep(800); ok(/\/insp\//.test(p.url()), '새 비밀번호 2468 로 들어감');
   ok(!p.errs.length, '오류 없음 ' + p.errs.join(' | '));
   await b.close(); console.log('\n' + pass + ' 통과 / ' + fail + ' 실패'); process.exit(fail ? 1 : 0);
 })();
