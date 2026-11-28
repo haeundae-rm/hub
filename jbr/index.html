@@ -333,6 +333,17 @@ td.x{color:var(--bad);font-weight:800;background:#FDECEC}td.trd{background:#FFF1
  #pv .qpg{page-break-after:always;break-after:page}
  #pv .qpg:last-child{page-break-after:auto;break-after:auto}
 }
+/* 11/28 소장님: 머리(위 두 줄)를 화면 폭에 딱 — 좌우 스크롤 없이 · 모니터마다 같은 비율 (글자 · 여백을 화면 폭에 따라 함께 줄임), 31일 + 🌙 초안까지 한 줄 */
+header{padding:clamp(5px,.45vw,8px) clamp(8px,1.2vw,24px) 0}
+header h1{font-size:clamp(14px,1.15vw,19px)}
+.hrow{gap:clamp(4px,.45vw,8px)}
+.hrow .tag{font-size:clamp(10px,.75vw,12px);padding:2px clamp(5px,.45vw,8px)}
+.hrow .fs,.mons .mon{font-size:clamp(11px,.82vw,14px);padding:2px clamp(6px,.6vw,10px);min-height:clamp(26px,1.9vw,30px)}
+.tabs button{font-size:clamp(11.5px,.85vw,14.5px);padding:clamp(3px,.3vw,6px) clamp(7px,.7vw,12px);min-height:clamp(28px,2.2vw,36px)}
+.days{overflow-x:hidden;gap:clamp(2px,.22vw,4px);padding:clamp(4px,.4vw,7px) 0 clamp(5px,.45vw,8px)}
+.days button{flex:1 1 0;min-width:0;padding:3px 0;font-size:clamp(10.5px,.8vw,14px);min-height:clamp(24px,1.8vw,30px);white-space:nowrap;overflow:hidden}
+.days button.jnewb{flex:0 0 auto;padding:3px clamp(6px,.6vw,12px)}
+@media (max-width:900px){.days{overflow-x:auto}.days button{flex:0 0 auto;min-width:30px;padding:3px 5px}}
 </style>
 </head>
 <body>
@@ -494,7 +505,7 @@ function drawHead() {
   $('#mons').innerHTML = Object.keys(P.months).map(k => '<button data-mon="' + k + '" class="mon' + (k === m ? ' on' : '') + '">' + (+k.slice(5)) + '월</button>').join('');
   $('#days').innerHTML = ds.map(x => '<button data-d="' + x + '" class="' + (x === day ? 'on ' : '') + (x === TODAY ? 'today ' : '') + (x > TODAY ? 'fut' : '') + '">' + (+x.slice(8)) + '일</button>').join('');
   { const sv = window.JBR && window.JBR.sv, t1 = new Date(Date.parse(TODAY + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10);   // 🌙 초안 만들기 (11/27)
-    if (sv && sv.newOk) [TODAY, t1].filter(x => monOf(x) === m || !P.days[x]).filter(x => sv.newOk(x)).forEach(x => { $('#days').innerHTML += '<button data-jnew="' + x + '" class="jnewb" title="전 객실 4(퇴실 예정)로 시작">🌙 ' + (+x.slice(5, 7)) + '/' + (+x.slice(8)) + ' 초안 만들기' + (P.days[x] ? ' (엑셀 사본 대신)' : '') + '</button>'; }); }
+    if (sv && sv.newOk) [TODAY, t1].filter(x => monOf(x) === m || !P.days[x]).filter(x => sv.newOk(x)).forEach(x => { $('#days').innerHTML += '<button data-jnew="' + x + '" class="jnewb" title="' + (+x.slice(5, 7)) + '/' + (+x.slice(8)) + ' 초안 만들기 — 전 객실 4(퇴실 예정)로 시작' + (P.days[x] ? ' (엑셀 사본 대신)' : '') + '">🌙 ' + (+x.slice(5, 7)) + '/' + (+x.slice(8)) + ' 초안</button>'; }); }
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
   
 }
@@ -1374,7 +1385,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-7'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-8'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1422,6 +1433,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-7"></script>
+<script type="module" src="jbr.js?v=2026.11.28-8"></script>
 </body>
 </html>
