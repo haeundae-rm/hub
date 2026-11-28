@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.28-10';
+const VER = '2026.11.28-11';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -177,6 +177,8 @@ const SV = {
   //   (11/27 15:00 소장님) 버튼은 한 날짜만 = 다음 근무일. 09시 전(새벽 · 아침)엔 오늘, 09시부터는 내일 — 키퍼가 새벽에 초안을 짜므로
   draftDay: () => { const h = new Date(Date.now() + 9 * 3600e3).getUTCHours(), t = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); return h < 9 ? t : addD(t, 1); },
   newOk: ds => { const d = docOf(ds); return ds === SV.draftDay() && (!d || d.src !== 'app'); },
+  // ↺ 초안 처음으로 (11/28 소장님: 초안에서 눌러 보다가 처음으로 못 돌아감) — 앱 원본 · 오늘이나 앞날 · 자동 배정을 아직 안 넣은 날 (넣었으면 자동 배정 창 「확정 취소」 먼저)
+  canReset: ds => { const d = docOf(ds); return !!d && d.src === 'app' && ds >= TODAY && !d.asg && !d.r0; },
   newDay(ds) {
     const base = docs.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).find(x => x.rooms && x.rooms.length);
     if (!base) { window.JBR.toast('호실 목록을 찾지 못했어요 — 엑셀 사본이 하루라도 있어야 해요'); return; }
@@ -184,7 +186,7 @@ const SV = {
     const d = { date: ds, src: 'app', file: '', rooms: base.rooms.slice(), r, xl: {}, cards: [], groups: [], at: S.SERVER_TIME, by: by(), made: S.SERVER_TIME };
     if (ds < LIVE_FROM) Object.assign(d, { r0: r, g0: [], onAt: S.SERVER_TIME, onBy: by() });   // 연습: 「연습 끝내기」 가능
     save(ds, 'set', d, { k: 'new' });
-    window.JBR.toast('🌙 ' + +ds.slice(5, 7) + '/' + +ds.slice(8) + ' 초안을 만들었어요 — 전 객실 4(퇴실 예정). 연박 · 공실 · 재실을 표시한 뒤 위 「🧩 자동 배정」에서 「📋 정비보고서 앱에서 불러오기」');
+    window.JBR.toast((docOf(ds) && docOf(ds).src === 'app' ? '↺ ' : '🌙 ') + +ds.slice(5, 7) + '/' + +ds.slice(8) + ' 초안을 ' + (docOf(ds) && docOf(ds).src === 'app' ? '처음으로 되돌렸어요' : '만들었어요') + ' — 전 객실 4(퇴실 예정). 연박 · 공실 · 재실을 표시한 뒤 위 「🧩 자동 배정」에서 「📋 정비보고서 앱에서 불러오기」');
   },
   rooms(ds, ch) {
     const r = {}; Object.keys(ch).forEach(k => { r[k] = clip(ch[k].a); ch[k] = { b: clip(ch[k].b), a: r[k] }; });

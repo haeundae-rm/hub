@@ -29,6 +29,7 @@ h1{font-size:19px;margin:0;font-weight:900;letter-spacing:-.3px}
 .days button{flex:1 0 auto;border:0;background:#ffffff14;color:#cfd8e6;border-radius:8px;padding:3px 6px;min-height:30px;min-width:34px}
 .days button.on{background:#fff;color:var(--navy);font-weight:800}
 .days button.today{box-shadow:inset 0 0 0 2px var(--org)}.days button.fut{opacity:.45}.tabs button.asgo{background:#2C8A55;color:#fff;font-weight:800;margin-right:6px}.tabs button.asgo:hover{background:#34A065}
+.rstb{display:inline-block;background:#fff;color:#7A2E0B;border:1.5px solid #F08A24;font-weight:900;border-radius:8px;padding:3px 10px;margin-right:8px;cursor:pointer}.rstb:hover{background:#FFF1DC}
 .takeb{display:inline-block;background:#F08A24;color:#1B1206;font-weight:900;border-radius:8px;padding:4px 12px;margin-right:8px;cursor:pointer}.takeb:hover{background:#FF9F3F}
 .sndb{display:flex;align-items:center;gap:12px;justify-content:space-between;border-radius:10px;padding:10px 14px;margin:8px 0;font-size:14px}.sndb span{display:flex;flex-direction:column;gap:2px}.sndb small{font-size:12.5px;opacity:.85}
 .sndb.wait{background:#FFF1DC;border:2px solid #F08A24;color:#7A2E0B}.sndb.ok{background:#E3F4E8;border:1.5px solid #9BD3AE;color:#1F5E33}
@@ -528,7 +529,7 @@ function hmOf(v) { const n = v && v.toMillis ? v.toMillis() : v && v.seconds ? v
 function svBar() {
   const sv = window.JBR && window.JBR.sv; if (!sv) return '';
   const lb = 'style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0"';
-  if (live(day)) return '<div class="check svb" style="flex-wrap:wrap"><label class="takeb" title="야간에 엑셀로 짠 날 → 그 날 시트 그대로 앱 정비보고서로 (이후 앱에서 고침)">📥 이 날 엑셀 → 앱 원본<input type="file" id="takeFile" accept=".xlsx" hidden></label> <b class="good">💾 저장 켜짐</b> — 고치는 즉시 저장소에 (방 하나씩) · <span id="svst">' + sv.status() + '</span> · <button data-jlog="1" ' + lb + '>📜 변경 기록</button>' +
+  if (live(day)) return '<div class="check svb" style="flex-wrap:wrap">' + (sv.canReset && sv.canReset(day) ? '<button class="rstb" data-jreset="1" title="전 객실 4(퇴실 예정)로 다시 — 지금 표시한 연박 · 공실 · 재실 · 메모가 지워져요">↺ 초안 처음으로</button>' : '') + '<label class="takeb" title="야간에 엑셀로 짠 날 → 그 날 시트 그대로 앱 정비보고서로 (이후 앱에서 고침)">📥 이 날 엑셀 → 앱 원본<input type="file" id="takeFile" accept=".xlsx" hidden></label> <b class="good">💾 저장 켜짐</b> — 고치는 즉시 저장소에 (방 하나씩) · <span id="svst">' + sv.status() + '</span> · <button data-jlog="1" ' + lb + '>📜 변경 기록</button>' +
     (sv.canOff(day) ? ' · <button data-joff="1" ' + lb + '>연습 끝내기 (켜기 전 엑셀 자료로)</button>' : '') + (sv.canBack && sv.canBack(day) ? ' · <button data-jback="1" ' + lb + ' style="border:0;background:none;color:#B23A48;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">⚠ 비상: 엑셀로 돌아가기</button>' : '') + '</div>';
   if (sv.canOn(day)) return '<div class="check svb"><span>이 날은 보기 · 연습만</span> · <button data-jon="1" ' + lb + '>💾 이 날짜로 실제 저장 연습 켜기</button> <small>(11/28 전 지난 날짜만)</small></div>';
   return '';
@@ -614,6 +615,10 @@ function barHtml(d) {
 }
 // 우선정비는 1 퇴실 · 4 퇴실 예정 · 3 미정비(이월) 방에만 (11/27 소장님: 끌어서 고를 때 연박 · 공실까지 지정되던 문제)
 //   11/27 15:13 소장님: 퇴실된(1) 배정 방도 우선정비가 돼야 함 (3109 시험에서 막힘) → 1 추가. 연박 · 공실 · 재실(2) · 간단은 그대로 빠짐
+// 5 연박 (11/28 소장님: 퇴실 예정(4) 방에 5를 누르면 바로 안 먹고 Backspace 를 한 번 더 눌러야 했음 — 4 · 1 · 3 숫자가 연박 노랑보다 먼저 보여서)
+//   켜기 = 연박 + 퇴실 · 퇴실 예정 · 이월 숫자 지움 (재실 2 는 연박 재실이라 그대로) / 끄기 = 연박 풀고 숫자가 없으면 4(퇴실 예정)로. 여러 방 = 하나라도 아니면 모두 켜기
+function ylToggle(idx) { const d = R(), on = !idx.every(i => d.rooms[i] && d.rooms[i].yl);
+  apply(idx, x => { if (on) { x.yl = true; if (['1', '3', '4'].includes(x.st)) x.st = ''; } else { x.yl = false; if (!x.st) x.st = '4'; } }); }
 const canPrio = x => !!x && !x.yl && (x.st === '1' || x.st === '4' || x.st === '3');
 // 🟣 늦은 퇴실 (11/27 소장님 "우선정비처럼"): 손님이 아직 계신 방 + 예상 시각 → 보라 빛 · 메이드 휴대폰에도 보라.
 //   프런트 연락 → 「퇴실」 누르면 그 방이 1(퇴실)로 바뀌고 담당 메이드 휴대폰이 울림 (meta/late_{날} — 메이드 휴대폰이 읽음, 규칙 그대로)
@@ -1106,7 +1111,7 @@ document.addEventListener('click', e => {
       if (m === '룸체' && x.yl && !/^[1-4]$/.test(x.st)) { x.st = '1'; moved++; } } });   // 연박 방 룸체인지 = 사실상 퇴실 (11/26 소장님)
     if (moved) toast('연박 ' + moved + '실 룸체인지 → 퇴실(1)로 바꿨어요'); return; }
   if (t.dataset.done) { t.blur(); toggleDone(idx); return; }
-  if (t.dataset.yl) { apply(idx, x => { x.yl = !x.yl; }); return; }
+  if (t.dataset.yl) { ylToggle(idx); return; }
   if (t.dataset.re) { reEntry(idx); return; }
   if (t.dataset.undo) { doUndo(); return; }
   if (t.dataset.mkprio) {
@@ -1133,6 +1138,9 @@ document.addEventListener('click', e => {
   if (t.dataset.water) { waterOpen = !waterOpen; draw(); return; }
   if (t.dataset.asgo) { asgOpen(t.dataset.asgo); return; }
   if (t.dataset.asgx) { asgClose(); return; }
+  if (t.dataset.jreset) { const nm = R().rooms.filter(x => x && x.nm).length;
+    if (!confirm((+day.slice(5, 7)) + '/' + (+day.slice(8)) + ' 초안을 처음으로 되돌릴까요?\n\n· 전 객실 4(퇴실 예정)로 다시 깔려요\n· 지금 표시한 연박 · 공실 · 재실 · 메모 · 단체가 모두 지워져요' + (nm ? '\n· ⚠ 이름이 들어간 방 ' + nm + '실도 지워져요' : '') + '\n· 변경 기록에는 남아요')) return;
+    window.JBR.sv.newDay(day); sel.clear(); cur = -1; return; }
   if (t.dataset.jsend) { if (window.JBR.sv && window.JBR.sv.pending && window.JBR.sv.pending()) { toast('저장 대기 중인 칸이 있어요 — 저장된 뒤 눌러 주세요'); return; } const g = (P.days[day] || {}).asg || {}; if (!confirm((+day.slice(5, 7)) + '/' + (+day.slice(8)) + ' 배정을 메이드 휴대폰에 ' + (g.sentAt ? '다시 ' : '') + '보낼까요?\n\n· 지금 격자 그대로 보내요\n· 정비 지원 더티 배분도 이 배정으로 불러와요')) return; asgOpen('send'); return; }
   if (t.dataset.xld) { xlOut('day', t); return; }
   if (t.dataset.xlm) { xlOut('month', t); return; }
@@ -1183,7 +1191,7 @@ document.addEventListener('keydown', e => {
     const k = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
     if (k) { e.preventDefault(); move(...k); focusCmd(); return; }
     if (/^[1-4]$/.test(e.key)) { e.preventDefault(); setSt(idx, e.key); return; }
-    if (e.key === '5') { e.preventDefault(); apply(idx, x => { x.yl = !x.yl; }); focusCmd(); return; }
+    if (e.key === '5') { e.preventDefault(); ylToggle(idx); focusCmd(); return; }
     if (e.key === '6') { e.preventDefault(); setSt(idx, '간단'); return; }
     if (e.key === '7') { e.preventDefault(); reEntry(idx); focusCmd(); return; }
     if (e.key === ' ') { e.preventDefault(); toggleDone(idx); focusCmd(); return; }
@@ -1220,7 +1228,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Backspace') { e.preventDefault(); unassign(idx); return; }
   if (e.key === 'Delete') { e.preventDefault(); setSt(idx, ''); return; }
   if (e.key === ' ') { e.preventDefault(); toggleDone(idx); return; }
-  if (e.key === '5') { apply(idx, x => { x.yl = !x.yl; }); return; }
+  if (e.key === '5') { ylToggle(idx); return; }
 });
 
 
@@ -1421,7 +1429,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-10'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-11'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1469,6 +1477,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-10"></script>
+<script type="module" src="jbr.js?v=2026.11.28-11"></script>
 </body>
 </html>
