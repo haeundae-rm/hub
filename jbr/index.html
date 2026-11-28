@@ -375,7 +375,7 @@ const MEMOS = ['VIP', '르씨엘', '룸체', '당직', '악취', '조기퇴실',
 const DETAIL = { 룸체: { q: '어디로 룸체인지하나요?', ph: '호실 (예: 2603)' }, 악취: { q: '무슨 냄새인가요?', ph: '직접 쓰기 (예: 페인트)' },
   시설: { q: '어떤 시설 문제인가요?', ph: '예: 에어컨 고장 · 욕실 누수' }, 우선: { q: '🟠 우선정비 — 몇 시까지 정비할까요?', ph: '예: 2시 · 오후 8시 · 20:00 · 3시 반' },
   늦은퇴실: { q: '🟣 늦은 퇴실 — 몇 시쯤 나가세요?', ph: '예: 1시 · 13:30 (비워도 돼요)' } };   // 11/28 소장님: 우선정비 · 늦은퇴실은 메모 줄 단추 하나씩으로 (오른쪽 위는 목록만)   // 11/28 시설 · 우선도
-const PRIO_CHIPS = ['12시', '14시', '15시', '16시'];
+const PRIO_CHIPS = ['12시', '14시', '15시', '16시', '17시'];
 const DONE_BTN = { 악취: [['악취해제', '해제'], ['악취탈취완료', '탈취완료']], 시설: [['시설작업완료', '완료']] };   // 11/28 소장님: 끝난 일 단추 — 메이드 휴대폰엔 주의 표시 없이 글만 (rm engine DONE_WORDS)
 // ⏰ 시간 읽기 (11/28 소장님 「8시 / 오후 8시 / 20:00 / 20시 다」): 오전·오후 없으면 1~8시 = 오후 (근무 중 마감), 9~12시 = 그대로 → { h, mi } 또는 null
 function parseHM(v) {
@@ -395,9 +395,9 @@ let mpop = null;   // { kind, idx:[] }
 const MCOL = { '🚧': '#FFE2B8', '📌': '#D7E8FF',  재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
 // 🎨 계속 챙길 메모 (11/28 소장님): 르씨엘 = 💧 + 연파랑 · 악취 = 처음 연보라, 글자는 기존 그대로. 둘 다 완료여도 흐려지지 않음 (.loud)
 //   악취해제 · 악취탈취완료는 예전 연한 색 (흐려짐도 그대로)
-const LOUD = [   // 11/28 15:02 소장님 확정: 연한 색 + 검정 글씨 (르씨엘 연파랑 + 💧 · 악취 처음 연보라), 완료여도 안 흐려짐
-  { re: /르씨엘/, ic: '💧 ', bg: '#BCD7F2', fg: '#111' },
-  { re: /악취(?!.*(해제|탈취완료))/, bg: '#DCCBF3', fg: '#111' },
+const LOUD = [   // 11/28 15:02 소장님 확정: 연한 색 + 검정 글씨 (15:08 두 단계 진하게: 르씨엘 #8CB6E5 + 💧 · 악취 #BA9CE4), 완료여도 안 흐려짐
+  { re: /르씨엘/, ic: '💧 ', bg: '#8CB6E5', fg: '#111' },
+  { re: /악취(?!.*(해제|탈취완료))/, bg: '#BA9CE4', fg: '#111' },
 ];
 const mcolOf = m => MCOL[Object.keys(MCOL).find(k => m.includes(k))] || '#eef0f3';
 const mchip = m => { const L = LOUD.find(x => x.re.test(m));
@@ -1474,7 +1474,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-22'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-23'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1522,6 +1522,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-22"></script>
+<script type="module" src="jbr.js?v=2026.11.28-23"></script>
 </body>
 </html>
