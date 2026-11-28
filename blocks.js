@@ -42,19 +42,35 @@ function roomsIn(line) {
 const FILLER = /일자|미정비로?|남겨\s*주세요|남겨|부탁\s*드립니다|부탁드려요|부탁|주세요|부터|까지|기간|진행|예정|입니다|합니다|요\b/g;
 const nameOf = ln => ln.replace(/\(\s*\d+\s*실\s*\)/g, ' ').replace(/\d{1,2}\s*[\/.월]\s*\d{1,2}\s*일?|\d{1,2}\s*[~\-]\s*\d{1,2}\s*일|\d{1,2}\s*일\s*자?/g, ' ')
   .replace(/\d{3,4}(?:\s*[~\-]\s*\d{1,4})?\s*호?/g, ' ').replace(/\d+\s*(?:층|실|호)/g, ' ').replace(FILLER, ' ').replace(/[\d,./~\-:()·!?]+/g, ' ').replace(/\s+/g, ' ').trim();
+// 11/28: '17호 라인 전체(23,24층 제외)' · '17라인 5~10층' → 그 라인이 있는 층 전부 (제외 층 빼고, 층 범위가 있으면 그 안만)
+function floorNums(t) { const out = []; for (const m of String(t).matchAll(/(\d{1,2})\s*(?:[~\-]\s*(\d{1,2}))?/g)) { const a = +m[1], b = m[2] ? +m[2] : a; for (let f = a; f <= b && f - a <= 40; f++) out.push(f); } return out; }
+function lineRooms(ln) {
+  const m = /(\d{1,2})\s*호?\s*라인/.exec(ln); if (!m) return null;
+  const slot = +m[1], ex = new Set(), only = new Set();
+  const xm = /((?:\d{1,2}\s*[,·~\-]?\s*)+)층\s*(?:은|는)?\s*(?:제외|빼고|빼)/.exec(ln); if (xm) floorNums(xm[1]).forEach(f => ex.add(f));
+  const om = /((?:\d{1,2}\s*[,·~\-]?\s*)+)층(?!\s*(?:은|는)?\s*(?:제외|빼))/.exec(ln.replace(xm ? xm[0] : '\u0000', ' ')); if (om) floorNums(om[1]).forEach(f => only.add(f));
+  return Object.keys(FLOORS).map(Number).sort((a, b) => a - b).filter(f => FLOORS[f].includes(slot) && !ex.has(f) && (!only.size || only.has(f))).map(f => String(f * 100 + slot));
+}
+// '-일자: …' · '-호실: …' 처럼 머리말로 시작하는 줄은 새 작업이 아니라 바로 위 작업에 붙임
+const LABEL = /^[-•*·▶>\s]*(일자|날짜|기간|일정|호실|객실|대상|위치|범위)\s*[:：]/;
+// '12/18(금)부터 판매가능' 같은 판매 · 오픈 날짜는 작업 날짜가 아님
+const SALE = /\d{1,2}\s*[\/.월]\s*\d{1,2}\s*일?\s*(?:\([^)]*\))?\s*(?:부터|이후)?\s*(?:판매|오픈|입실|사용)\s*가?능?|\d{1,2}\s*일\s*(?:\([^)]*\))?\s*(?:부터|이후)?\s*(?:판매|오픈|입실|사용)\s*가?능?/g;
 // 메시지 → [{ name, rooms, want(메시지에 적힌 실 수), bad, from, to }]
 export function parseMsg(text, base) {
   // 날짜: 작업명과 같은 줄이면 그 작업만, 따로 있는 줄이면 날짜가 없는 모든 작업에 (예: 맨 끝 '8일자 미정비 남겨주세요')
   const groups = []; let cur = null, from = '', to = '';
   const mk = (ln, word, ds) => { const w = /\(\s*(\d+)\s*실\s*\)/.exec(ln); cur = { name: word.slice(0, 20), rooms: [], want: w ? +w[1] : 0, bad: [], from: ds.length ? ds[0] : '', to: ds.length ? ds[ds.length - 1] : '' }; groups.push(cur); };
   const lines = String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  for (const ln of lines) {
-    const ds = datesIn(ln, base), { out, bad } = roomsIn(ln), word = nameOf(ln), named = word && !/^[A-Za-z]{0,3}$/.test(word);
+  for (const ln0 of lines) {
+    const ln = ln0.replace(SALE, ' '), lab = LABEL.exec(ln), lr = lineRooms(ln);
+    const ds = datesIn(ln, base), { out, bad } = roomsIn(ln), word = nameOf(ln.replace(/\d{1,2}\s*호?\s*라인/g, ' ')), named = !lab && word && !/^[A-Za-z]{0,3}$/.test(word);
     if (named) mk(ln, word, ds);
-    else if (ds.length) { from = from || ds[0]; to = ds[ds.length - 1]; }
+    else if (ds.length) { if (lab && cur) { cur.from = ds[0]; cur.to = ds[ds.length - 1]; } else { from = from || ds[0]; to = ds[ds.length - 1]; } }
+    if (lr) { if (!cur) mk(ln, '보수', []); if (lab || !cur.lr) cur.lr = lr; }   // 호실 줄의 라인(제외 층 반영)이 작업명 줄의 라인보다 먼저
     if (out.length || bad.length) { if (!cur) mk(ln, '보수', []);
       out.forEach(r => { if (!cur.rooms.includes(r)) cur.rooms.push(r); }); cur.bad.push(...bad); }
   }
+  groups.forEach(g => { if (g.lr) g.lr.forEach(r => { if (!g.rooms.includes(r)) g.rooms.push(r); }); delete g.lr; });
   const f0 = from || base;
   return groups.filter(g => g.rooms.length || g.bad.length).map(g => { const f = g.from || f0, t = g.to || (g.from ? g.from : to || f0); return Object.assign(g, { from: f, to: t >= f ? t : f, prio: false }); });
 }

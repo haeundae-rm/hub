@@ -5,7 +5,7 @@
 // 하우스키퍼 공용 계정 (11/25): HK 전파 (전체)만 봄. 원본(rmsched/…)은 못 읽고, 소장 · 부소장이 저장할 때 같이 쓰는 rmsched_hk/{날짜}(그날 HK 전파 내용만)를 읽음
 import * as DB from '../../rm/app/store.js';
 import { openBlockPick } from './blockpick.js?v=2026.11.25-8';   // 🗺 작업객실 도면 (11/25)
-import { prune as bkPrune, newId as bkNewId } from '../blocks.js?v=2026.11.18-1';
+import { prune as bkPrune, newId as bkNewId } from '../blocks.js?v=2026.11.28-19';
 {
 const C = window.RMCore, $ = id => document.getElementById(id);
 const { DAYS, STATUSES, OFF, isNum, num, addDays, md } = C;
