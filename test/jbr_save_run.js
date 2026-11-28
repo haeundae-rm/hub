@@ -133,18 +133,17 @@ async function pick(p, room) { const i = await cellOf(p, room); await p.click('.
   await p.click('#days [data-d="2026-11-24"]'); await sleep(200);
   const i1 = await cellOf(p, '1201'), i2 = await cellOf(p, '1217');
   await p.click('.c[data-i="' + i1 + '"]'); await p.click('.c[data-i="' + i2 + '"]', { modifiers: ['Shift'] }); await sleep(150);
-  await p.click('[data-drawer="prio"]'); await sleep(150);
-  ok(/빠져요/.test(await p.innerText('.box')), '고른 방 중 빠지는 수 안내: ' + ((await p.innerText('.box')).match(/고른 방 중 \d+실/) || [''])[0]);
-  await p.click('[data-mkprio]'); await sleep(200);
+  await p.click('[data-memo="우선"]'); await sleep(150); await p.click('#mpop [data-mpv="14시"]'); await sleep(300);
   const pr = await p.$$eval('.c.pr[data-i]', cs => cs.map(c => c.innerText.match(/\d{3,4}/)[0]));
-  const d24 = await doc(p, '2026-11-24');
-  ok(pr.length > 0 && pr.every(r => ['1', '3', '4'].includes(d24.r[r][0]) && !d24.r[r][5]) && pr.some(r => d24.r[r][0] === '1'), '주황 빛 ' + pr.length + '실 모두 1 · 4 · 3, 퇴실(1) 포함 (' + pr.map(r => r + ':' + d24.r[r][0]).join(' ') + ')');
-  ok(Object.keys(d24.r).filter(r => r.startsWith('12') && (d24.r[r][5] || !d24.r[r][0])).every(r => !pr.includes(r)), '연박 · 공실은 하나도 안 들어감');
+  const d24 = await doc(p, '2026-11-24'), prR = pr;
+  ok(prR.length > 0 && prR.every(r => ['1', '2', '3', '4'].includes(d24.r[r][0]) && !d24.r[r][5]) && prR.some(r => d24.r[r][0] === '1'), '🟠 우선정비 ' + prR.length + '실 모두 1 · 4 · 3, 퇴실(1) 포함 (' + prR.map(r => r + ':' + d24.r[r][0]).join(' ') + ')');
+  ok(Object.keys(d24.r).filter(r => r.startsWith('12') && (d24.r[r][5] || !d24.r[r][0])).every(r => !prR.includes(r)), '연박 · 공실은 우선정비에 안 들어감 (메모만)');
 
   // 퇴실(1) 방 하나만 골라도 단추가 켜짐 (3109 사례)
-  const one = Object.keys(d24.r).find(r => d24.r[r][0] === '1' && d24.r[r][1] && !d24.r[r][5]);
+  const one = Object.keys(d24.r).find(r => r.length === 4 && !r.startsWith('12') && d24.r[r][0] === '1' && d24.r[r][1] && !d24.r[r][5] && !d24.r[r][4]);
   await p.click('.c[data-i="' + (await cellOf(p, one)) + '"]'); await sleep(150);
-  ok(!(await p.$eval('[data-mkprio]', b => b.disabled)), '퇴실(1) · 배정된 ' + one + '호 하나만 골라도 「선택한 1실 지정」 켜짐');
+  await p.click('[data-memo="우선"]'); await sleep(150); await p.fill('#mpin', '16'); await p.keyboard.press('Enter'); await sleep(300);
+  ok(await p.evaluate(i => document.querySelector('.c[data-i="' + i + '"]').classList.contains('pr'), await cellOf(p, one)), '퇴실(1) · 배정된 ' + one + '호 하나만 골라도 🟠 우선정비 (발광)');
 
   console.log('⑫ 저장은 앱 원본인 날만 · 오늘은 연습 못 켬');
   ok(await p.evaluate(() => !window.JBR.sv.live('2026-12-01') && !window.JBR.sv.live('2026-11-24') && !window.JBR.sv.canOn(new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10))), '앱 원본(src app)인 날만 저장 · 엑셀 사본 날은 키를 눌러도 안 바뀜 · 오늘 연습 켜기 없음');

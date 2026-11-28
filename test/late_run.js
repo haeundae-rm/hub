@@ -57,15 +57,18 @@ async function pick(p, room) { const i = await cellOf(p, room); await p.click('.
   const r0 = ROOMS.find(r => !seedDoc.r[r][0] && !seedDoc.r[r][5]);   // 공실
   console.log('① 고르기 → 늦은 퇴실 칸');
   await p.click('#days [data-d="' + D + '"]').catch(() => {}); await sleep(200);
-  await pick(p, r0); await p.click('[data-drawer="prio"]'); await sleep(150);
-  ok(await p.$eval('[data-mklate]', x => x.disabled), '공실(' + r0 + ')만 고르면 「늦은 퇴실」 꺼짐');
+  await pick(p, r0); await p.click('[data-memo="늦은퇴실"]'); await sleep(150); await p.keyboard.press('Enter'); await sleep(200);
+  ok(!(await p.evaluate(d => window.__seed['meta/late_' + d], D)), '공실(' + r0 + ')은 늦은 퇴실 안 됨 (메모 줄 🟣 늦은퇴실 단추)'); await p.keyboard.press('Escape').catch(() => {});
   await pick(p, r4); await sleep(100);
-  ok(!(await p.$eval('[data-mklate]', x => x.disabled)), '퇴실 예정 · 배정(' + r4 + ' ' + seedDoc.r[r4][1] + ') → 「선택한 1실 늦은 퇴실」 켜짐');
-  await p.fill('#ltime', '13:00'); await p.click('[data-mklate]'); await sleep(300);
+  await p.click('[data-memo="늦은퇴실"]'); await sleep(150);
+  ok(/몇 시쯤 나가세요/.test(await p.innerText('#mpop')), '🟣 늦은퇴실 창 (' + r4 + ' ' + seedDoc.r[r4][1] + ')');
+  await p.fill('#mpin', '1시'); await sleep(100); ok(/오후 1시 \(13:00\) 예정/.test(await p.innerText('#mpst')), '「1시」 → 오후 1시 (13:00) 예정');
+  await p.keyboard.press('Enter'); await sleep(300);
+  await p.click('[data-drawer="late"]'); await sleep(150);
   let m = await p.evaluate(d => window.__seed['meta/late_' + d], D);
   ok(m && m.rooms[r4] && m.rooms[r4].at === '13:00' && m.rooms[r4].out === false, 'meta/late_' + D + ' 저장: ' + r4 + ' 13:00');
   ok(await p.evaluate(i => document.querySelector('.c[data-i="' + i + '"]').classList.contains('lt'), await cellOf(p, r4)), '격자 ' + r4 + ' 보라 빛');
-  ok(/🟣/.test(await p.innerText('[data-drawer="prio"]')), '우선정비 단추에 🟣 수');
+  ok(/🟣 늦은퇴실 1/.test(await p.innerText('[data-drawer="late"]')), '오른쪽 위 「🟣 늦은퇴실 1」 (우선정비와 따로)');
   ok((await p.innerText('.ltl')).includes(seedDoc.r[r4][1]), '목록에 담당 메이드 이름');
   console.log('② 퇴실');
   await p.click('[data-lateout="' + r4 + '"]'); await sleep(400);
@@ -84,8 +87,10 @@ async function pick(p, room) { const i = await cellOf(p, room); await p.click('.
   const r1 = ROOMS.find(r => seedDoc.r[r][0] === '1' && seedDoc.r[r][1] && !seedDoc.r[r][4] && !seedDoc.r[r][5]);
   await p.evaluate(() => { document.querySelectorAll('.c.on,.c.sel').forEach(() => {}); });
   await pick(p, r1); await sleep(150);
-  ok(!(await p.$eval('[data-mkprio]', x => x.disabled)), '퇴실(1) · 배정(' + r1 + ') 한 방만 골라도 「선택한 1실 지정」 켜짐');
-  await p.fill('#pname', '시험 우선'); await p.fill('#ptime', '15'); await p.click('[data-mkprio]'); await sleep(300);
+  await p.click('[data-memo="우선"]'); await sleep(150);
+  ok(/우선정비 — 몇 시까지/.test(await p.innerText('#mpop')), '메모 줄 🟠 우선정비 단추 → 창');
+  await p.fill('#mpname', '시험 우선'); await p.fill('#mpin', '15'); await p.keyboard.press('Enter'); await sleep(300);
+  await p.click('[data-drawer="prio"]'); await sleep(150);
   let pr = await p.evaluate(d => window.__seed['meta/prio_' + d], D);
   ok(pr && pr.list.length === 1 && pr.list[0].rooms.includes(r1) && pr.list[0].until === '15:00' && pr.list[0].name === '시험 우선', 'meta/prio_' + D + ' 저장: ' + r1 + ' 15:00 (「15」 → 15:00)');
   ok(await p.evaluate(i => document.querySelector('.c[data-i="' + i + '"]').classList.contains('pr'), await cellOf(p, r1)), '격자 주황 빛');
