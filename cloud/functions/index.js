@@ -80,3 +80,59 @@ exports.lostDaily = onSchedule({ schedule: '10 6 * * *', timeZone: 'Asia/Seoul',
   await db().doc('meta/lost_fn').set({ day, at: admin.firestore.FieldValue.serverTimestamp(), photosGone: gone.length - fail, fail });
   logger.info('습득물 사진 정리', { day, photosGone: gone.length - fail, fail });
 });
+
+// 📋 정비보고서(앱) → 메이드 휴대폰 서버 반영 (2026-11-28, 소장님 "반드시 진행") — 1분마다
+//   오더테이커 PC 크롬 「정비보고서 연결」이 하던 계산(앱 정비보고서 ↔ 메이드 앱)을 서버가. 계산 부분은 jsync.js
+//   meta/rsync_srv.mode: 'shadow'(기본) = 계산만 하고 meta/rsync_cmp 에 남겨 PC 가 실제로 반영한 것과 비교 / 'live' = 서버가 반영 (PC 연결 창은 쉼) / 'off'
+//   읽기 아끼기: 매분 jbr/{오늘} · meta/rsync_srv 두 문서만. 앱 정비보고서가 바뀌고 30초 그대로일 때만 메이드 앱 상태(plans · changes · recs · info)를 읽음
+//   안전장치(PC 와 같음): 손으로 바꾼 방 · 완료 방 · 관리자 표시 보호(planSync) · 20건 넘으면 보류(허브에서 meta/rsync_srv.go = hash 로 반영) · 기록 uploads/rsync_{날}
+const J = require('./jsync');
+let RM = null;
+const rmMods = async () => { if (!RM) RM = { eng: await import('./rm/engine.mjs'), rs: await import('./rm/rsync.mjs') }; return RM; };
+const toMs = o => { const x = Object.assign({}, o); Object.keys(x).forEach(k => { if (x[k] && typeof x[k].toMillis === 'function') x[k] = x[k].toMillis(); }); return x; };
+exports.jbrSync = onSchedule({ schedule: 'every 1 minutes', timeZone: 'Asia/Seoul', retryCount: 0, memory: '512MiB', timeoutSeconds: 50 }, async () => {
+  const now = Date.now(), day = J.seoulDay(now), F = admin.firestore.FieldValue;
+  const [jSnap, sSnap] = await Promise.all([db().doc('jbr/' + day).get(), db().doc('meta/rsync_srv').get()]);
+  const srv = sSnap.exists ? sSnap.data() : {}, mode = srv.mode === 'live' ? 'live' : srv.mode === 'off' ? 'off' : 'shadow';
+  const hb = x => db().doc('meta/rsync_srv').set(Object.assign({ day, at: F.serverTimestamp(), runMode: mode }, x), { merge: true });
+  if (mode === 'off') return hb({ state: 'off' });
+  const { eng, rs } = await rmMods();
+  const c = J.check({ now, day, jd: jSnap.exists ? jSnap.data() : null, srv }, eng, rs);
+  if (c.step === 'excel') return hb({ state: 'excel', hash: '', planned: '' });
+  if (c.step === 'wait') return hb({ state: 'wait', hash: c.hash, since: c.since });
+  if (c.step === 'same' && !(srv.go && srv.go === c.hash && srv.hold)) return hb({ state: 'ok' });
+  // 메이드 앱 상태 읽기 (바뀐 뒤 한 번)
+  const D = 'days/' + day;
+  const [dSnap, pl, ch, rc, inf, lg, pcSnap] = await Promise.all([db().doc(D).get(), db().collection(D + '/plans').get(), db().collection(D + '/changes').get(),
+    db().collection(D + '/recs').get(), db().collection(D + '/info').get(), db().doc('uploads/rsync_' + day).get(), db().doc('meta/rsync').get()]);
+  const plans = {}; pl.docs.forEach(x => { plans[x.id] = (x.data().rooms || []); });
+  const info = {}; inf.docs.forEach(x => { info[x.id] = x.data(); });
+  const log = lg.exists ? lg.data() : { ids: [], log: [], ign: {} };
+  const p = J.planOps(c.rows, { dayMaids: (dSnap.exists && dSnap.data().maids) || [], plans, chg: ch.docs.map(x => ({ id: x.id, data: toMs(x.data()) })), recs: rc.docs.map(x => x.data()), info, log }, rs);
+  if (p.noplan) return hb({ state: 'noplan', hash: c.hash, planned: c.hash });
+  const keys = p.ops.map(J.keyOf), entry = { at: now, h: c.hash.length + ':' + keys.length, n: p.lines.length, keys: keys.slice(0, 60), lines: p.lines.slice(0, 30).map(l => l.room + ' ' + l.t + ' ' + l.s), diff: p.diff.length, held: p.held.length, big: p.big };
+  // 그림자 비교 기록 (오늘 것만, 최근 60건)
+  const cSnap = await db().doc('meta/rsync_cmp').get(), cd = cSnap.exists && cSnap.data().day === day ? cSnap.data() : { day, list: [] };
+  const list = (p.ops.length ? cd.list.concat([entry]) : cd.list).slice(-60), cmp = J.compare(list, log.log, now);
+  const pc = pcSnap.exists ? pcSnap.data() : {};
+  await db().doc('meta/rsync_cmp').set({ day, at: F.serverTimestamp(), list: cmp.list, same: cmp.same, miss: cmp.miss, wait: cmp.wait, pcPend: Number(pc.pend) || 0, pcAt: J.ms(pc.at), last: { n: p.lines.length, diff: p.diff.length, at: now } });
+  if (mode !== 'live' || !p.ops.length) return hb({ state: 'ok', planned: c.hash, n: p.lines.length, hold: null });
+  if (p.big && srv.go !== c.hash) return hb({ state: 'hold', planned: c.hash, n: p.lines.length, hold: { hash: c.hash, n: p.lines.length, lines: entry.lines, at: now } });
+  // 반영 (PC 연결 창과 같은 길: 담당 = days/{날}/changes + sup/{날}/rm, 표시 = days/{날}/info/{객실} by '보고서')
+  const done = [];
+  for (const o of p.ops) {
+    if (o.k === '표시') {
+      await db().doc(D + '/info/' + o.room).set({ tags: o.to.tags, after: o.to.after, due: o.to.due, note: o.note || '', by: '보고서', at: F.serverTimestamp() });
+      done.push({ k: '표시', room: o.room, from: o.from, to: o.to, prev: o.prev ? { tags: o.prev.tags || [], after: o.prev.after || '', due: o.prev.due || '', note: o.prev.note || '', by: o.prev.by || '' } : null });
+    } else {
+      const d = { kind: o.k, maid: o.maid, room: o.room, by: '관리자', at: F.serverTimestamp(), clientAt: new Date(), uid: 'server-jbrSync', parties: [o.maid] };
+      const ref = await db().collection(D + '/changes').add(d);
+      await db().doc('sup/' + day + '/rm/' + ref.id).set(d).catch(e => logger.warn('정비 지원 반영 실패', String(e && e.message || e)));
+      done.push({ k: o.k, maid: o.maid, room: o.room, id: ref.id });
+    }
+  }
+  await db().doc('uploads/rsync_' + day).set({ csv: '', kind: 'rsync', date: day, ids: (log.ids || []).concat(done.filter(x => x.id).map(x => x.id)).slice(-2000),
+    log: (log.log || []).concat([{ at: now, how: '서버', file: '📋 정비보고서 앱', ops: done, undo: false }]).slice(-100), ign: log.ign || {}, at: F.serverTimestamp() });
+  logger.info('정비보고서 서버 반영', { day, n: done.length });
+  return hb({ state: 'ok', planned: c.hash, n: 0, hold: null, go: null, lastApply: now, lastN: done.length });
+});

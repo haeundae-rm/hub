@@ -5,6 +5,7 @@
 ## 들어 있는 함수
 | 이름 | 언제 | 하는 일 |
 |---|---|---|
+| `jbrSync` | 1분마다 (2026-11-28) | 📋 정비보고서(앱) → 메이드 휴대폰 반영 계산. `meta/rsync_srv.mode`: 없음·`shadow` = 계산만 하고 `meta/rsync_cmp` 에 남김 (PC 「정비보고서 연결」이 실제 반영한 것과 비교) / `live` = 서버가 반영 · PC 연결 창은 쉼 (서버가 5분 넘게 멈추면 PC 가 다시 맡음) / `off`. 20건 넘으면 보류(`hold`) → 허브에서 `go`. 계산 부품은 `functions/rm/*.mjs` = rm/app/engine.js · rsync.js 사본 (rm 을 고치면 같이 복사, 시험이 확인) |
 | `dreqPush` | 메이드가 🔔 더티 요청(`sup/{날짜}/req/{메이드}`)을 새로 보낼 때 | 담당 정비보조(ws) 이름으로 등록된 휴대폰(`push/{uid}`, 정비 지원 앱 '알림 받기')에 푸시. 결과는 `meta/push_fn` |
 
 - 지역 서울(asia-northeast3, Firestore 와 같음), 동시 최대 2개, 메모리 256MiB, 30초.
