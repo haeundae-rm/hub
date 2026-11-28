@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.28-26';
+const VER = '2026.11.28-27';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -313,7 +313,8 @@ const PRIOS = {
     PRL[ds] = L.map(p => Object.assign({}, p, { rooms: p.rooms.slice() }));
     track(S.set('meta/prio_' + ds, { date: ds, list: L, at: S.SERVER_TIME, by: by() })); if (window.JBR) window.JBR.redraw(); }
 };
-if (window.JBR) { window.JBR.blocks = () => BLK; window.JBR.recOn = recOn; window.JBR.stayBad = stayBad; window.JBR.recur = () => REC;
+if (window.JBR) { window.JBR.blocks = () => BLK; window.JBR.recOn = recOn; window.JBR.hkDay = ds => hkU(hks, ds);   // 📣 그날 HK 전파 출근 예정 {이름: 유닛} (초안 미리 보기 카드)
+  window.JBR.stayBad = stayBad; window.JBR.recur = () => REC;
 window.JBR.saveStay = async (list, what) => { const b = by(); await S.set('meta/recur', { list, hist: REC_HIST.concat([{ at: Date.now(), by: b, what: String(what).slice(0, 120) }]).slice(-50), at: S.SERVER_TIME, by: b }); REC = list; }; window.JBR.blockOn = blockOn; window.JBR.sv = SV; window.JBR.late = Object.assign(ds => (role ? LATE.map(ds) : null), LATE); window.JBR.prio = Object.assign(ds => { if (!role) return null; prWatch(ds); return PRL[ds]; }, PRIOS); }
 window.addEventListener('online', svPaint); window.addEventListener('offline', svPaint);
 window.addEventListener('beforeunload', e => { if (sv.pend) { e.preventDefault(); e.returnValue = ''; } });
