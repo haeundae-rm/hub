@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.28-13';
+const VER = '2026.11.28-14';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -40,7 +40,7 @@ export function toP(list, sched) {
     const m = d.date.slice(0, 7), M = months[m] = months[m] || { days: {}, roster: [], xl: { has: false, room: { per: {}, '정비수': [], '인원': [] }, bill: { '정비수': [], '인원': [], '금액': [] }, ot: {}, otT: { d: [] }, unit: {} } };
     M.days[d.date] = {
       r: rooms.map(r => { const x = d.r[r]; return x ? [x[0] || '', x[1] || '', x[2] || '', x[3] || '', x[4] ? '1' : '', x[5] ? 1 : 0] : null; }),
-      cards: (d.cards || []).map(c => [c.n, c.u, c.in ? 1 : 0, undefined, c.h == null || c.h === '' ? null : c.h]),   // [4] 인계 유닛 (11/28 자동 배정 넣기 때 따로 저장)
+      cards: (d.cards || []).map(c => [c.n, c.u, c.in ? 1 : 0, undefined, c.h == null || c.h === '' ? (hkU(sched, d.date)[c.n] != null ? hkU(sched, d.date)[c.n] : null) : c.h]),   // [4] 인계 유닛: 자동 배정 넣기 때 저장한 값 → 없으면 그날 HK 전파(룸메이드 스케줄) 유닛 (11/28 박순자 9 사례 — 엑셀 카드 칸보다 HK 인계가 기준)
       groups: (d.groups || []).map(g => [g.name, g.time, String(g.rooms || '').split(',').filter(Boolean)]),
       xl: d.xl || {}, at: d.at || 0, file: d.file || '', src: d.src || '', asg: d.asg || null
     };
@@ -52,6 +52,8 @@ export function toP(list, sched) {
   Object.values(months).forEach(M => { if (!M.roster.length) { const s = new Set(); Object.values(M.days).forEach(x => x.cards.forEach(c => c[0] && s.add(c[0]))); M.roster = [...s]; } });
   return { rooms, months };
 }
+// 그날 HK 전파(rmsched_hk) 유닛 {이름: 유닛} — 정비보고서 카드 '인계' 기준 (11/28)
+export function hkU(sched, ds) { const o = {}; const x = (sched || []).find(y => y && y.date === ds); ((x && x.rm) || []).forEach(r => { const n = String(r.n || '').replace(/\s+/g, ''); if (n && r.u != null && r.u !== '' && isFinite(+r.u)) o[n] = +r.u; }); return o; }
 // 그 달 명단 = 그 달 가장 최근 HK 전파 사본의 주간 명단(순번 = 줄 순서, 퇴사 표시 빼고)
 //   + 그 달 정비 기록이 있는 분은 퇴사 · 명단에서 빠져도 남김 (근태 · 급여) — 예전 주의 순번 자리에 끼워 넣음
 export function schedRoster(m, days, sched) {
