@@ -5,13 +5,18 @@
 // 한 번 맞히면 이 탭에서 30분 동안 다시 안 물음 (sessionStorage). 5번 틀리면 이 기기에서 5분 잠금
 import * as S from '../rm/app/store.js';
 
-const DOC = 'uploads/hubpin', OK_KEY = 'hub_pin_ok', FAIL_KEY = 'hub_pin_fail', KEEP = 30 * 60e3, LOCK = 5 * 60e3;
+const KEEP = 30 * 60e3, LOCK = 5 * 60e3;
+// 🔒 화면마다 따로 (11/28 소장님: 🔍 인스펙션도 4자리) — key '' = 인사 · 연차(예전 그대로), 'insp' = 인스펙션
+//   DEF = 저장소에 아직 없을 때 쓰는 처음 비밀번호 (소금 + SHA-256 만, 숫자는 코드에 없음). 「비밀번호 바꾸기」로 저장소에 새로 정하면 그걸 씀
+const KEYS = { '': { doc: 'uploads/hubpin', ok: 'hub_pin_ok', fail: 'hub_pin_fail' }, insp: { doc: 'uploads/hubpin_insp', ok: 'hub_pin_ok_insp', fail: 'hub_pin_fail_insp', def: { salt: 'c7e1a94b5d2f0836', h: '53a1f6e69f93c93cbe2f6ec501046a8d8dd9dc958f2ec7e8ab68479f8b819c10' } } };
+let K = KEYS[''], DOC = K.doc, OK_KEY = K.ok, FAIL_KEY = K.fail;
+const use = key => { K = KEYS[key || ''] || KEYS['']; DOC = K.doc; OK_KEY = K.ok; FAIL_KEY = K.fail; };
 const ss = { get: k => { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} } };
 const ls = { get: k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
 async function sha(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return Array.from(new Uint8Array(b)).map(x => ('0' + x.toString(16)).slice(-2)).join(''); }
-export function passed() { return Number(ss.get(OK_KEY) || 0) > Date.now(); }
+export function passed(key) { use(key); return Number(ss.get(OK_KEY) || 0) > Date.now(); }
 function mark() { ss.set(OK_KEY, String(Date.now() + KEEP)); }
-export function forget() { ss.set(OK_KEY, '0'); }
+export function forget() { Object.values(KEYS).forEach(k => ss.set(k.ok, '0')); }
 
 function css() {
   if (document.getElementById('pncss')) return;
@@ -55,7 +60,7 @@ function ask(steps, check) {
     document.body.appendChild(bg); draw('');
   });
 }
-async function readDoc() { const d = await S.get(DOC); return d && d.h && d.salt ? d : null; }
+async function readDoc() { const d = await S.get(DOC); return d && d.h && d.salt ? d : (K.def || null); }
 async function save(pin) {
   const salt = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(x => ('0' + x.toString(16)).slice(-2)).join('');
   await S.set(DOC, { csv: '', kind: 'hubpin', salt, h: await sha(salt + ':' + pin), at: S.SERVER_TIME });
@@ -64,8 +69,8 @@ function locked() { const f = ls.get(FAIL_KEY) || { n: 0, t: 0 }; return f.n >= 
 function fail() { const f = ls.get(FAIL_KEY) || { n: 0, t: 0 }; const n = Date.now() - f.t < LOCK ? f.n + 1 : 1; ls.set(FAIL_KEY, { n, t: Date.now() }); return n; }
 
 /** 들어가기 전에 부름 → true 면 통과. what = '인사' 같은 화면 이름 */
-export async function gate(what) {
-  if (passed()) return true;
+export async function gate(what, key) {
+  if (passed(key)) return true;
   let d;
   try { d = await readDoc(); } catch (e) { alert('비밀번호 확인을 못 했어요. 인터넷을 확인하고 다시 눌러 주세요.'); return false; }
   if (!d) {   // 처음: 소장님이 정함
@@ -77,7 +82,7 @@ export async function gate(what) {
   }
   const lk = locked();
   if (lk) { alert('비밀번호를 여러 번 틀렸어요. ' + lk + '분 뒤에 다시 해 주세요.'); return false; }
-  const v = await ask([{ title: what + ' 화면 비밀번호', text: '개인정보가 있는 화면이에요. 숫자 4자리를 넣어 주세요.' }], async v => {
+  const v = await ask([{ title: what + ' 화면 비밀번호', text: (key === 'insp' ? '관리자용 화면이에요.' : '개인정보가 있는 화면이에요.') + ' 숫자 4자리를 넣어 주세요.' }], async v => {
     if (await sha(d.salt + ':' + v[0]) === d.h) return '';
     const n = fail();
     if (n >= 5) return '5번 틀렸어요. 5분 뒤에 다시 해 주세요.';
@@ -87,8 +92,8 @@ export async function gate(what) {
   ls.set(FAIL_KEY, { n: 0, t: 0 }); mark(); return true;
 }
 /** 비밀번호 바꾸기 (지금 비밀번호 확인 → 새로 두 번) */
-export async function change() {
-  let d;
+export async function change(key) {
+  use(key); let d;
   try { d = await readDoc(); } catch (e) { alert('인터넷을 확인해 주세요.'); return false; }
   const steps = (d ? [{ title: '지금 비밀번호', text: '바꾸기 전에 지금 비밀번호를 넣어 주세요.' }] : [])
     .concat([{ title: '새 비밀번호', text: '새 숫자 4자리를 넣어 주세요.' }, { title: '한 번 더', text: '새 숫자 4자리를 다시 넣어 주세요.' }]);
