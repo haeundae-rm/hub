@@ -20,18 +20,18 @@
 // 📢 공지 올리기 (2026-11-18-6): 현장 관리 안 — notice.js. 옛 구글 앱 공지목록.csv 대신 허브에서 바로 notices 에 씀 (id 'hub-…')
 // 2단계 ③ (2026-11-13): 📣 고객만족도 VOC — 정비 레포트 voc.js 를 그대로 불러와 허브 전체 화면에서 씀 (같은 voc/{id} 문서). 열려 있는 동안만 voc 구독
 import * as S from '../rm/app/store.js';
-import * as K from '../rm/app/keys.js?v=2026.11.28-30';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
-import { setupNotice } from './notice.js?v=2026.11.28-30';
-import * as PIN from './pin.js?v=2026.11.28-30';
-import { setupClose } from './close.js?v=2026.11.28-30';
-import { setupClosing } from './closing.js?v=2026.11.28-30';
-import { supProgress } from './supcalc.js?v=2026.11.28-30';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
-import * as XW from './xlsxw.js?v=2026.11.28-30';
-import { setupMeal } from './meal.js?v=2026.11.28-30';
-import * as BD from './bday.js?v=2026.11.28-30';   // 🎂 이번 주 생일 (2026-11-22)
+import * as K from '../rm/app/keys.js?v=2026.11.28-31';   // 🔑 플로어키 셈 (정비 레포트와 같은 부품, 2026-11-19)
+import { setupNotice } from './notice.js?v=2026.11.28-31';
+import * as PIN from './pin.js?v=2026.11.28-31';
+import { setupClose } from './close.js?v=2026.11.28-31';
+import { setupClosing } from './closing.js?v=2026.11.28-31';
+import { supProgress } from './supcalc.js?v=2026.11.28-31';   // 더티 % = 정비 지원 앱과 같은 셈 (2026-11-21)
+import * as XW from './xlsxw.js?v=2026.11.28-31';
+import { setupMeal } from './meal.js?v=2026.11.28-31';
+import * as BD from './bday.js?v=2026.11.28-31';   // 🎂 이번 주 생일 (2026-11-22)
 // 🧹 하우스키퍼 카드 (2026-11-21): 첫 화면 '야간 보고서' 칸 → '하우스키퍼' 카드 (야간 업무 보고서 + 📅 연차 현황 · 본인 4자리). hkleave.js 는 누를 때만 불러옴   // 🍚 주간 식단 (2026-11-21): 식단표 사진 → AI 표 → meta/meals · 첫 화면 오늘 식단 · 메이드 오늘 점심
 
-const VER = '2026.11.28-30';
+const VER = '2026.11.28-31';
 const HK_UID = 'nBL2QYezEmRNRmBRMXN6LNPJO2s2';
 const isHk = () => !!(admin && admin.hk);
 const ADMINS = [
@@ -121,12 +121,13 @@ async function load(force) {
   view.busy = true; draw();
   const d = ymd(), tm = ymd(Date.now() + 864e5);
   const hrP = isHk() ? Promise.resolve(null) : hrLoad(d);
-  const [up, rl, srl, cmp, sup, day, recs, errs, auto, rs] = await Promise.all([
+  const [up, rl, srl, cmp, sup, day, recs, errs, auto, rs, srv, scmp] = await Promise.all([
     safe(S.get('uploads/latest')), safe(S.get('meta/relay')), safe(S.get('sup_meta/relay')), safe(S.get('meta/compare')),
     safe(S.get('sup/' + d)), safe(S.get('days/' + d)),
     safe(S.getQuery('days/' + d + '/recs', [])), safe(S.getQuery('errors', [['day', '==', d]])),
     safe(S.getQuery('sup/' + d + '/auto', [])),   // 2026-11-21: 레포트 방 변경 → 더티 자동 배정 알림 (정비 지원 휴대폰이 씀, 규칙 v22)
-    safe(S.get('meta/rsync'))   // 2026-11-21: 📄 정비보고서 연결 상태 (오더테이커 PC 연결 창이 5분마다 남김)
+    safe(S.get('meta/rsync')),   // 2026-11-21: 📄 정비보고서 연결 상태 (오더테이커 PC 연결 창이 5분마다 남김)
+    safe(S.get('meta/rsync_srv')), safe(S.get('meta/rsync_cmp'))   // 11/28: ☁ 서버 연동(jbrSync) 상태 · 그림자 비교
   ]);
   // 오늘 배정 실 수: 그날 정비보고서 저장본(rep_) → 없으면 올림 문서(오늘 것) → 없으면 메이드별 배정(plans)
   let base = await safe(S.get('uploads/rep_' + d));
@@ -154,7 +155,7 @@ async function load(force) {
   }
   const ls = null, [lt, fb, fl] = await Promise.all([safe(S.getQuery('lost', [['date', '==', d]])), safe(S.get('meta/bday_fn')), safe(S.get('meta/lost_fn'))]);   // + 11/25 서버 함수 실행 기록 (문제일 때만 표시)   // 🧳 습득물: 오늘 접수 (11/25: 서버 처리 대기 수는 허브에 안 띄움 — 대장 '처리 대기' 탭에서)
   const bd = isHk() ? null : await BD.load(S, d);   // 🎂 하루 한 번만 연차 명단을 읽음 (소장 · 부소장)
-  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd, ls, lt, hs, fb, fl };
+  view.st = { d, tm, up, rl, srl, cmp, sup, day, recs, errs, base, hr, lvq, ng, kc, ks, auto, rs, bd, ls, lt, hs, fb, fl, srv, scmp };
   view.busy = false; view.at = Date.now(); draw();
 }
 // 더티·정비보조 / 진행 중 활동 — '오늘 정비 → 더티 · 활동' 탭을 열 때만 읽음 (첫 화면에선 안 읽음)
@@ -210,6 +211,7 @@ function statusItems(v) {
     if (by('auto').length) add('ok', '방 변경 자동 배정 ' + by('auto').length + '건', by('auto').map(x => x.maid + ' ' + x.msg).join(' / ').slice(0, 300));
   }
   rsItems(v, now, H).forEach(x => L.push(x));
+  srvItems(v, now).forEach(x => L.push(x));
   // 중계 두 개
   [['정비 레포트 시트 중계', v.rl], ['정비 지원 시트 중계', v.srl]].forEach(([nm, r]) => {
     if (bad(r) || !r.at) { add('bad', nm + ' 기록 없음', r && r.__err ? r.__err : '중계가 한 번도 안 돌았어요'); return; }
@@ -806,6 +808,45 @@ function rsCardHtml() {
       : '<p class="note" style="margin:0 0 10px">' + (r && r.on ? '오늘은 아직 연결 소식이 없어요.' : '아직 연결 안 됨.') + ' 오더테이커 PC(크롬)에서 연결 창을 열고 정비보고서 폴더를 한 번 골라 두면, 엑셀에서 바꾼 방(추가·빠짐·재실·시간)이 메이드 화면과 정비보조 더티에 들어가요.</p>') +
     '<a class="big-btn sec" style="display:block;text-align:center;text-decoration:none;margin-top:10px" href="' + RS_URL + '" target="_blank" rel="noopener">연결 창 열기 (새 탭 · 켜 두기)</a></div>';
 }
+// ☁ 서버 연동 jbrSync (11/28 소장님: 실제 반영 전 비상 장치) — meta/rsync_srv { mode shadow|live|off, runMode, state, at, hold{hash,n,lines}, go } · meta/rsync_cmp(그림자 비교)
+//   ① 보류: 20건 넘게 한꺼번에 → 허브에서 확인 후 [반영] (go = hash) ② 멈춤: 5분 넘게 소식 없음 → 빨강 (실제 반영 중이면 PC 연결 창이 대신 맡음) ③ 모드 단추: 소장만
+const SRV_MODE = { shadow: '비교만 (PC 연결 창이 반영)', live: '실제 반영 (서버)', off: '꺼짐' };
+function srvItems(v, now) {
+  const r = v.srv; if (!r || r.__err || !r.at) return [];
+  const mode = r.mode === 'live' ? 'live' : r.mode === 'off' ? 'off' : 'shadow', gap = Math.round((now - Number(r.at || 0)) / 60000);
+  const it = (lv, title, sub) => ({ lv, title, sub, go: 'work/up' });
+  if (mode === 'off') return [];
+  if (gap > 5) return [it(mode === 'live' ? 'bad' : 'wait', '☁ 서버 연동이 ' + gap + '분째 멈췄어요', mode === 'live' ? 'PC 연결 창이 5분 뒤부터 대신 맡아요 — 오더테이커 PC 창을 켜 두세요' : '비교 기록만 멈춤 — 메이드 휴대폰 반영은 PC 연결 창이 계속 해요')];
+  if (r.state === 'hold' && r.hold) return [it('bad', '☁ 서버 반영 보류 — ' + (r.hold.n || 0) + '건이 한꺼번에 바뀌어요', '정비보고서가 크게 바뀌었어요 · 맞으면 오늘 정비 → 보고서 올리기에서 [반영]')];
+  return [it('ok', '☁ 서버 연동 · ' + SRV_MODE[mode], hm(r.at) + ' 확인' + (r.state ? ' · ' + ({ ok: '이상 없음', wait: '바뀜 기다림', excel: '엑셀 사본인 날', noplan: '휴대폰에 보내기 전' }[r.state] || r.state) : ''))];
+}
+function srvCardHtml() {
+  const v = view.st || {}, r = v.srv && !v.srv.__err ? v.srv : null, c = v.scmp && !v.scmp.__err && v.scmp.day === v.d ? v.scmp : null;
+  const mode = r && r.mode === 'live' ? 'live' : r && r.mode === 'off' ? 'off' : 'shadow', boss = admin && admin.label === '소장';
+  const x = r ? srvItems(v, Date.now())[0] : null;
+  let h = '<div class="card"><h2>☁ 서버 연동 <small>정비보고서 → 메이드 휴대폰 (PC 창 없이)</small></h2>';
+  if (!r) return h + '<p class="note" style="margin:0">서버 소식이 아직 없어요 (배포 전이거나 읽기 권한 없음).</p></div>';
+  h += '<p class="' + (!x ? 'note' : x.lv === 'bad' ? 'err' : x.lv === 'wait' ? 'waitbox' : 'okbox') + '">' + (x ? (x.lv === 'ok' ? '✅ ' : x.lv === 'bad' ? '❗ ' : '⏳ ') + esc(x.title) + '<br><small>' + esc(x.sub) + '</small>' : '지금 모드: ' + esc(SRV_MODE[mode])) + '</p>';
+  if (r.state === 'hold' && r.hold) h += '<div class="waitbox" style="margin:8px 0"><b>보류된 ' + (r.hold.n || 0) + '건</b> <small>(' + hm(r.hold.at) + ')</small><br><small>' + (r.hold.lines || []).slice(0, 12).map(esc).join('<br>') + ((r.hold.lines || []).length > 12 ? '<br>…' : '') + '</small>' +
+    '<div class="btn2" style="margin-top:8px"><button class="big-btn" data-srvgo="' + esc(r.hold.hash) + '">맞아요 — 반영</button><button class="big-btn sec" data-ref="1">↻ 다시 보기</button></div><p class="note" style="margin:6px 0 0">아니면 정비보고서를 먼저 고치세요 (고치면 새로 계산해요).</p></div>';
+  // 그림자 비교 (오늘)
+  if (c) { const miss = (c.list || []).filter(e => e.pc === 'miss').slice(-5);
+    h += '<p class="note" style="margin:8px 0 4px"><b>오늘 비교</b> (서버 계산 ↔ PC 창이 실제로 넣은 것): 같음 <b>' + (c.same || 0) + '</b> · 다름 <b style="color:' + (c.miss ? 'var(--bad)' : 'inherit') + '">' + (c.miss || 0) + '</b> · 확인 중 ' + (c.wait || 0) + (c.pcPend ? ' · PC 대기 ' + c.pcPend : '') + '</p>' +
+      (miss.length ? '<p class="note" style="margin:0 0 8px">다른 것: ' + miss.map(e => hm(e.at) + ' ' + esc((e.pcMissing || []).slice(0, 4).join(', '))).join(' / ') + '</p>' : '');
+  } else h += '<p class="note" style="margin:8px 0">오늘 비교 기록은 아직 없어요 (정비보고서가 바뀌면 쌓여요).</p>';
+  h += '<p class="note" style="margin:8px 0 4px">모드 ' + (boss ? '(소장님만 바꿀 수 있어요)' : '— 소장 로그인에서만 바꿔요') + '</p><div class="seg2" style="margin:0">' +
+    [['shadow', '비교만'], ['live', '실제 반영'], ['off', '끄기']].map(([k, l]) => '<button data-srvmode="' + k + '" aria-pressed="' + (mode === k) + '"' + (boss ? '' : ' disabled') + '>' + l + '</button>').join('') + '</div>' +
+    '<p class="note" style="margin:6px 0 0">실제 반영 중엔 PC 연결 창이 쉬고, 서버가 5분 넘게 멈추면 PC 창이 다시 맡아요. 처음 며칠은 PC 창도 켜 두세요.</p></div>';
+  return h;
+}
+async function srvAct(t) {
+  if (t.hasAttribute('data-srvgo')) { if (!confirm('보류된 변경을 메이드 휴대폰에 반영할까요?')) return;
+    try { await S.merge('meta/rsync_srv', { go: t.getAttribute('data-srvgo'), goBy: (admin && admin.label) || '', goAt: S.SERVER_TIME }); alert('반영하라고 보냈어요 — 1분 안에 서버가 넣어요.'); load(true); } catch (e) { alert('저장 못 했어요: ' + (e && (e.code || e.message) || e)); } return; }
+  const m = t.getAttribute('data-srvmode'); if (!m || !(admin && admin.label === '소장')) return;
+  const msg = { live: '서버가 메이드 휴대폰에 직접 반영해요 (PC 연결 창은 쉼).\n처음 며칠은 PC 창도 켜 두세요.', shadow: '서버는 계산 · 비교만 하고, 반영은 PC 연결 창이 해요.', off: '서버 연동을 꺼요. 반영은 PC 연결 창만 해요.' }[m];
+  if (!confirm('☁ 서버 연동을 「' + SRV_MODE[m] + '」로 바꿀까요?\n\n' + msg)) return;
+  try { await S.merge('meta/rsync_srv', { mode: m, modeBy: admin.label, modeAt: S.SERVER_TIME }); load(true); } catch (e) { alert('저장 못 했어요: ' + (e && (e.code || e.message) || e)); }
+}
 // 첫 화면 '지금 확인할 것': 오늘 한눈에에서 문제·주의만 + 이상 보고 · 연차 승인 대기 · 퇴사일 지남
 function todoItems(v) {
   const L = statusItems(v).filter(x => x.lv !== 'ok').map(x => Object.assign({ go: /휴대폰 오류/.test(x.title) ? 'field' : 'work/now' }, x));
@@ -901,7 +942,7 @@ function secHtml() {
     (sec === 'work' || sec === 'people' ? '<button class="ref" data-ref="1">' + (view.busy || ex.busy ? '읽는 중…' : '↻ 새로 고침') + '</button>' : '') + '</div>';
   if (S0.tabs) h += '<div class="hm-tabs" role="tablist">' + S0.tabs.map(t => '<button role="tab" data-tab="' + t[0] + '" aria-pressed="' + (route.tab === t[0]) + '">' + esc(t[1]) + (t[0] === 'up' && up && !up.sent ? ' •' : '') + '</button>').join('') + '</div>';
   if (sec === 'work') {
-    if (route.tab === 'up') h += upHtml() + rsCardHtml();
+    if (route.tab === 'up') h += upHtml() + rsCardHtml() + srvCardHtml();
     else if (route.tab === 'dirty') h += exHtml();
     else if (route.tab === 'asg') h += assignCardHtml();
     else h += statusHtml() + progHtml() + rmCardHtml();
@@ -975,12 +1016,13 @@ document.addEventListener('click', e => {
       return;
     } }
   if (e.target.closest && e.target.closest('[data-hkleave]')) { import('./hkleave.js?v=' + VER).then(m => m.open()).catch(err => { console.warn(err); alert('연차 현황을 열지 못했어요. 새로 고침 후 다시 해 주세요.'); }); return; }
-  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-sup],[data-actclose],[data-actlogin],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"],a[href="./insp/"]');
+  const t = e.target.closest && e.target.closest('[data-who],[data-login],[data-ref],[data-staff],[data-logout],[data-up],[data-upd],[data-hdist],[data-voc],[data-vclose],[data-act],[data-sup],[data-actclose],[data-actlogin],[data-asg],[data-go],[data-tab],[data-home],[data-rm],[data-rmclose],[data-unlock],[data-pinchg],a[href="./leave/"],a[href="./insp/"],[data-srvgo],[data-srvmode]');
   if (!t || (t.closest && t.closest('#dz'))) return;
   if (t.matches('a[href="./insp/"]') && !PIN.passed('insp')) { e.preventDefault(); PIN.gate('🔍 인스펙션', 'insp').then(ok => { if (ok) location.href = './insp/'; }); return; }   // 11/28 소장님: 인스펙션도 4자리
   if (t.matches('a[href="./leave/"]') && !PIN.passed()) { e.preventDefault(); PIN.gate('룸메이드 연차 · 근무').then(ok => { if (ok) location.href = './leave/'; }); return; }
   if (t.matches('a[href="./leave/"]')) return;
   if (t.hasAttribute('data-unlock')) { PIN.gate('인사').then(ok => { if (ok) draw(); }); return; }
+  if (t.hasAttribute('data-srvgo') || t.hasAttribute('data-srvmode')) { srvAct(t); return; }
   if (t.hasAttribute('data-pinchg')) { PIN.change(t.getAttribute('data-pinchg') === 'insp' ? 'insp' : ''); return; }
   if (t.hasAttribute('data-go') && t.getAttribute('data-go').split('/')[0] === 'people' && !PIN.passed()) { PIN.gate('인사').then(ok => { if (ok) goSec('people', ''); }); return; }
   if (t.hasAttribute('data-rm')) { openRm(t.getAttribute('data-rm')); return; }
