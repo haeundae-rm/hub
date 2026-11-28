@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.28-23';
+const VER = '2026.11.28-24';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -28,8 +28,12 @@ const ym = (d, n) => { const y = +d.slice(0, 4), m = +d.slice(5, 7) - 1 + n; ret
 const hm = t => { if (!t) return ''; const d = seoul(Number(t)); return ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2); };
 
 let BLK = [], REC = [];   // 🚧 meta/blocks list · 📌 meta/recur list (정기 표기 11/28)
-// 📌 정기 표기 (11/28 소장님: 1405 총지배인 객실 매주 화 재실 청소) — { id, room, dows:[0~6 일~토], st:'2'|'4'|'', memo, from, to }
-const recOn = ds => { const w = new Date(ds + 'T00:00:00Z').getUTCDay(), m = {}; REC.forEach(x => { if (x && x.room && (x.dows || []).includes(w) && (!x.from || x.from <= ds) && (!x.to || ds <= x.to)) m[String(x.room)] = x; }); return m; };
+// 🏨 장기 투숙 (11/28 소장님: 1405 총지배인 객실 — 매일 투숙(연박) + 매주 화 재실 청소) — meta/recur { list:[{ id, room, dows:[0~6 일~토 = 재실 청소 요일], memo, from, to, by, at }], hist }
+//   그 기간 매일: 재실 청소 요일이면 2(재실) + 연박, 아니면 연박(정비 없음). 끝 날짜가 비면 계속
+let REC_HIST = [];
+const recOn = ds => { const w = new Date(ds + 'T00:00:00Z').getUTCDay(), m = {}; REC.forEach(x => { if (x && x.room && (!x.from || x.from <= ds) && (!x.to || ds <= x.to)) m[String(x.room)] = Object.assign({}, x, { clean: (x.dows || []).includes(w) }); }); return m; };
+// 그날 그 방이 장기 투숙 규칙과 맞는지: 재실 청소 날 = 2, 아닌 날 = 연박(1 · 3 · 4 · 공실이면 틀림)
+const stayBad = (x, st, yl) => x.clean ? (st !== '2' ? '재실 청소(2)' : '') : ((st === '1' || st === '3' || st === '4' || (!st && !yl)) ? '연박' : '');
 const blockOn = ds => { const m = {}; BLK.forEach(b => { if (b.from <= ds && ds <= b.to) b.rooms.forEach(r => { m[String(r)] = b; }); }); return m; };
 let hks = [], me = '', sv = { pend: 0, fail: 0, lastOk: 0, err: '' }, role = null, login = { who: 0, err: '', busy: false }, unsub = [], docs = [], hb = null, meta = { fromCache: false, pending: 0 }, fill = '';
 
@@ -99,7 +103,7 @@ function watch() {
   const from = ym(TODAY, -1) + '-01';
   unsub.push(S.listenQuery('jbr', [['date', '>=', from]], (list, m) => { docs = list.map(x => x.data); meta.fromCache = !!(m && m.fromCache); push(); }, e => { $('#main').innerHTML = '<p style="padding:20px">자료를 읽지 못했어요: ' + esc(e && e.message || e) + ' (규칙 v32 게시 전이면 이렇게 보여요)</p>'; }));
   unsub.push(S.listenDoc('meta/rsync', x => { hb = x; tag(); }, () => {}));
-  unsub.push(S.listenDoc('meta/recur', x => { REC = ((x && x.list) || []).filter(r => r && r.room); if (window.JBR && window.JBR.redraw) window.JBR.redraw(); }, () => {}));   // 📌 정기 표기 (11/28)
+  unsub.push(S.listenDoc('meta/recur', x => { REC = ((x && x.list) || []).filter(r => r && r.room); REC_HIST = (x && x.hist) || []; if (window.JBR && window.JBR.redraw) window.JBR.redraw(); }, () => {}));   // 📌 정기 표기 (11/28)
   unsub.push(S.listenDoc('meta/blocks', x => { BLK = ((x && x.list) || []).filter(b => b && b.from && b.to && Array.isArray(b.rooms)); if (window.JBR && window.JBR.redraw) window.JBR.redraw(); }, () => {}));   // 🚧 기간 작업 (11/28)
   // 👥 룸메이드 스케줄표 HK 전파 사본 (명단 · 앞으로 출근자 · 유닛) — 규칙 v30: 하우스키퍼 읽기 가능
   // 🏆 시상 (jbr/cfg-YYYY-MM.awards) — 이번 달 · 지난달 · 그 전 달 (이월 가져오기용)
@@ -231,7 +235,7 @@ const SV = {
     const r = {}; base.rooms.forEach(k => { r[k] = ['4', '', '', '', 0, 0]; });
     // 🚧 기간 작업(meta/blocks): 그날 걸린 방에 「시설(작업명)」 메모 (11/28 소장님 「둘 다」)
     const bon = blockOn(ds); Object.keys(bon).forEach(k => { if (r[k]) r[k][2] = '시설(' + String(bon[k].name || '작업').slice(0, 20) + ')'; });
-    const ron = recOn(ds); Object.keys(ron).forEach(k => { const x = ron[k], a = r[k]; if (!a) return; if (x.st) { a[0] = x.st; if (x.st === '2') a[5] = 1; } const mm = '📌 ' + String(x.memo || '정기').slice(0, 30); if (!a[2]) a[2] = mm; else a[3] = mm; });   // 📌 정기 표기
+    const ron = recOn(ds); Object.keys(ron).forEach(k => { const x = ron[k], a = r[k]; if (!a) return; a[0] = x.clean ? '2' : ''; a[5] = 1; const mm = '🏨 ' + String(x.memo || '장기 투숙').slice(0, 30); if (!a[2]) a[2] = mm; else a[3] = mm; });   // 🏨 장기 투숙
     if (pre) Object.keys(pre).forEach(k => { if (r[k]) r[k] = clip(pre[k]); });
     const d = { date: ds, src: 'app', file: '', rooms: base.rooms.slice(), r, xl: {}, cards: [], groups: preG || [], at: S.SERVER_TIME, by: by(), made: S.SERVER_TIME };
     if (ds < LIVE_FROM) Object.assign(d, { r0: r, g0: [], onAt: S.SERVER_TIME, onBy: by() });   // 연습: 「연습 끝내기」 가능
@@ -309,7 +313,8 @@ const PRIOS = {
     PRL[ds] = L.map(p => Object.assign({}, p, { rooms: p.rooms.slice() }));
     track(S.set('meta/prio_' + ds, { date: ds, list: L, at: S.SERVER_TIME, by: by() })); if (window.JBR) window.JBR.redraw(); }
 };
-if (window.JBR) { window.JBR.blocks = () => BLK; window.JBR.recOn = recOn; window.JBR.recur = () => REC; window.JBR.blockOn = blockOn; window.JBR.sv = SV; window.JBR.late = Object.assign(ds => (role ? LATE.map(ds) : null), LATE); window.JBR.prio = Object.assign(ds => { if (!role) return null; prWatch(ds); return PRL[ds]; }, PRIOS); }
+if (window.JBR) { window.JBR.blocks = () => BLK; window.JBR.recOn = recOn; window.JBR.stayBad = stayBad; window.JBR.recur = () => REC;
+window.JBR.saveStay = async (list, what) => { const b = by(); await S.set('meta/recur', { list, hist: REC_HIST.concat([{ at: Date.now(), by: b, what: String(what).slice(0, 120) }]).slice(-50), at: S.SERVER_TIME, by: b }); REC = list; }; window.JBR.blockOn = blockOn; window.JBR.sv = SV; window.JBR.late = Object.assign(ds => (role ? LATE.map(ds) : null), LATE); window.JBR.prio = Object.assign(ds => { if (!role) return null; prWatch(ds); return PRL[ds]; }, PRIOS); }
 window.addEventListener('online', svPaint); window.addEventListener('offline', svPaint);
 window.addEventListener('beforeunload', e => { if (sv.pend) { e.preventDefault(); e.returnValue = ''; } });
 
