@@ -83,7 +83,7 @@ main{padding:10px max(2vw,12px) 40px}
 .c .mm span{font-size:10px;border-radius:3px;padding:0 2px;background:#eef0f3;color:#333;white-space:normal;word-break:break-all;letter-spacing:-.4px;line-height:1.2;max-width:100%;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .c .mm.one span{-webkit-line-clamp:3}   /* 11/28 소장님 (2차): 긴 메모는 아래 줄까지 — 메모 하나면 3줄, 둘이면 2줄씩 · 넘치면 … · 전체는 칸에 마우스 · 오른쪽 편집 칸 */
 .c .mm{flex-wrap:nowrap;flex-direction:column;align-items:flex-start;gap:1px;max-height:38px;overflow:hidden}
-#mpop{position:absolute;z-index:70;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #0003;padding:10px 12px;width:300px;display:flex;flex-direction:column;gap:6px}#mpop b{font-size:15px}#mpop small,#mpop .mph{font-size:12px;color:var(--mute)}#mpop .inp{width:100%;font-size:16px}
+#mpop{position:fixed;z-index:70;max-height:calc(100vh - 16px);overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #0003;padding:10px 12px;width:300px;display:flex;flex-direction:column;gap:6px}#mpop b{font-size:15px}#mpop small,#mpop .mph{font-size:12px;color:var(--mute)}#mpop .inp{width:100%;font-size:16px}
 #mpop .mpc{display:flex;flex-wrap:wrap;gap:4px}#mpop .mpc button{border:1px solid #D6C6F0;background:#F4EEFC;color:#4B2C82;border-radius:8px;padding:4px 10px;font-weight:700}
 #mpop .mpn{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;background:#FFF4E8;border:1px solid #F7C99A;border-radius:8px;padding:6px 8px;cursor:pointer}#mpop .mpn small{color:var(--mute);font-weight:500}
 #mpop .mps{font-size:13px;background:#FFF1DC;border-radius:8px;padding:5px 8px;color:#7A2E0B}#mpop .mps.lt{background:#F1EAFE;color:#4C1D95}#mpop .mpr2{display:flex;gap:6px}#mpop .mpr2 .inp{font-size:14px}#mpop .mpr2 select{width:86px;flex:none}#mpop .mpb .lout{background:#7C3AED;color:#fff;border-color:#7C3AED}
@@ -675,7 +675,10 @@ function drawMpop(btn) {
     '<div class="mpb">' + (curM || (mpop.kind === '우선' && prCur()) || (mpop.kind === '늦은퇴실' && ltCur()) ? '<button data-mpx="del" class="del">' + (mpop.kind === '우선' || mpop.kind === '늦은퇴실' ? '해제' : '지우기') + '</button>' : '') + (mpop.kind === '늦은퇴실' && ltCur() && !ltCur().out ? '<button data-mpx="lout" class="lout">🔔 퇴실했어요</button>' : '') + '<button data-mpx="esc">닫기</button><button data-mpx="ok" class="ok">저장</button></div>';
   document.body.appendChild(o);
   const r = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 100, bottom: 100 };
-  o.style.left = Math.max(8, Math.min(window.innerWidth - o.offsetWidth - 8, r.left)) + 'px'; o.style.top = (r.bottom + 6 + window.scrollY) + 'px';
+  // 11/28 소장님: 화면 맨 위로 올리면 머리가 길어져 창 아래가 잘리고, 아래로 굴려도 창은 그대로 → 화면에 고정(fixed) + 아래가 모자라면 단추 위로 · 그래도 모자라면 화면 안으로 당김 · 창이 화면보다 길면 안에서 굴림
+  o.style.left = Math.max(8, Math.min(window.innerWidth - o.offsetWidth - 8, r.left)) + 'px';
+  const H = o.offsetHeight, below = r.bottom + 6, above = r.top - 6 - H;
+  o.style.top = (below + H <= window.innerHeight - 8 ? below : above >= 8 ? above : Math.max(8, window.innerHeight - H - 8)) + 'px';
   const i = document.getElementById('mpin'); if (i) { i.focus(); i.select(); mpCheck(); } else o.querySelector('[data-mpx="ok"]').focus();
 }
 function mpCheck() {   // 룸체 호실: 있는 방인지 · 그 방 지금 상태
@@ -1436,7 +1439,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-14'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-15'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1484,6 +1487,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-14"></script>
+<script type="module" src="jbr.js?v=2026.11.28-15"></script>
 </body>
 </html>
