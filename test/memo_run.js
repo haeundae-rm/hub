@@ -132,9 +132,14 @@ const asp = p => p.innerText('#asp');
   console.log('⑥ 긴 메모 = 한 줄 … · 칸 높이 고르게');
   await cell('407').click(); await p.fill('#fmemo', '고객이 오후 세시 이후에 짐을 빼신다고 하셨으니 꼭 확인 후 들어가 주세요'); await p.press('#fmemo', 'Enter'); await sleep(300);
   const hs = await p.$$eval('.c[data-i]', els => els.filter(e => /^\s*40[1-9]/.test(e.querySelector('.no').textContent)).map(e => e.getBoundingClientRect().height));
-  const sp = await cell('407').locator('.mm span').evaluate(e => ({ sw: e.scrollWidth, cw: e.clientWidth, ws: getComputedStyle(e).whiteSpace }));
-  ok(sp.ws === 'nowrap' && sp.sw > sp.cw, '긴 메모는 한 줄 · … (잘림)');
-  ok(Math.max(...hs) - Math.min(...hs) < 1, '4층 칸 높이 모두 같음 (' + [...new Set(hs.map(Math.round))].join(',') + 'px)');
+  await p.setViewportSize({ width: 1366, height: 768 }); await sleep(300);   // 노트북 화면
+  const fit = async r => cell(r).locator('.mm span').first().evaluate(e => ({ h: e.scrollHeight <= e.clientHeight + 1 && e.scrollWidth <= e.clientWidth + 1, lines: Math.round(e.clientHeight / parseFloat(getComputedStyle(e).lineHeight)) }));
+  const f404 = await fit('404'), f407 = await cell('407').locator('.mm span').evaluate(e => ({ cut: e.scrollHeight > e.clientHeight + 1, lines: Math.round(e.clientHeight / parseFloat(getComputedStyle(e).lineHeight)) }));
+  { await cell('401').evaluate(e => e.scrollIntoView({ block: 'center' })); await sleep(200); const bx = await cell('401').boundingBox(); await p.screenshot({ path: '/tmp/memo_wrap.png', clip: { x: 0, y: Math.max(0, bx.y - 80), width: 1366, height: 170 } }); }
+  ok(f404.h, '「악취탈취완료」 다 보임 (' + f404.lines + '줄)');
+  ok(f407.cut && f407.lines === 3, '아주 긴 메모 = 3줄까지 쓰고 … (' + f407.lines + '줄)');
+  const hs2 = await p.$$eval('.c[data-i]', els => els.filter(e => /^\s*40[1-9]/.test(e.querySelector('.no').textContent)).map(e => e.getBoundingClientRect().height));
+  ok(Math.max(...hs2) - Math.min(...hs2) < 1, '같은 층 칸 높이 모두 같음 (' + [...new Set(hs2.map(Math.round))].join(',') + 'px)');
   ok(/고객이 오후 세시 이후에/.test(await cell('407').getAttribute('title')), '마우스를 올리면 전체 글');
   await p.screenshot({ path: '/tmp/memo_1.png', clip: { x: 0, y: 0, width: 1500, height: 700 } });
   await cell('401').scrollIntoViewIfNeeded(); await p.locator('.g').screenshot({ path: '/tmp/memo_3.png', clip: undefined }).catch(() => {}); { const bx = await cell('401').boundingBox(); await p.screenshot({ path: '/tmp/memo_3.png', clip: { x: 0, y: bx.y - 60, width: 1500, height: 140 } }); }
