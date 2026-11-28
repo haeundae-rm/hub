@@ -1550,7 +1550,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-28'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-29'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1598,6 +1598,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-28"></script>
+<script type="module" src="jbr.js?v=2026.11.28-29"></script>
 </body>
 </html>

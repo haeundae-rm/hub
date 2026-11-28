@@ -2,7 +2,7 @@
 // 정비 지원 객실 활동판(dirty) 도면 고르기와 같은 손놀림: 칸 누르기 · 네모로 끌어 한꺼번에(⊕ 넣기 / ⊖ 빼기) · 층 번호 · 위 호수 번호로 한 줄씩
 // 고른 결과는 자동 배정의 🚧 장기 미정비 블럭(meta/blocks)과 같은 모양 { name, rooms, from, to, prio } — 저장은 app.js 가 함
 // openBlockPick({ name, rooms, from, to, prio, base }) → Promise<null | { name, rooms, from, to, prio }>
-import { FLOORS, parseMsg } from '../blocks.js?v=2026.11.28-19';
+import { FLOORS, parseMsg } from '../blocks.js?v=2026.11.28-29';
 
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const md = d => d ? Number(d.slice(5, 7)) + '/' + Number(d.slice(8)) : '';

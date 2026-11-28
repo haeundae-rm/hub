@@ -17,7 +17,7 @@ const ymdOf = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.g
 // 날짜: '8일', '11/16', '11월 16일', '16~30일' — 달이 없으면 기준 날짜 달 (이틀 넘게 지난 날이면 다음 달)
 function toDate(m, d, base) {
   const [by, bm, bd] = base.split('-').map(Number);
-  if (m) { let y = by; if (m < bm - 6) y++; return y + '-' + pad(m) + '-' + pad(d); }
+  if (m) { let y = by; if (m < bm - 6) y++; else if (m > bm + 6) y--; return y + '-' + pad(m) + '-' + pad(d); }   // 11/28: 1월에 받은 「12/30」 = 작년
   let y = by, mm = bm; if (d < bd - 2) { mm++; if (mm > 12) { mm = 1; y++; } }
   return y + '-' + pad(mm) + '-' + pad(d);
 }
