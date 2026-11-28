@@ -85,6 +85,14 @@ label.f>span{display:block;margin:0 0 3px}
 .ck2{display:flex;align-items:center;gap:8px;font-weight:800}.ck2 input{width:22px;height:22px}
 .sec2{font-size:14px;font-weight:900;margin:4px 0 0}
 
+/* 11/28 달 단추 · 달력 */
+.mons{display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:2px}.mons button{flex:none;min-height:38px;padding:0 14px;border-radius:99px;border:1.5px solid var(--line);background:#fff;font-weight:800;cursor:pointer;white-space:nowrap}
+.mons button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}.mons button[data-today]{border-color:var(--brand);color:var(--brand)}
+.datebar button.d{min-height:44px;border:0;background:none;cursor:pointer;padding:0}.datebar .cv{font-size:12px;color:var(--muted);font-weight:700}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}.cal b{text-align:center;font-size:12px;color:var(--muted)}
+.cal button{position:relative;min-height:42px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;cursor:pointer}.cal button:disabled{opacity:.35;cursor:default}
+.cal button.on{background:var(--brand);border-color:var(--brand);color:#fff}.cal button i{position:absolute;right:3px;top:2px;font-style:normal;font-size:10px;font-weight:900;color:var(--brand)}.cal button.on i{color:#fff}
+.tools .big{display:flex;align-items:center;justify-content:center;white-space:nowrap;font-size:15px;padding:0 6px;cursor:pointer}
 /* 11/26 휴대폰 잘림 정리 — PC 그대로 */
 @media (max-width:760px){
  .tabs button{white-space:nowrap;padding:0 6px;font-size:14px;min-width:0}
@@ -95,6 +103,6 @@ label.f>span{display:block;margin:0 0 3px}
 <header class="top"><a class="back" href="../" aria-label="허브로">‹</a><h1>🧳 습득물 관리대장<small id="who"></small></h1></header>
 <main id="main"><div class="card"><p class="note" style="margin:0">여는 중…</p></div></main>
 <div id="sheet"></div>
-<script type="module" src="./lost.js?v=2026.11.22-2"></script>
+<script type="module" src="./lost.js?v=2026.11.28-1"></script>
 </body>
 </html>
