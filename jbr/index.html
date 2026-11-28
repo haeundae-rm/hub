@@ -122,6 +122,8 @@ main{padding:10px max(2vw,12px) 40px}
 .eb1,.eb2{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 .eb2{flex-wrap:nowrap}.eb2>.btns{flex:none;flex-wrap:nowrap}.eb2 #fmemo{flex:1 1 160px;min-width:120px;max-width:none}   /* 11/28 소장님 (테트리스): 메모 줄 = 메모 단추 · 🟠🟣 · 메모 칸 한 줄 */
 .eb2 .btns.pl button{font-weight:800}.eb2 .btns.pl b{font-family:Inter,sans-serif;margin-left:2px}
+.eb1{flex-wrap:nowrap}.eb1>.btns,.eb1>.plate{flex:none;flex-wrap:nowrap}.eb1 .namebox{flex:1 1 220px;min-width:140px;max-width:320px}   /* 11/28 15:41 소장님 (테트리스 2): 단추가 늘어도 첫 줄 한 줄 — 이름 칸이 줄어듦 */
+@media (max-width:1235px){.eb1{flex-wrap:wrap}}
 @media (max-width:1180px){.eb2{flex-wrap:wrap}.eb2 #fmemo{flex-basis:100%}}
 #mpop .mpl{border:0;background:none;color:var(--mute);text-decoration:underline;font-size:12.5px;text-align:left;padding:0;cursor:pointer}
 .ebar .btns{gap:4px}.ebar .btns button{min-height:34px;padding:3px 9px}
@@ -1538,7 +1540,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-24'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-25'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1586,6 +1588,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-24"></script>
+<script type="module" src="jbr.js?v=2026.11.28-25"></script>
 </body>
 </html>
