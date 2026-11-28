@@ -29,6 +29,7 @@ h1{font-size:19px;margin:0;font-weight:900;letter-spacing:-.3px}
 .days button{flex:1 0 auto;border:0;background:#ffffff14;color:#cfd8e6;border-radius:8px;padding:3px 6px;min-height:30px;min-width:34px}
 .days button.on{background:#fff;color:var(--navy);font-weight:800}
 .days button.today{box-shadow:inset 0 0 0 2px var(--org)}.days button.fut{opacity:.45}.tabs button.asgo{background:#2C8A55;color:#fff;font-weight:800;margin-right:6px}.tabs button.asgo:hover{background:#34A065}
+.c.bk:not(.done){box-shadow:inset 0 0 0 2px #F2B36B}.days button.pre{box-shadow:inset 0 -2px 0 #9FC3EE}
 .rstb{display:inline-block;background:#fff;color:#7A2E0B;border:1.5px solid #F08A24;font-weight:900;border-radius:8px;padding:3px 10px;margin-right:8px;cursor:pointer}.rstb:hover{background:#FFF1DC}
 .takeb{display:inline-block;background:#F08A24;color:#1B1206;font-weight:900;border-radius:8px;padding:4px 12px;margin-right:8px;cursor:pointer}.takeb:hover{background:#FF9F3F}
 .sndb{display:flex;align-items:center;gap:12px;justify-content:space-between;border-radius:10px;padding:10px 14px;margin:8px 0;font-size:14px}.sndb span{display:flex;flex-direction:column;gap:2px}.sndb small{font-size:12.5px;opacity:.85}
@@ -388,7 +389,7 @@ const SMELLS = ['담배', '생선', '음식', '하수구', '향수', '화장품�
 const memoKind = m => { m = String(m || ''); return MEMOS.includes(m) ? m : /^룸체(→|\s|$)/.test(m) ? '룸체' : /^악취/.test(m) ? '악취' : /^시설/.test(m) ? '시설' : /^우선(\s|$)/.test(m) ? '우선' : ''; };   // 버튼으로 넣은 메모 (자세히 붙은 것 포함)
 const isBtnMemo = m => !!memoKind(m);
 let mpop = null;   // { kind, idx:[] }
-const MCOL = { 재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
+const MCOL = { '🚧': '#FFE2B8',  재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
 const GCOL = ['#E53935', '#1E88E5', '#43A047', '#8E24AA', '#F4511E', '#00897B', '#6D4C41', '#3949AB', '#C0CA33', '#D81B60'];
 const TODAY = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 let waterOpen = false;
@@ -511,9 +512,9 @@ function gIndex(d) { const m = {}; d.groups.forEach((g, k) => g.rooms.forEach(r 
 function drawHead() {
   const m = monOf(day), ds = Object.keys(P.days).filter(x => monOf(x) === m);
   $('#mons').innerHTML = Object.keys(P.months).map(k => '<button data-mon="' + k + '" class="mon' + (k === m ? ' on' : '') + '">' + (+k.slice(5)) + '월</button>').join('');
-  $('#days').innerHTML = ds.map(x => '<button data-d="' + x + '" class="' + (x === day ? 'on ' : '') + (x === TODAY ? 'today ' : '') + (x > TODAY ? 'fut' : '') + '">' + (+x.slice(8)) + '일</button>').join('');
+  $('#days').innerHTML = ds.map(x => '<button data-d="' + x + '" class="' + (x === day ? 'on ' : '') + (x === TODAY ? 'today ' : '') + (P.days[x] && P.days[x].virtual ? 'fut' : x > TODAY ? 'pre' : '') + '"' + (P.days[x] && P.days[x].virtual ? ' title="아직 초안 전 — 눌러서 미리 표기"' : '') + '>' + (+x.slice(8)) + '일</button>').join('');
   { const sv = window.JBR && window.JBR.sv, t1 = new Date(Date.parse(TODAY + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10);   // 🌙 초안 만들기 (11/27)
-    if (sv && sv.newOk) [TODAY, t1].filter(x => monOf(x) === m || !P.days[x]).filter(x => sv.newOk(x)).forEach(x => { $('#days').innerHTML += '<button data-jnew="' + x + '" class="jnewb" title="' + (+x.slice(5, 7)) + '/' + (+x.slice(8)) + ' 초안 만들기 — 전 객실 4(퇴실 예정)로 시작' + (P.days[x] ? ' (엑셀 사본 대신)' : '') + '">🌙 ' + (+x.slice(5, 7)) + '/' + (+x.slice(8)) + ' 초안</button>'; }); }
+    if (sv && sv.newOk) [TODAY, t1].filter(x => monOf(x) === m || !P.days[x] || P.days[x].virtual).filter(x => sv.newOk(x)).forEach(x => { $('#days').innerHTML += '<button data-jnew="' + x + '" class="jnewb" title="' + (+x.slice(5, 7)) + '/' + (+x.slice(8)) + ' 초안 만들기 — 전 객실 4(퇴실 예정)로 시작' + (P.days[x] && !P.days[x].virtual ? ' (엑셀 사본 대신)' : '') + '">🌙 ' + (+x.slice(5, 7)) + '/' + (+x.slice(8)) + ' 초안</button>'; }); }
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
   
 }
@@ -533,6 +534,7 @@ function hmOf(v) { const n = v && v.toMillis ? v.toMillis() : v && v.seconds ? v
 function svBar() {
   const sv = window.JBR && window.JBR.sv; if (!sv) return '';
   const lb = 'style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0"';
+  if (P.days[day] && P.days[day].virtual) return '<div class="check svb"><b style="color:#1E5FA8">🗓 아직 초안 전인 날</b> — 엑셀 빈 시트처럼 전 객실 4로 보여요. 방을 골라 시설 · 우선정비 · 메모 등을 표기하면 <b>그 순간 이 날 초안이 만들어지고</b> 저장돼요 (🚧 기간 작업은 저절로 시설 메모)</div>';
   if (live(day)) return '<div class="check svb" style="flex-wrap:wrap">' + (sv.canReset && sv.canReset(day) ? '<button class="rstb" data-jreset="1" title="전 객실 4(퇴실 예정)로 다시 — 지금 표시한 연박 · 공실 · 재실 · 메모가 지워져요">↺ 초안 처음으로</button>' : '') + '<label class="takeb" title="야간에 엑셀로 짠 날 → 그 날 시트 그대로 앱 정비보고서로 (이후 앱에서 고침)">📥 이 날 엑셀 → 앱 원본<input type="file" id="takeFile" accept=".xlsx" hidden></label><label class="takeb" style="background:#fff;border:1.5px solid #B23A48;color:#B23A48" title="실수로 되돌린 날: 엑셀 파일 + 오늘 고친 기록을 순서대로 다시 적용">🛟 복구<input type="file" id="restFile" accept=".xlsx" hidden></label> <b class="good">💾 저장 켜짐</b> — 고치는 즉시 저장소에 (방 하나씩) · <span id="svst">' + sv.status() + '</span> · <button data-jlog="1" ' + lb + '>📜 변경 기록</button>' +
     (sv.canOff(day) ? ' · <button data-joff="1" ' + lb + '>연습 끝내기 (켜기 전 엑셀 자료로)</button>' : '') + (sv.canBack && sv.canBack(day) ? ' · <button data-jback="1" ' + lb + ' style="border:0;background:none;color:#B23A48;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">⚠ 비상: 엑셀로 돌아가기</button>' : '') + '</div>';
   if (sv.canOn(day)) return '<div class="check svb"><span>이 날은 보기 · 연습만</span> · <button data-jon="1" ' + lb + '>💾 이 날짜로 실제 저장 연습 켜기</button> <small>(11/28 전 지난 날짜만)</small></div>';
@@ -567,6 +569,7 @@ function drawGrid() {
   if (focus) { const k = d.cards.find(x => x.n === focus); if (k) { const ho = handOf(k), u = c.per[k.n] || 0, fl = [...new Set(d.rooms.map((x, i) => x && x.nm && people(P.rooms[i], x).includes(k.n) ? Math.floor(+P.rooms[i] / 100) : 0).filter(Boolean))].sort((a, b) => b - a);
     h += '<div class="ctip"><b>' + esc(k.n) + '</b> · ' + (ho == null ? '인계 —' : '인계 ' + ho) + ' → 배정 <b>' + u + '</b>' + (ho != null && Math.abs(u - ho) > 1e-9 ? ' <b class="' + (u > ho ? 'up' : 'dn') + '">(' + (u > ho ? '+' : '−') + Math.round(Math.abs(u - ho) * 10) / 10 + ')</b>' : '') + (fl.length ? ' · ' + fl.join('·') + 'F' : '') + '</div>'; } }
   // 격자
+  const bkOn = (window.JBR && window.JBR.blockOn) ? window.JBR.blockOn(day) : {};   // 🚧 그날 기간 작업 방
   let g = '<div class="g">';
   for (let f = 31; f >= 4; f--) {
     g += '<div class="fl">' + f + 'F</div>';
@@ -583,7 +586,9 @@ function drawGrid() {
       if (typoOf(room, x).length) cls.push('typo');
       if (!x.done && ((pr[room] && pr[room].top) || x.m1 === '우선' || x.m2 === '우선' || /우선/.test(x.m1 + x.m2))) cls.push('pr');   // 우선정비 지정 · '우선' 메모 = 같은 주황 빛
       if (!x.done && lateOf(room) && !lateOf(room).out) cls.push('lt');   // 🟣 늦은 퇴실 (11/27)
-      const dk = downKind(x), memos = dk ? [dk + ' · ' + x.m1].concat(x.m2 ? [x.m2.replace(/^미정비( · )?/, '')].filter(Boolean) : []) : [x.m1, x.m2].filter(Boolean);
+      const bk = bkOn[room], dk = downKind(x), memos0 = dk ? [dk + ' · ' + x.m1].concat(x.m2 ? [x.m2.replace(/^미정비( · )?/, '')].filter(Boolean) : []) : [x.m1, x.m2].filter(Boolean);
+      const memos = bk && !memos0.some(m => m.includes(bk.name || '시설')) ? memos0.concat(['🚧 ' + (bk.name || '기간 작업') + ' ~' + (+bk.to.slice(5, 7)) + '/' + (+bk.to.slice(8))]) : memos0;   // 🚧 기간 작업 표시 (메모가 없을 때만 — 초안을 만들면 「시설(작업명)」 메모가 들어감)
+      if (bk) cls.push('bk');
       g += '<div class="' + cls.join(' ') + '" data-i="' + i + '"' + jdStyle + (memos.length ? ' title="' + esc(room + ' ' + memos.join(' / ')) + '"' : '') + '>' + (room in gi ? '<div class="gb" style="background:' + GCOL[gi[room] % 10] + '"></div>' : '') + 
         '<div class="no">' + room + (x.done ? '<b class="dn">✓</b>' : '') + '</div><div class="nm">' + esc(nmShort(room, x)) + '</div>' +
         (memos.length ? '<div class="mm' + (memos.length === 1 ? ' one' : '') + '">' + memos.map(m => '<span style="background:' + (MCOL[Object.keys(MCOL).find(k => m.includes(k))] || '#eef0f3') + '">' + esc(m) + '</span>').join('') + '</div>' : '') +
@@ -609,7 +614,7 @@ function barHtml(d) {
     [['', '공실', '']].map(b => '<button class="' + b[2] + '" data-st=""' + dis + '>' + b[1] + '</button>').join('') + '</span>';
   h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 이름 · 초성 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
   h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
-  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button></span></div>';   // 11/28 소장님: 우선정비 · 늦은퇴실은 아래 줄 단추 하나씩 (목록도 그 단추로)
+  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-blocks="1" title="며칠 걸리는 시설 작업 — 카톡 메시지 붙여 넣기 · 도면에서 고르기 · 기간 (그 기간 초안에 시설 메모 · 자동 배정에서 빠짐)">🚧 기간 작업 ' + ((window.JBR && window.JBR.blocks) ? window.JBR.blocks().filter(b => b.to >= TODAY).length : 0) + '</button></span></div>';   // 11/28 소장님: 우선정비 · 늦은퇴실은 아래 줄 단추 하나씩 (목록도 그 단추로)
   { const r1 = one ? P.rooms[[...sel][0]] : '', onPr = !!(one && (memoKind(one.m1) === '우선' || memoKind(one.m2) === '우선' || prioList().some(q => q.rooms.includes(r1)))), onLt = !!(one && lateOf(r1));
     h += '<div class="eb2"><span class="btns">' + MEMOS.filter(m => m !== '우선').map(m => '<button data-memo="' + m + '"' + (one && (memoKind(one.m1) === m || memoKind(one.m2) === m) ? ' class="on"' : '') + dis + '>' + m + '</button>').join('') +
       '</span><span class="btns pl"><button data-memo="우선" class="mpr' + (onPr || drawer === 'prio' ? ' on' : '') + '" title="방을 고르고 누르면 지정 · 해제 / 방을 안 고르고 누르면 목록">🟠 우선정비 <b class="num">' + prioList().reduce((a, q) => a + q.rooms.length, 0) + '</b></button><button data-memo="늦은퇴실" class="mlt' + (onLt || drawer === 'late' ? ' on' : '') + '" title="방을 고르고 누르면 지정 · 퇴실 · 해제 / 방을 안 고르고 누르면 목록">🟣 늦은퇴실 <b class="num">' + Object.values(lateMap()).filter(l => !l.out).length + '</b></button></span>'; }
@@ -814,12 +819,20 @@ function saveRooms(ds, idxs, bef) {
   idxs.forEach((i, k) => { const a = packX(d.rooms[i]), b = packX(JSON.parse(bef[k] || 'null')); if (JSON.stringify(a) !== JSON.stringify(b)) ch[P.rooms[i]] = { b, a }; });
   if (Object.keys(ch).length) window.JBR.sv.rooms(ds, ch);
 }
-function saveGroups(d) { if (live(day)) window.JBR.sv.groups(day, d.groups); else d.edited = true; }
+function saveGroups(d) { if (P.days[day] && P.days[day].virtual) virtCreate(day); else if (live(day)) window.JBR.sv.groups(day, d.groups); else d.edited = true; }
+// 🗓 앞날 미리 표기 (11/28): 아직 초안이 없는 날에 처음 표기하는 순간 → 그날 초안(전 객실 4 + 🚧 기간 작업 메모)을 만들고 지금 고친 방 · 단체를 함께 저장
+function virtCreate(ds) {
+  const d = dayData(ds), pre = {};
+  d.rooms.forEach((x, i) => { if (!x) return; const a = [x.st || '', x.nm || '', x.m1 || '', x.m2 || '', x.done ? 1 : 0, x.yl ? 1 : 0]; if (a.join('|') !== '4||||0|0') pre[P.rooms[i]] = a; });
+  const g = (d.groups || []).map(x => ({ name: x.name || '', time: x.time || '', rooms: (x.rooms || []).join(',') }));
+  P.days[ds].virtual = false; d.edited = false;
+  if (window.JBR && window.JBR.sv && window.JBR.sv.newDay) window.JBR.sv.newDay(ds, pre, g); else toast('로그인 전이라 저장할 수 없어요');
+}
 function pushUndo(idxs) { const d = R(); undo.push({ ds: day, v: idxs.map(i => [i, JSON.stringify(d.rooms[i])]) }); if (undo.length > 200) undo.shift(); }
 function apply(idxs, fn) {
   if (!idxs.length) return; const t0 = performance.now(), d = R(); pushUndo(idxs); const bef = undo[undo.length - 1].v.map(v => v[1]);
   idxs.forEach(i => { d.rooms[i] = d.rooms[i] || { st: '', nm: '', m1: '', m2: '', done: false, yl: false }; fn(d.rooms[i], i); });
-  if (live(day)) saveRooms(day, idxs, bef); else d.edited = true;
+  if (P.days[day] && P.days[day].virtual) virtCreate(day); else if (live(day)) saveRooms(day, idxs, bef); else d.edited = true;
   draw(); requestAnimationFrame(() => { lat = performance.now() - t0; const l = document.querySelector('.lat'); if (l) l.textContent = '반영 ' + lat.toFixed(1) + 'ms'; });
 }
 // 상태 바꾸기 (한 곳)
@@ -970,7 +983,7 @@ function phoneHtml(name) {
 
 // ---------- 결산
 function drawClose(only) {
-  const m = (only && only.m) || monOf(day), M = P.months[m], X = M.xl, ds = Object.keys(P.days).filter(x => monOf(x) === m), C = ds.map(x => calc(x)), names = M.roster;
+  const m = (only && only.m) || monOf(day), M = P.months[m], X = M.xl, ds = Object.keys(P.days).filter(x => monOf(x) === m && !P.days[x].virtual), C = ds.map(x => calc(x)), names = M.roster;
   let dBad = 0, dN = 0; ds.forEach((x, k) => { const xl = P.days[x].xl || {}, c = C[k]; if (!c.asg || xl['정비수'] == null) return; dN++; if ([[c.fam, '정비수'], [c.roy, '로얄'], [c.ppl, '인원'], [c.mij, '미정비'], [c.jae, '재실'], [c.gan * 0.5, '간단']].some(([v, q]) => Math.abs(v - (+xl[q] || 0)) > 1e-9)) dBad++; });
   const N = ds.length, eq = (a, b) => { const A = (a === '' || a == null) ? 0 : +a, B = (b === '' || b == null || typeof b === 'string') ? 0 : +b; return typeof b === 'string' && b.startsWith('#') ? (a === '' || a == null) : Math.abs(A - B) < 1e-6; };
   let bad = 0, cells = 0, trd = 0; const td = (v, x, cls, trU) => { cells++; let ok = x === undefined || eq(v, x), tr = false;
@@ -1148,6 +1161,7 @@ document.addEventListener('click', e => {
   if (t.dataset.water) { waterOpen = !waterOpen; draw(); return; }
   if (t.dataset.asgo) { asgOpen(t.dataset.asgo); return; }
   if (t.dataset.asgx) { asgClose(); return; }
+  if (t.dataset.blocks) { asgOpen('blocks'); return; }
   if (t.dataset.jreset) { const nm = R().rooms.filter(x => x && x.nm).length;
     if (!confirm((+day.slice(5, 7)) + '/' + (+day.slice(8)) + ' 초안을 처음으로 되돌릴까요?\n\n· 전 객실 4(퇴실 예정)로 다시 깔려요\n· 지금 표시한 연박 · 공실 · 재실 · 메모 · 단체가 모두 지워져요' + (nm ? '\n· ⚠ 이름이 들어간 방 ' + nm + '실도 지워져요' : '') + '\n· 변경 기록에는 남아요')) return;
     window.JBR.sv.newDay(day); sel.clear(); cur = -1; return; }
@@ -1439,7 +1453,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-15'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-16'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1461,7 +1475,7 @@ async function xlOut(kind, btn, which) {
 function asgOpen(kind) {
   let o = document.getElementById('asgx'); if (o) o.remove();
   o = document.createElement('div'); o.id = 'asgx';
-  o.innerHTML = '<div class="bar"><b>' + (kind === 'send' ? '📱 메이드 휴대폰 보내기 — 「반영 완료」가 뜨면 닫으세요' : kind === 'notes' ? '📝 배정 의견 · 답' : '🧩 자동 배정 — 출근자 불러오기 · 차이 정리 · 자동 배정 · 확정') + '</b>' + (kind === 'notes' || kind === 'send' ? '' : '<button data-asgo="notes">📝 배정 의견</button>') + '<button class="x" data-asgx="1">✕ 닫고 정비보고서로</button></div><iframe src="../?embed=' + kind + (kind === 'send' ? '&d=' + day : '') + '" title="자동 배정"></iframe>';
+  o.innerHTML = '<div class="bar"><b>' + (kind === 'send' ? '📱 메이드 휴대폰 보내기 — 「반영 완료」가 뜨면 닫으세요' : kind === 'blocks' ? '🚧 기간 작업 — 메시지 붙여 넣기 · 도면에서 고르기 · 기간 (그 기간 초안에 시설 메모 · 자동 배정에서 빠짐)' : kind === 'notes' ? '📝 배정 의견 · 답' : '🧩 자동 배정 — 출근자 불러오기 · 차이 정리 · 자동 배정 · 확정') + '</b>' + (kind === 'notes' || kind === 'send' || kind === 'blocks' ? '' : '<button data-asgo="notes">📝 배정 의견</button>') + '<button class="x" data-asgx="1">✕ 닫고 정비보고서로</button></div><iframe src="../?embed=' + kind + (kind === 'send' ? '&d=' + day : '') + '" title="자동 배정"></iframe>';
   document.body.appendChild(o);
 }
 function asgClose() {
@@ -1487,6 +1501,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-15"></script>
+<script type="module" src="jbr.js?v=2026.11.28-16"></script>
 </body>
 </html>
