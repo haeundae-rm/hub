@@ -77,7 +77,7 @@ export async function openAssign(hub, o) {
   if (o && o.view === 'blocks') { A.view = 'blocks'; A.back = 'close'; }
   const [cfgDoc, staff, teams, bdoc, rdoc] = await Promise.all([S.get('meta/assign').catch(() => null), S.getQuery('staff', [['job', '==', '룸메이드']]).catch(() => []), S.get('meta/teams').catch(() => null), S.get('meta/blocks').catch(() => null), S.get('meta/recur').catch(() => null)]);
   if (!A) return;
-  A.recur = (rdoc && rdoc.list) || []; A.recHist = (rdoc && rdoc.hist) || []; A.rc = { f: null, ok: '', err: '' };   // 📌 정기 표기 (11/28)
+  A.recur = (rdoc && rdoc.list) || [];   // 🏨 장기 투숙 (11/28)
   A.blocks = (bdoc && bdoc.list) || []; A.bk = { draft: null, sel: new Set(), day: A.date, open: {}, msg: '' }; bmapUpd();
   // 2인 1조 (부부) — 정비 레포트 관리자 '2인 1조' 카드에 저장한 짝 (없으면 기본 두 조)
   A.teams = ((teams && teams.pairs) || DEF_TEAMS).map(p => String(p).split(',').map(s => s.trim())).filter(p => p.length === 2 && p[0] && p[1]);
@@ -301,12 +301,14 @@ function draftCounts() {
   return { yl: R.filter(x => yl(x) && !String(x.st || '').trim()).length - re, gong: R.filter(x => !yl(x) && !String(x.st || '').trim()).length, re, jae: R.filter(x => String(x.st).trim() === '2').length,
     tgt: R.filter(live).length, ppl: Object.keys(H0).length, units: Object.values(H0).reduce((a, b) => a + b, 0) };
 }
-// 📌 확인 창: 그날 정기 표기 방이 제 상태인지 (재실이 빠지면 빨갛게)
+// 🏨 확인 창: 그날 장기 투숙 방이 제 상태인지 (재실 청소 날 = 2, 아닌 날 = 연박) — 틀리면 빨갛게
 function recAsk() {
   const esc = H.esc, on = recOn(A.recur, A.date), ks = Object.keys(on); if (!ks.length) return '';
-  const info = roomInfo(), bad = [], good = [];
-  ks.forEach(k => { const x = on[k], y = info[k] || {}; const st = String(y.st || '').trim(); if (x.st && st !== x.st) bad.push(k + ' ' + (x.memo || '') + ' (지금 ' + (st === '1' ? '퇴실' : st === '2' ? '재실' : st === '3' ? '이월' : st === '4' ? '퇴실 예정' : '공실·연박') + ')'); else good.push(k + ' ' + (x.memo || '') + (x.st === '2' ? '(재실)' : '')); });
-  return (good.length ? '<p class="okbox" style="margin:0 0 8px">📌 정기 ' + good.length + '실 — ' + esc(good.join(', ')) + ' ✓</p>' : '') + (bad.length ? '<p class="err" style="margin:0 0 8px">📌 정기 표기 방이 빠져 있어요: ' + esc(bad.join(', ')) + ' — 정비보고서에서 상태를 고쳐 주세요</p>' : '');
+  const info = roomInfo(), bad = [], good = [], nm = st => st === '1' ? '퇴실' : st === '2' ? '재실' : st === '3' ? '이월' : st === '4' ? '퇴실 예정' : '공실';
+  ks.forEach(k => { const x = on[k], y = info[k] || {}, st = String(y.st || '').trim(), yl = !!y.yl;
+    const want = x.clean ? (st !== '2' ? '재실 청소(2)' : '') : ((st === '1' || st === '3' || st === '4' || (!st && !yl)) ? '연박' : '');
+    if (want) bad.push(k + ' ' + (x.memo || '') + ' → ' + want + ' (지금 ' + (yl && !st ? '연박' : nm(st)) + ')'); else good.push(k + ' ' + (x.memo || '') + (x.clean ? '(재실 청소)' : '(연박)')); });
+  return (good.length ? '<p class="okbox" style="margin:0 0 8px">🏨 장기 투숙 ' + good.length + '실 — ' + esc(good.join(', ')) + ' ✓</p>' : '') + (bad.length ? '<p class="err" style="margin:0 0 8px">🏨 장기 투숙 방이 맞지 않아요: ' + esc(bad.join(', ')) + ' — 정비보고서 위 빨간 줄의 「바로 맞추기」를 누르세요</p>' : '');
 }
 function askHtml() {
   const esc = H.esc, c = draftCounts();
@@ -662,7 +664,6 @@ function blocksHtml() {
   let h = '';
   if (B.ok) h += '<p class="okbox">' + esc(B.ok) + '</p>';
   if (B.err) h += '<p class="err">' + esc(B.err) + '</p>';
-  h += recHtml();
   // 1 메시지
   h += '<div class="card"><h2>📋 메시지로 넣기 <small>카톡·텔레그램 그대로</small></h2>' +
     '<textarea id="bkmsg" rows="6" style="width:100%;box-sizing:border-box;border:1.5px solid var(--line);border-radius:10px;padding:8px;font:15px inherit" placeholder="예)\n타일교체(10실)\n403, 517, 1003 …\n매지하자(4실)\n709, 1009 …\n8일자 미정비 남겨주세요.">' + esc(B.msg || '') + '</textarea>' +
@@ -710,51 +711,9 @@ function blocksHtml() {
   if (A.back !== 'close') h += '<button class="big-btn sec" data-as="bkback">← 자동 배정으로</button>';
   return h;
 }
-// ---------- 📌 정기 표기 (11/28 소장님: 1405 총지배인 객실 매주 화 재실 청소 — 한 줄 규칙, 바뀌면 호실만 · 끝나면 끝 날짜)
-//   meta/recur { list: [{ id, room, dows:[0~6], st:'2'|'4'|'', memo, from, to, by, at }], hist: [{ at, by, what }] } — 초안을 만들 때 정비보고서(jbr.js newDay)가 적용
-const DOW = ['일', '월', '화', '수', '목', '금', '토'];
-export function recOn(list, ds) { const w = new Date(ds + 'T00:00:00Z').getUTCDay(), m = {}; (list || []).forEach(x => { if (x && x.room && (x.dows || []).includes(w) && (!x.from || x.from <= ds) && (!x.to || ds <= x.to)) m[String(x.room)] = x; }); return m; }
-const recTxt = x => x.room + ' · 매주 ' + (x.dows || []).map(d => DOW[d]).join('·') + ' · ' + (x.st === '2' ? '재실 청소' : x.st === '4' ? '퇴실 예정' : '메모만') + ' · 「' + (x.memo || '') + '」 · ' + (x.from ? md2(x.from) : '') + ' ~ ' + (x.to ? md2(x.to) : '끝 없음');
-function recHtml() {
-  const esc = H.esc, R = A.rc, today = H.ymd(), L = A.recur.slice().sort((a, b) => String(a.room).localeCompare(String(b.room)));
-  let h = '<div class="card"><h2>📌 정기 표기 <small>매주 같은 요일 · 같은 방</small></h2>';
-  if (R.ok) h += '<p class="okbox">' + esc(R.ok) + '</p>'; if (R.err) h += '<p class="err">' + esc(R.err) + '</p>';
-  h += L.length ? '<div class="asg-list">' + L.map(x => { const end = x.to && x.to < today;
-    return '<div class="asg-m" style="cursor:default' + (end ? ';opacity:.5' : '') + '"><span class="n"><b>📌 ' + esc(recTxt(x)) + '</b>' + (end ? ' <small>(끝남)</small>' : '') + '</span><span class="f"><button class="asg-chip" data-as="rcedit" data-v="' + esc(x.id) + '">고치기</button> <button class="asg-chip bad" data-as="rcdel" data-v="' + esc(x.id) + '">지우기</button></span></div>'; }).join('') + '</div>' : '<p class="note">없어요. 예: 1405 · 매주 화 · 재실 청소 · 「총지배인 객실」</p>';
-  const f = R.f;
-  if (!f) h += '<button class="big-btn sec" style="margin-top:8px" data-as="rcnew">+ 정기 표기 넣기</button>';
-  else h += '<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px"><label class="asg-prev" style="margin-top:0"><span>호실</span><input data-rc="room" inputmode="numeric" maxlength="4" value="' + esc(f.room) + '" placeholder="1405"></label>' +
-    '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0"><span style="font-weight:700;font-size:14px;width:90px">요일</span>' + DOW.map((n, i) => '<button class="asg-chip' + (f.dows.includes(i) ? ' on' : '') + '" data-as="rcdow" data-v="' + i + '">' + n + '</button>').join('') + '</div>' +
-    '<div class="seg2" style="margin:0 0 8px">' + [['2', '재실 청소 (2)'], ['4', '퇴실 예정 (4)'], ['', '메모만']].map(([v, l]) => '<button data-as="rcst" data-v="' + v + '" aria-pressed="' + (f.st === v) + '">' + l + '</button>').join('') + '</div>' +
-    '<label class="asg-prev" style="margin-top:0"><span>메모</span><input data-rc="memo" maxlength="30" value="' + esc(f.memo) + '" placeholder="총지배인 객실"></label>' +
-    '<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap"><span style="font-weight:700;font-size:14px;width:90px">기간</span><input type="date" data-rc="from" value="' + esc(f.from) + '" style="min-height:40px"> ~ <input type="date" data-rc="to" value="' + esc(f.to) + '" style="min-height:40px"><small class="note" style="margin:0">끝 날짜를 비우면 계속 · 임기가 끝나면 끝 날짜만 넣으세요</small></div>' +
-    '<div class="btn2" style="margin-top:10px"><button class="big-btn sec" data-as="rcx">취소</button><button class="big-btn" data-as="rcsave">저장</button></div></div>';
-  h += '<p class="note" style="margin-top:8px">그 요일 초안을 만들 때 정비보고서에 저절로 들어가요 (재실 청소 = 2 + 연박, 메모 「📌 …」). 앞날 미리 보기 · 자동 배정 확인 창에도 보이고, 재실이 빠지면 빨갛게 알려요. 고치면 기록이 남아요.</p></div>';
-  return h;
-}
-function rcRead() { const f = A.rc.f; if (!f) return; document.querySelectorAll('#asp [data-rc]').forEach(el => { f[el.getAttribute('data-rc')] = el.value.trim(); }); }
-async function rcSave(list, what) {
-  const by = (H.admin() && H.admin().label) || '';
-  try { await H.S.set('meta/recur', { list, hist: (A.recHist || []).concat([{ at: Date.now(), by, what: String(what).slice(0, 120) }]).slice(-50), at: H.S.SERVER_TIME, by }); A.recur = list; A.recHist = (A.recHist || []).concat([{ at: Date.now(), by, what }]); A.rc.ok = what; A.rc.err = ''; A.rc.f = null; }
-  catch (e) { A.rc.err = '저장하지 못했어요: ' + (e && (e.code || e.message) || e); }
-  draw();
-}
-function rcClick(a, v) {
-  const R = A.rc; rcRead(); R.ok = ''; R.err = '';
-  if (a === 'rcnew') { R.f = { id: '', room: '', dows: [], st: '2', memo: '', from: H.ymd(), to: '' }; draw(); return; }
-  if (a === 'rcx') { R.f = null; draw(); return; }
-  if (a === 'rcdow') { const i = +v, f = R.f; f.dows = f.dows.includes(i) ? f.dows.filter(x => x !== i) : f.dows.concat([i]).sort(); draw(); return; }
-  if (a === 'rcst') { R.f.st = v; draw(); return; }
-  if (a === 'rcedit') { const x = A.recur.find(y => y.id === v); if (x) R.f = Object.assign({ from: '', to: '' }, x, { dows: (x.dows || []).slice() }); draw(); return; }
-  if (a === 'rcdel') { const x = A.recur.find(y => y.id === v); if (!x || !confirm('📌 ' + recTxt(x) + '\n\n이 정기 표기를 지울까요? (이미 만든 초안의 메모는 그대로예요 — 끝난 거면 「고치기」에서 끝 날짜를 넣는 게 기록에 좋아요)')) return; rcSave(A.recur.filter(y => y.id !== v), '지움: ' + recTxt(x)); return; }
-  if (a === 'rcsave') { const f = R.f;
-    if (!/^\d{3,4}$/.test(f.room) || !FLOORS[Math.floor(+f.room / 100)] || !FLOORS[Math.floor(+f.room / 100)].includes(+f.room % 100)) { R.err = '없는 호실이에요'; draw(); return; }
-    if (!f.dows.length) { R.err = '요일을 하나 이상 골라 주세요'; draw(); return; }
-    if (f.to && f.from && f.to < f.from) { R.err = '끝 날짜가 시작보다 빨라요'; draw(); return; }
-    const x = { id: f.id || newId(), room: f.room, dows: f.dows, st: f.st, memo: f.memo || '정기', from: f.from || '', to: f.to || '', by: (H.admin() && H.admin().label) || '', at: Date.now() };
-    const was = A.recur.find(y => y.id === x.id), list = was ? A.recur.map(y => (y.id === x.id ? x : y)) : A.recur.concat([x]);
-    rcSave(list, (was ? '고침: ' + recTxt(was) + ' → ' : '넣음: ') + recTxt(x)); return; }
-}
+// ---------- 🏨 장기 투숙 (11/28 소장님 — 정비보고서 표 위 「🏨 장기 투숙」 단추에서 넣음, 여기선 확인 창 점검만)
+//   meta/recur { list: [{ id, room, dows:[재실 청소 요일 0~6], memo, from, to }] } — 기간 매일 연박, 고른 요일은 재실(2)
+export function recOn(list, ds) { const w = new Date(ds + 'T00:00:00Z').getUTCDay(), m = {}; (list || []).forEach(x => { if (x && x.room && (!x.from || x.from <= ds) && (!x.to || ds <= x.to)) m[String(x.room)] = Object.assign({}, x, { clean: (x.dows || []).includes(w) }); }); return m; }
 // PC 마우스로 끌어서 고르기 (휴대폰은 탭)
 let bkDrag = null;
 document.addEventListener('pointerdown', e => { if (!A || A.view !== 'blocks' || e.pointerType !== 'mouse') return; const c = e.target.closest && e.target.closest('#bkmap [data-as="bkcell"]'); if (!c) return;
@@ -769,7 +728,7 @@ document.addEventListener('pointerup', () => { if (!bkDrag || !A) return; const 
 function draw() {
   const box = document.getElementById('asp'); if (!box || !A) return;
   const esc = H.esc, y = box.scrollTop;
-  let h = '<div class="vp-in"><div class="vp-head"><h2>🧩 자동 배정 <small style="font-size:13px;color:var(--muted);font-weight:600">' + (A.view === 'cfg' ? '담당표·정량' : A.view === 'blocks' ? '🚧 기간 작업 · 📌 정기' : '시험 · 대조') + '</small></h2><button class="vp-x" data-as="' + (A.view === 'cfg' ? 'cfx' : 'close') + '" aria-label="닫기">✕</button></div>';
+  let h = '<div class="vp-in"><div class="vp-head"><h2>🧩 자동 배정 <small style="font-size:13px;color:var(--muted);font-weight:600">' + (A.view === 'cfg' ? '담당표·정량' : A.view === 'blocks' ? '🚧 기간 작업' : '시험 · 대조') + '</small></h2><button class="vp-x" data-as="' + (A.view === 'cfg' ? 'cfx' : 'close') + '" aria-label="닫기">✕</button></div>';
   if (A.view === 'cfg') { box.innerHTML = h + cfgHtml() + '</div>'; box.scrollTop = y; return; }
   if (A.view === 'carry') { box.innerHTML = h + carryHtml() + '</div>'; box.scrollTop = y; return; }
   if (A.view === 'carry2') { box.innerHTML = h + carry2Html() + '</div>'; box.scrollTop = y; return; }
@@ -956,7 +915,6 @@ document.addEventListener('click', e => {
     if (a === 'c2done') A.view = '';
     A.res = null; A.cmp = null; draw(); return; }
   if (a === 'blocks') { A.view = 'blocks'; A.back = ''; A.bk.ok = ''; A.bk.day = A.date; draw(); const bx = document.getElementById('asp'); if (bx) bx.scrollTop = 0; return; }
-  if (a && a.startsWith('rc')) { rcClick(a, v); return; }
   if (a && a.startsWith('bk')) { bkClick(a, v, t); return; }
   if (a === 'carry') { carryOpen(); return; }
   if (a === 'cqclear') { Object.keys(A.cq).forEach(t => { A.cq[t] = 0; }); A.carry = new Set(); A.cshort = []; A.res = null; A.cmp = null; draw(); return; }

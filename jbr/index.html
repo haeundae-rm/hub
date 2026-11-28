@@ -85,6 +85,7 @@ main{padding:10px max(2vw,12px) 40px}
 .c .mm span.loud{letter-spacing:-.5px}
 .c .mm.one span{-webkit-line-clamp:3}   /* 11/28 소장님 (2차): 긴 메모는 아래 줄까지 — 메모 하나면 3줄, 둘이면 2줄씩 · 넘치면 … · 전체는 칸에 마우스 · 오른쪽 편집 칸 */
 .c .mm{flex-wrap:nowrap;flex-direction:column;align-items:flex-start;gap:1px;max-height:38px;overflow:hidden}
+#spop{position:fixed;z-index:72;left:50%;top:50%;transform:translate(-50%,-50%);max-height:calc(100vh - 24px);overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #0003;padding:12px 14px;width:min(360px,94vw);display:flex;flex-direction:column;gap:8px}#spop b{font-size:15px}#spop small{font-size:12px;color:var(--mute)}#spop .sl{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700}#spop .inp{font-size:16px}#spop .srow{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:13px;border-bottom:1px solid var(--line);padding:4px 0}#spop .srow.end{opacity:.5}#spop .mpc{display:flex;flex-wrap:wrap;gap:4px}#spop .mpc button{border:1px solid #BCD7F2;background:#EEF5FD;color:#1C4E80;border-radius:8px;padding:5px 12px;font-weight:700;min-width:38px}#spop .mpc button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 #mpop{position:fixed;z-index:70;max-height:calc(100vh - 16px);overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #0003;padding:10px 12px;width:300px;display:flex;flex-direction:column;gap:6px}#mpop b{font-size:15px}#mpop small,#mpop .mph{font-size:12px;color:var(--mute)}#mpop .inp{width:100%;font-size:16px}
 #mpop .mpc{display:flex;flex-wrap:wrap;gap:4px}#mpop .mpc button{border:1px solid #D6C6F0;background:#F4EEFC;color:#4B2C82;border-radius:8px;padding:4px 10px;font-weight:700}
 #mpop .mpn{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;background:#FFF4E8;border:1px solid #F7C99A;border-radius:8px;padding:6px 8px;cursor:pointer}#mpop .mpn small{color:var(--mute);font-weight:500}
@@ -392,7 +393,7 @@ const SMELLS = ['담배', '생선', '음식', '하수구', '향수', '화장품�
 const memoKind = m => { m = String(m || ''); return MEMOS.includes(m) ? m : /^룸체(→|\s|$)/.test(m) ? '룸체' : /^악취/.test(m) ? '악취' : /^시설/.test(m) ? '시설' : /^우선(\s|$)/.test(m) ? '우선' : ''; };   // 버튼으로 넣은 메모 (자세히 붙은 것 포함)
 const isBtnMemo = m => !!memoKind(m);
 let mpop = null;   // { kind, idx:[] }
-const MCOL = { '🚧': '#FFE2B8', '📌': '#D7E8FF',  재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
+const MCOL = { '🚧': '#FFE2B8', '🏨': '#D7E8FF',  재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
 // 🎨 계속 챙길 메모 (11/28 소장님): 르씨엘 = 💧 + 연파랑 · 악취 = 처음 연보라, 글자는 기존 그대로. 둘 다 완료여도 흐려지지 않음 (.loud)
 //   악취해제 · 악취탈취완료는 예전 연한 색 (흐려짐도 그대로)
 const LOUD = [   // 11/28 15:02 소장님 확정: 연한 색 + 검정 글씨 (15:08 두 단계 진하게: 르씨엘 #8CB6E5 + 💧 · 악취 #BA9CE4), 완료여도 안 흐려짐
@@ -571,10 +572,10 @@ function drawGrid() {
     (okN === 6 ? '<span class="good">엑셀 계산값과 같음 ' + okN + '/6</span> (금일 정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단)' : '<span class="warn">엑셀과 다른 칸 ' + (6 - okN) + '개</span> ' + same.filter(s => !s[3]).map(s => s[0] + ' 앱 ' + s[1] + ' / 엑셀 ' + s[2]).join(', '))) + '</div>';
   h += svBar();
   h += sendBar();
-  { const rc = (window.JBR && window.JBR.recOn) ? window.JBR.recOn(day) : {}, bad = []; if (!(P.days[day] && P.days[day].virtual)) Object.keys(rc).forEach(k => { const i = P.rooms.indexOf(k), x = d.rooms[i] || {}, want = rc[k].st;
+  { const rc = (window.JBR && window.JBR.recOn) ? window.JBR.recOn(day) : {}, bad = []; if (!(P.days[day] && P.days[day].virtual)) Object.keys(rc).forEach(k => { const i = P.rooms.indexOf(k), x = d.rooms[i] || {}, want = window.JBR.stayBad(rc[k], x.st || '', !!x.yl);
       const stTxt = x.st === '1' ? '퇴실' : x.st === '2' ? '재실' : x.st === '3' ? '이월' : x.st === '4' ? '퇴실 예정' : x.yl ? '연박' : '공실';
-      if (want && x.st !== want) bad.push(k + ' ' + (rc[k].memo || '정기') + ' — ' + (want === '2' ? '재실(2)' : want === '4' ? '퇴실 예정(4)' : want) + '이어야 하는데 지금 ' + stTxt); });
-    if (bad.length) h += '<div class="check" style="background:#FDEDEF;border:2px solid #B23A48;border-radius:10px;padding:8px 12px;color:#8A1C2B;font-weight:800">📌 정기 표기 확인: ' + bad.map(esc).join(' · ') + '</div>'; }
+      if (want) bad.push(k + ' ' + (rc[k].memo || '장기 투숙') + ' — ' + want + '이어야 하는데 지금 ' + stTxt); });
+    if (bad.length) h += '<div class="check" style="background:#FDEDEF;border:2px solid #B23A48;border-radius:10px;padding:8px 12px;color:#8A1C2B;font-weight:800">🏨 장기 투숙 확인: ' + bad.map(esc).join(' · ') + ' <button data-stayfix="1" style="margin-left:6px">바로 맞추기</button></div>'; }
   // 인계 대비 (11/28 하우스맨 · 소장님 추천안): 같으면 아무것도 · 다르면 +1(빨강) / −1(파랑) 배지 · 누르면 말풍선 · 끝에 요약 칩(누르면 차이만)
   const dif = d.cards.map(k => { const st = /휴/.test(k.u) ? 'off' : k.u === '퇴사' ? 'quit' : ''; const ho = handOf(k); return st || ho == null ? null : Math.round(((c.per[k.n] || 0) - ho) * 10) / 10; });
   const nUp = dif.filter(x => x > 0).length, nDn = dif.filter(x => x < 0).length;
@@ -607,7 +608,7 @@ function drawGrid() {
       const bk = bkOn[room], dk = downKind(x), memos0 = dk ? [dk + ' · ' + x.m1].concat(x.m2 ? [x.m2.replace(/^미정비( · )?/, '')].filter(Boolean) : []) : [x.m1, x.m2].filter(Boolean);
       const rc = rcOn[room];
       let memos = bk && !memos0.some(m => m.includes(bk.name || '시설')) ? memos0.concat(['🚧 ' + (bk.name || '기간 작업') + ' ~' + (+bk.to.slice(5, 7)) + '/' + (+bk.to.slice(8))]) : memos0;
-      if (rc && !memos.some(m => /^📌/.test(m))) memos = memos.concat(['📌 ' + (rc.memo || '정기')]);   // 앞날(흐린 날) · 메모가 지워진 날도 보이게
+      if (rc && !memos.some(m => /^🏨/.test(m))) memos = memos.concat(['🏨 ' + (rc.memo || '장기 투숙') + (rc.clean ? ' · 재실' : '')]);   // 앞날(흐린 날) · 메모가 지워진 날도 보이게
       if (rc) cls.push('rc');   // 🚧 기간 작업 표시 (메모가 없을 때만 — 초안을 만들면 「시설(작업명)」 메모가 들어감)
       if (bk) cls.push('bk');
       g += '<div class="' + cls.join(' ') + '" data-i="' + i + '"' + jdStyle + (memos.length ? ' title="' + esc(room + ' ' + memos.join(' / ')) + '"' : '') + '>' + (room in gi ? '<div class="gb" style="background:' + GCOL[gi[room] % 10] + '"></div>' : '') + 
@@ -635,7 +636,7 @@ function barHtml(d) {
     [['', '공실', '']].map(b => '<button class="' + b[2] + '" data-st=""' + dis + '>' + b[1] + '</button>').join('') + '</span>';
   h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 이름 · 초성 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
   h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
-  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-blocks="1" title="며칠 걸리는 시설 작업 — 카톡 메시지 붙여 넣기 · 도면에서 고르기 · 기간 (그 기간 초안에 시설 메모 · 자동 배정에서 빠짐)">🚧 기간 작업 ' + ((window.JBR && window.JBR.blocks) ? window.JBR.blocks().filter(b => b.to >= TODAY).length : 0) + '</button></span></div>';   // 11/28 소장님: 우선정비 · 늦은퇴실은 아래 줄 단추 하나씩 (목록도 그 단추로)
+  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-blocks="1" title="며칠 걸리는 시설 작업 — 카톡 메시지 붙여 넣기 · 도면에서 고르기 · 기간 (그 기간 초안에 시설 메모 · 자동 배정에서 빠짐)">🚧 기간 작업 ' + ((window.JBR && window.JBR.blocks) ? window.JBR.blocks().filter(b => b.to >= TODAY).length : 0) + '</button><button data-stay="1" title="방을 고르고 누르면 장기 투숙 지정 · 고치기 / 방을 안 고르고 누르면 목록 (매일 연박 + 정한 요일 재실 청소)">🏨 장기 투숙 ' + Object.keys((window.JBR && window.JBR.recOn) ? window.JBR.recOn(day) : {}).length + '</button></span></div>';   // 11/28 소장님: 우선정비 · 늦은퇴실은 아래 줄 단추 하나씩 (목록도 그 단추로) · 🏨 장기 투숙
   { const r1 = one ? P.rooms[[...sel][0]] : '', onPr = !!(one && (memoKind(one.m1) === '우선' || memoKind(one.m2) === '우선' || prioList().some(q => q.rooms.includes(r1)))), onLt = !!(one && lateOf(r1));
     h += '<div class="eb2"><span class="btns">' + MEMOS.filter(m => m !== '우선').map(m => '<button data-memo="' + m + '"' + (one && (memoKind(one.m1) === m || memoKind(one.m2) === m) ? ' class="on"' : '') + dis + '>' + m + '</button>').join('') +
       '</span><span class="btns pl"><button data-memo="우선" class="mpr' + (onPr || drawer === 'prio' ? ' on' : '') + '" title="방을 고르고 누르면 지정 · 해제 / 방을 안 고르고 누르면 목록">🟠 우선정비 <b class="num">' + prioList().reduce((a, q) => a + q.rooms.length, 0) + '</b></button><button data-memo="늦은퇴실" class="mlt' + (onLt || drawer === 'late' ? ' on' : '') + '" title="방을 고르고 누르면 지정 · 퇴실 · 해제 / 방을 안 고르고 누르면 목록">🟣 늦은퇴실 <b class="num">' + Object.values(lateMap()).filter(l => !l.out).length + '</b></button></span>'; }
@@ -649,6 +650,66 @@ function barHtml(d) {
 //   켜기 = 연박 + 퇴실 · 퇴실 예정 · 이월 숫자 지움 (재실 2 는 연박 재실이라 그대로) / 끄기 = 연박 풀고 숫자가 없으면 4(퇴실 예정)로. 여러 방 = 하나라도 아니면 모두 켜기
 function ylToggle(idx) { const d = R(), on = !idx.every(i => d.rooms[i] && d.rooms[i].yl);
   apply(idx, x => { if (on) { x.yl = true; if (['1', '3', '4'].includes(x.st)) x.st = ''; } else { x.yl = false; if (!x.st) x.st = '4'; } }); }
+// ---------- 🏨 장기 투숙 (11/28 소장님: 표 위 단추로 — 1405 총지배인 객실처럼 계속 투숙 + 매주 화 재실 청소)
+//   방을 고르고 누르면 그 방(들) 지정 · 고치기, 안 고르고 누르면 목록. 저장하면 오늘부터 이미 만든 날(저장 켜진 날)도 바로 맞춤
+const DOWK = ['일', '월', '화', '수', '목', '금', '토'];
+let stay = null;   // { mode:'list'|'edit', rooms:[], id, dows:[], memo, from, to, err }
+const stayList = () => ((window.JBR && window.JBR.recur) ? window.JBR.recur() : []).slice().sort((a, b) => String(a.room).localeCompare(String(b.room)));
+const stayTxt = x => x.room + ' · ' + (x.memo || '장기 투숙') + ' · ' + ((x.dows || []).length ? '매주 ' + x.dows.map(d => DOWK[d]).join('·') + ' 재실 청소' : '연박만') + ' · ' + (x.from ? (+x.from.slice(5, 7)) + '/' + (+x.from.slice(8)) : '') + '~' + (x.to ? (+x.to.slice(5, 7)) + '/' + (+x.to.slice(8)) : '계속');
+function stayOpen() {
+  const rs = [...sel].map(i => P.rooms[i]).filter(Boolean);
+  if (!rs.length) { stay = { mode: 'list' }; return stayDraw(); }
+  const ex = rs.length === 1 ? stayList().find(x => String(x.room) === rs[0] && (!x.to || x.to >= TODAY)) : null;
+  stay = ex ? { mode: 'edit', rooms: rs, id: ex.id, dows: (ex.dows || []).slice(), memo: ex.memo || '', from: ex.from || TODAY, to: ex.to || '' } : { mode: 'edit', rooms: rs, id: '', dows: [], memo: '', from: day < TODAY ? TODAY : day, to: '' };
+  stayDraw();
+}
+function stayClose() { stay = null; const o = $('#spop'); if (o) o.remove(); }
+function stayDraw() {
+  let o = $('#spop'); if (!o) { o = document.createElement('div'); o.id = 'spop'; document.body.appendChild(o); }
+  const S = stay, L = stayList();
+  if (S.mode === 'list') {
+    o.innerHTML = '<b>🏨 장기 투숙</b><small>방을 고르고 이 단추를 누르면 지정 · 고치기</small>' +
+      (L.length ? L.map(x => { const end = x.to && x.to < TODAY; return '<div class="srow' + (end ? ' end' : '') + '"><span>🏨 ' + esc(stayTxt(x)) + (end ? ' <i>(끝남)</i>' : '') + '</span><button data-sed="' + esc(x.id) + '">고치기</button></div>'; }).join('') : '<p class="hint">없어요 — 격자에서 방(예: 1405)을 고르고 「🏨 장기 투숙」을 누르세요</p>') +
+      '<div class="btns"><button data-sx="1">닫기</button></div>';
+    return;
+  }
+  o.innerHTML = '<b>🏨 장기 투숙 — ' + esc(S.rooms.join(', ')) + '</b>' + (S.err ? '<small style="color:var(--bad);font-weight:800">' + esc(S.err) + '</small>' : '') +
+    '<label class="sl">메모<input class="inp" id="smemo" maxlength="30" placeholder="예: 총지배인 객실" value="' + esc(S.memo) + '"></label>' +
+    '<div class="sl">재실 청소 요일 <small>(안 고르면 연박만)</small><div class="mpc">' + DOWK.map((n, i) => '<button data-sdow="' + i + '"' + (S.dows.includes(i) ? ' class="on"' : '') + '>' + n + '</button>').join('') + '</div></div>' +
+    '<div class="sl">기간<div style="display:flex;gap:6px;align-items:center"><input type="date" class="inp" id="sfrom" value="' + esc(S.from) + '"> ~ <input type="date" class="inp" id="sto" value="' + esc(S.to) + '"></div><small>끝 날짜를 비우면 계속</small></div>' +
+    '<small>매일 연박(정비 없음) · 고른 요일은 재실 청소(2). 초안을 만들 때 저절로 들어가고, 이미 만든 오늘 · 앞날도 바로 맞춰요</small>' +
+    '<div class="btns"><button data-sx="1">닫기</button>' + (S.id ? '<button data-sout="1">퇴실 처리 (오늘 끝)</button>' : '') + '<button class="pri" data-ssave="1">저장</button></div>';
+}
+function stayRead() { const S = stay; if (!S || S.mode !== 'edit') return; S.memo = ($('#smemo').value || '').trim(); S.from = $('#sfrom').value || ''; S.to = $('#sto').value || ''; }
+// 이미 만든 날(오늘부터 · 저장 켜진 날)의 장기 투숙 방을 규칙대로 맞춤 — 상태 · 연박 · 🏨 메모만 (정비자 · 완료는 그대로)
+function stayApply(dss) {
+  let n = 0; dss.forEach(ds => { if (!P.days[ds] || P.days[ds].virtual || !live(ds)) return; const on = window.JBR.recOn(ds), d = dayData(ds), idx = [], bef = [];
+    Object.keys(on).forEach(k => { const i = P.rooms.indexOf(k), x = d.rooms[i]; if (i < 0 || !x) return; const want = window.JBR.stayBad(on[k], x.st || '', !!x.yl), mm = '🏨 ' + (on[k].memo || '장기 투숙'), hasM = /^🏨/.test(x.m1 || '') || /^🏨/.test(x.m2 || '');
+      if (!want && hasM) return; idx.push(i); bef.push(JSON.stringify(x));
+      if (want) { x.st = on[k].clean ? '2' : ''; x.yl = true; }
+      if (!hasM) { if (!x.m1) x.m1 = mm; else if (!x.m2) x.m2 = mm; } n++; });
+    if (idx.length) { d.edited = true; saveRooms(ds, idx, bef); } });
+  draw(); return n;
+}
+document.addEventListener('click', async e => { const o = $('#spop'); if (!o || !stay) return; const b = e.target.closest('#spop button'); if (!b) { if (!e.target.closest('#spop') && !e.target.closest('[data-stay]')) stayClose(); return; }
+  stayRead(); const S = stay;
+  if (b.dataset.sx) return stayClose();
+  if (b.dataset.sed) { const x = stayList().find(y => y.id === b.dataset.sed); if (x) stay = { mode: 'edit', rooms: [String(x.room)], id: x.id, dows: (x.dows || []).slice(), memo: x.memo || '', from: x.from || '', to: x.to || '' }; return stayDraw(); }
+  if (b.dataset.sdow) { const i = +b.dataset.sdow; S.dows = S.dows.includes(i) ? S.dows.filter(v => v !== i) : S.dows.concat([i]).sort(); return stayDraw(); }
+  if (b.dataset.sout) S.to = TODAY;
+  if (b.dataset.ssave || b.dataset.sout) {
+    if (S.to && S.from && S.to < S.from) { S.err = '끝 날짜가 시작보다 빨라요'; return stayDraw(); }
+    const L = stayList(), was = S.id ? L.find(y => y.id === S.id) : null, now = Date.now(); let list = L.slice(), what = [];
+    S.rooms.forEach((rm, k) => { const id = k === 0 && S.id ? S.id : 's' + now.toString(36) + k + Math.random().toString(36).slice(2, 5);
+      const x = { id, room: rm, dows: S.dows.slice(), memo: S.memo || '장기 투숙', from: S.from || TODAY, to: S.to || '', at: now };
+      const old = list.find(y => y.id === id); list = old ? list.map(y => (y.id === id ? x : y)) : list.filter(y => !(String(y.room) === rm && (!y.to || y.to >= x.from))).concat([x]);
+      what.push((old ? '고침: ' + stayTxt(old) + ' → ' : '넣음: ') + stayTxt(x)); });
+    try { await window.JBR.saveStay(list, what.join(' / ')); }
+    catch (err) { S.err = '저장하지 못했어요: ' + (err && (err.code || err.message) || err); return stayDraw(); }
+    stayClose(); const n = stayApply(Object.keys(P.days).filter(ds => ds >= TODAY));
+    toast('🏨 ' + (b.dataset.sout ? S.rooms.join(', ') + ' 장기 투숙을 오늘로 끝냈어요' : '장기 투숙 저장 — ' + S.rooms.join(', ')) + (n ? ' · 이미 만든 날 ' + n + '곳 맞춤' : ''));
+  }
+});
 const canPrio = x => !!x && !x.yl && (x.st === '1' || x.st === '4' || x.st === '3');
 // 🟣 늦은 퇴실 (11/27 소장님 "우선정비처럼"): 손님이 아직 계신 방 + 예상 시각 → 보라 빛 · 메이드 휴대폰에도 보라.
 //   프런트 연락 → 「퇴실」 누르면 그 방이 1(퇴실)로 바뀌고 담당 메이드 휴대폰이 울림 (meta/late_{날} — 메이드 휴대폰이 읽음, 규칙 그대로)
@@ -1183,6 +1244,8 @@ document.addEventListener('click', e => {
   if (t.dataset.asgo) { asgOpen(t.dataset.asgo); return; }
   if (t.dataset.asgx) { asgClose(); return; }
   if (t.dataset.blocks) { asgOpen('blocks'); return; }
+  if (t.dataset.stay) { stayOpen(); return; }
+  if (t.dataset.stayfix) { stayApply([day]); return; }
   if (t.dataset.jreset) { const nm = R().rooms.filter(x => x && x.nm).length;
     if (!confirm((+day.slice(5, 7)) + '/' + (+day.slice(8)) + ' 초안을 처음으로 되돌릴까요?\n\n· 전 객실 4(퇴실 예정)로 다시 깔려요\n· 지금 표시한 연박 · 공실 · 재실 · 메모 · 단체가 모두 지워져요' + (nm ? '\n· ⚠ 이름이 들어간 방 ' + nm + '실도 지워져요' : '') + '\n· 변경 기록에는 남아요')) return;
     window.JBR.sv.newDay(day); sel.clear(); cur = -1; return; }
@@ -1224,6 +1287,7 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('input', e => { if (e.target.id === 'cmd') { cmdVal = e.target.value; const sg = $('#sug'); if (sg) sg.innerHTML = sugHtml(cmdVal); previewCards(); return; } if (e.target.id === 'clk') { clock = +e.target.value; draw(); const k = $('#clk'); if (k) k.focus(); } });
 document.addEventListener('keydown', e => {
+  if (stay && $('#spop')) { if (e.key === 'Escape') { e.preventDefault(); stayClose(); } return; }   // 🏨 장기 투숙 창이 열려 있으면 격자 단축키 막음
   if (askCb) { if (e.key === 'Escape') { e.preventDefault(); closeAsk(false); } else if (e.key === 'Enter') { e.preventDefault(); closeAsk(true); } else e.preventDefault(); return; }
   if (e.target.dataset && e.target.dataset.ptime != null) { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } return; }   // 🟠 우선정비 시간 고치기
   if (e.target.id === 'cmd') {
@@ -1474,7 +1538,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-23'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-24'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1522,6 +1586,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-23"></script>
+<script type="module" src="jbr.js?v=2026.11.28-24"></script>
 </body>
 </html>
