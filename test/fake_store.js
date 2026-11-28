@@ -20,7 +20,7 @@ export async function signOut() { user = null; sessionStorage.removeItem('fu'); 
 export async function signInAnon() {}
 export async function idToken() { return 't'; }
 const match = (d, w) => w.every(([k, op, v]) => { const x = d[k]; const n = y => (y instanceof Date ? y.getTime() : y);
-  return op === '==' ? x === v : op === '>=' ? n(x) >= n(v) : op === '>' ? n(x) > n(v) : op === 'in' ? v.includes(x) : op === 'array-contains' ? (x || []).includes(v) : true; });
+  return op === '==' ? x === v : op === '>=' ? n(x) >= n(v) : op === '>' ? n(x) > n(v) : op === '<' ? n(x) < n(v) : op === '<=' ? n(x) <= n(v) : op === 'in' ? v.includes(x) : op === 'array-contains' ? (x || []).includes(v) : true; });
 const kids = c => Object.keys(D).filter(p => p.startsWith(c + '/') && p.split('/').length === c.split('/').length + 1);
 export async function get(p) { window.__reads++; return D[p] ? JSON.parse(JSON.stringify(D[p])) : null; }
 export async function getQuery(c, w) { const r = kids(c).filter(p => match(D[p], w || [])).map(p => ({ id: p.split('/').pop(), data: JSON.parse(JSON.stringify(D[p])) })); window.__reads += Math.max(1, r.length); return r; }

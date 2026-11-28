@@ -8,7 +8,7 @@ import * as XW from '../xlsxw.js?v=2026.11.22-2';
 import { CATS, DONE, KEEP, ACTS, isDone, isValuable, ageDays, todo, valuables, excel, check, byTime } from './lostcalc.js?v=2026.11.22-2';
 import { readBook, parseLedger } from './lostxl.js?v=2026.11.28-1';
 
-const VER = '2026.11.28-1';
+const VER = '2026.11.28-2';
 const START_YM = '2026-11';   // 월 단추는 이 달부터 (앱 대장 시작 · 11월은 엑셀에서 옮김)
 const ROLES = [
   { k: 'hk', label: '하우스키퍼', email: 'unieshaeundae+hk@gmail.com', uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2' },
@@ -29,6 +29,16 @@ const errOf = e => /permission/i.test(String(e && (e.code || e.message))) ? '권
 
 let user = null, role = null, login = { who: 0, err: '', busy: false };
 let date = ymd(), tab = 'day', list = [], from = '', busy = false, msg = '', ed = null, pics = {}, loadedAt = 0, cal = false, imp = null;
+// 📅 대장이 있는 달 목록 meta/lost_months { list:['2026-10', …] } (11/28 소장님: 10월을 옮겼는데 10월 단추가 안 보임) — 옮기기 · 저장 때 더하고, 처음엔 옛 달을 한 번 훑어 채움
+let MONS = new Set(), monsLoaded = false;
+async function loadMonths() {
+  if (monsLoaded) return; monsLoaded = true;
+  try { const m = await S.get('meta/lost_months'); if (m && Array.isArray(m.list)) { m.list.forEach(x => MONS.add(x)); return; }
+    const old = await S.getQuery('lost', [['date', '<', START_YM + '-01']]); old.forEach(x => x.data && x.data.date && MONS.add(x.data.date.slice(0, 7)));
+    list.forEach(x => x.date && MONS.add(x.date.slice(0, 7))); await S.set('meta/lost_months', { list: [...MONS].sort(), at: S.SERVER_TIME });
+  } catch (e) {}
+}
+async function addMonths(ms) { const add = [...new Set(ms)].filter(m => /^\d{4}-\d{2}$/.test(m) && !MONS.has(m)); if (!add.length) return; add.forEach(m => MONS.add(m)); try { await S.set('meta/lost_months', { list: [...MONS].sort(), at: S.SERVER_TIME }); } catch (e) {} }
 
 function roleOf(u) { if (!u || u.anon) return null; return ROLES.filter(r => r.uid === u.uid || r.email === u.email)[0] || null; }
 
@@ -40,6 +50,7 @@ async function load(force) {
   try {
     const xs = await S.getQuery('lost', [['date', '>=', need]]);
     list = xs.map(x => Object.assign({ id: x.id }, x.data)); from = need; msg = ''; loadedAt = Date.now();
+    await loadMonths(); list.forEach(x => x.date && MONS.add(x.date.slice(0, 7)));
   } catch (e) { msg = '읽지 못했어요: ' + errOf(e); }
   busy = false; draw();
 }
@@ -50,7 +61,7 @@ async function put(x, note) {
   const doc = Object.assign(clean(x), { upd: S.SERVER_TIME, updBy: role.label });
   await S.set('lost/' + x.id, doc);
   const i = list.findIndex(y => y.id === x.id); const keep = Object.assign({}, x, { upd: Date.now(), updBy: role.label });
-  if (i >= 0) list[i] = keep; else list.push(keep);
+  if (i >= 0) list[i] = keep; else { list.push(keep); addMonths([x.date.slice(0, 7)]); }
   if (note) toast(note);
 }
 async function toggleChk(id) {
@@ -133,7 +144,7 @@ async function impRun() {
     if (o.chk) { o.chkBy = '엑셀'; o.chkAt = o.clientAt; } o.upd = S.SERVER_TIME; o.updBy = role.label + ' (엑셀 옮김)'; return o; };
   try {
     for (let i = 0; i < L.length; i += 100) { const part = L.slice(i, i + 100); await S.batch(part.map(x => ({ op: 'set', path: 'lost/' + x.id, data: doc(x) }))); imp.done = i + part.length; draw(); }
-    const n = L.length; imp = null; toast('엑셀 대장 ' + n + '건을 옮겼어요'); await load(true);
+    const n = L.length; await addMonths(L.map(x => x.date.slice(0, 7))); imp = null; toast('엑셀 대장 ' + n + '건을 옮겼어요'); await load(true);
   } catch (e) { imp.busy = false; imp.err = '옮기다 멈췄어요 (' + imp.done + '건까지 저장): ' + errOf(e) + ' — 다시 누르면 이어서 덮어써요'; draw(); }
 }
 function impHtml() {
@@ -151,7 +162,7 @@ function impHtml() {
 }
 
 // ---------- 📅 달 · 날 고르기 (11/28 소장님: 좌우로만 넘기면 달이 쌓일수록 오래 걸림)
-const monthsList = () => { const out = [], end = ymd().slice(0, 7); let m = [START_YM, date.slice(0, 7)].sort()[0]; while (m <= end) { out.push(m); const [y, mo] = m.split('-').map(Number); m = mo === 12 ? (y + 1) + '-01' : y + '-' + String(mo + 1).padStart(2, '0'); } return out; };
+const monthsList = () => { const out = [], end = ymd().slice(0, 7); let m = [START_YM, date.slice(0, 7)].concat([...MONS]).sort()[0]; while (m <= end) { out.push(m); const [y, mo] = m.split('-').map(Number); m = mo === 12 ? (y + 1) + '-01' : y + '-' + String(mo + 1).padStart(2, '0'); } return out; };
 const lastDay = ym => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).toISOString().slice(0, 10);
 function goDate(d) { const t = ymd(); date = d > t ? t : d; history.replaceState(null, '', '#' + date); load(); }
 function calHtml() {
@@ -232,6 +243,7 @@ function draw() {
   }
   $('#main').innerHTML = h;
   $('#sheet').innerHTML = imp ? impHtml() : ed ? editHtml() : '';
+  { const mb = document.querySelector('.mons [aria-pressed="true"]'); if (mb && mb.parentNode.scrollWidth > mb.parentNode.clientWidth) mb.parentNode.scrollLeft = mb.offsetLeft - mb.parentNode.clientWidth / 2; }   // 달이 많아지면 고른 달이 보이게
 }
 
 // ---------- 누르기
