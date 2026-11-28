@@ -124,8 +124,11 @@ main{padding:10px max(2vw,12px) 40px}
 .eb2{flex-wrap:nowrap}.eb2>.btns{flex:none;flex-wrap:nowrap}.eb2 #fmemo{flex:1 1 160px;min-width:120px;max-width:none}   /* 11/28 소장님 (테트리스): 메모 줄 = 메모 단추 · 🟠🟣 · 메모 칸 한 줄 */
 .eb2 .btns.pl button{font-weight:800}.eb2 .btns.pl b{font-family:Inter,sans-serif;margin-left:2px}
 .eb1{flex-wrap:nowrap}.eb1>.btns,.eb1>.plate{flex:none;flex-wrap:nowrap}.eb1 .namebox{flex:1 1 220px;min-width:140px;max-width:320px}   /* 11/28 15:41 소장님 (테트리스 2): 단추가 늘어도 첫 줄 한 줄 — 이름 칸이 줄어듦 */
-@media (max-width:1235px){.eb1{flex-wrap:wrap}}
-@media (max-width:1180px){.eb2{flex-wrap:wrap}.eb2 #fmemo{flex-basis:100%}}
+/* 11/28 17:00 소장님 (테트리스 3 — 오더테이커 노트북): 좁으면 단추 글을 줄여 한 줄 유지 (🚧 · 🏨 아이콘 + 숫자, 이름판 · 칸 여백 줄임), 아주 좁을 때만 줄바꿈 */
+@media (max-width:1235px){.eb1 .lb{display:none}.eb1 .plate{min-width:118px;padding-right:8px}.eb1 .namebox{min-width:120px}.ebar .eb1 .btns button{padding:3px 7px}.eb1{gap:6px 7px}}
+@media (max-width:980px){.eb1{flex-wrap:wrap}}
+@media (max-width:1235px){.eb2{gap:6px 7px}.eb2 .btns button{padding:2px 7px}}
+@media (max-width:1040px){.eb2{flex-wrap:wrap}.eb2 #fmemo{flex-basis:100%}}
 #mpop .mpl{border:0;background:none;color:var(--mute);text-decoration:underline;font-size:12.5px;text-align:left;padding:0;cursor:pointer}
 .ebar .btns{gap:4px}.ebar .btns button{min-height:34px;padding:3px 9px}
 .eb2 .btns button{min-height:30px;padding:2px 8px;font-size:13px}
@@ -643,9 +646,9 @@ function barHtml(d) {
     [['간단', '6 간단', '']].map(b => '<button class="' + b[2] + (one && one.st === b[0] ? ' on' : '') + '" data-st="' + b[0] + '"' + dis + '>' + b[1] + '</button>').join('') +
     '<button class="b7' + (one && downKind(one) === '재입' ? ' on' : '') + '" data-re="1"' + dis + ' title="퇴실 예정 → 연박 전환: 정비자를 한 칸 아래로">7 재입</button>' +
     [['', '공실', '']].map(b => '<button class="' + b[2] + '" data-st=""' + dis + '>' + b[1] + '</button>').join('') + '</span>';
-  h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 이름 · 초성 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
+  h += '<span class="namebox"><input class="inp" id="cmd" autocomplete="off" placeholder="' + (n ? '정비자 → Enter' : '방을 먼저 고르세요') + '"' + dis + ' value="' + esc(cmdVal) + '"><span class="sug" id="sug">' + sugHtml(cmdVal) + '</span></span>';
   h += '<span class="btns"><button data-unasg="1"' + (anyName ? '' : ' disabled') + ' title="Backspace">✕ 배정 취소</button></span>';
-  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-blocks="1" title="며칠 걸리는 시설 작업 — 카톡 메시지 붙여 넣기 · 도면에서 고르기 · 기간 (그 기간 초안에 시설 메모 · 자동 배정에서 빠짐)">🚧 기간 작업 ' + ((window.JBR && window.JBR.blocks) ? window.JBR.blocks().filter(b => b.to >= TODAY).length : 0) + '</button><button data-stay="1" title="방을 고르고 누르면 장기 투숙 지정 · 고치기 / 방을 안 고르고 누르면 목록 (매일 연박 + 정한 요일 재실 청소)">🏨 장기 투숙 ' + Object.keys((window.JBR && window.JBR.recOn) ? window.JBR.recOn(day) : {}).length + '</button></span></div>';   // 11/28 소장님: 우선정비 · 늦은퇴실은 아래 줄 단추 하나씩 (목록도 그 단추로) · 🏨 장기 투숙
+  h += '<span class="btns drw"><button data-drawer="grp"' + (drawer === 'grp' ? ' class="on"' : '') + '>단체 ' + d.groups.length + '</button><button data-blocks="1" title="며칠 걸리는 시설 작업 — 카톡 메시지 붙여 넣기 · 도면에서 고르기 · 기간 (그 기간 초안에 시설 메모 · 자동 배정에서 빠짐)">🚧<span class="lb"> 기간 작업</span> ' + ((window.JBR && window.JBR.blocks) ? window.JBR.blocks().filter(b => b.to >= TODAY).length : 0) + '</button><button data-stay="1" title="방을 고르고 누르면 장기 투숙 지정 · 고치기 / 방을 안 고르고 누르면 목록 (매일 연박 + 정한 요일 재실 청소)">🏨<span class="lb"> 장기 투숙</span> ' + Object.keys((window.JBR && window.JBR.recOn) ? window.JBR.recOn(day) : {}).length + '</button></span></div>';   // 11/28 소장님: 우선정비 · 늦은퇴실은 아래 줄 단추 하나씩 (목록도 그 단추로) · 🏨 장기 투숙
   { const r1 = one ? P.rooms[[...sel][0]] : '', onPr = !!(one && (memoKind(one.m1) === '우선' || memoKind(one.m2) === '우선' || prioList().some(q => q.rooms.includes(r1)))), onLt = !!(one && lateOf(r1));
     h += '<div class="eb2"><span class="btns">' + MEMOS.filter(m => m !== '우선').map(m => '<button data-memo="' + m + '"' + (one && (memoKind(one.m1) === m || memoKind(one.m2) === m) ? ' class="on"' : '') + dis + '>' + m + '</button>').join('') +
       '</span><span class="btns pl"><button data-memo="우선" class="mpr' + (onPr || drawer === 'prio' ? ' on' : '') + '" title="방을 고르고 누르면 지정 · 해제 / 방을 안 고르고 누르면 목록">🟠 우선정비 <b class="num">' + prioList().reduce((a, q) => a + q.rooms.length, 0) + '</b></button><button data-memo="늦은퇴실" class="mlt' + (onLt || drawer === 'late' ? ' on' : '') + '" title="방을 고르고 누르면 지정 · 퇴실 · 해제 / 방을 안 고르고 누르면 목록">🟣 늦은퇴실 <b class="num">' + Object.values(lateMap()).filter(l => !l.out).length + '</b></button></span>'; }
@@ -1547,7 +1550,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-27'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-28'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1595,6 +1598,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-27"></script>
+<script type="module" src="jbr.js?v=2026.11.28-28"></script>
 </body>
 </html>
