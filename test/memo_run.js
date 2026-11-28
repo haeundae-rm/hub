@@ -175,6 +175,13 @@ const asp = p => p.innerText('#asp');
   await p.screenshot({ path: '/tmp/memo_1.png', clip: { x: 0, y: 0, width: 1500, height: 700 } });
   await cell('401').scrollIntoViewIfNeeded(); await p.locator('.g').screenshot({ path: '/tmp/memo_3.png', clip: undefined }).catch(() => {}); { const bx = await cell('401').boundingBox(); await p.screenshot({ path: '/tmp/memo_3.png', clip: { x: 0, y: bx.y - 60, width: 1500, height: 140 } }); }
   await cell('402').click(); await p.click('[data-memo="룸체"]'); await sleep(150); await p.screenshot({ path: '/tmp/memo_2.png', clip: { x: 0, y: 150, width: 1000, height: 420 } }); await p.keyboard.press('Escape');
+  console.log('⑦ 창이 화면 밖으로 안 잘림 (낮은 노트북 화면 · 맨 위)');
+  for (const [w, h] of [[1366, 620], [1280, 560], [1920, 900]]) {
+    await p.setViewportSize({ width: w, height: h }); await sleep(250); await p.evaluate(() => { window.scrollTo(0, 0); const L = document.getElementById('left'); if (L) L.scrollTop = 0; }); await sleep(150);
+    await cell('1601').click(); await p.click('[data-memo="우선"]'); await sleep(200);
+    const bx = await p.locator('#mpop').boundingBox(); ok(bx.y >= 0 && bx.y + bx.height <= h + 1, w + '×' + h + ': 🟠 창이 화면 안 (위 ' + Math.round(bx.y) + ' · 아래 ' + Math.round(bx.y + bx.height) + ')');
+    if (w === 1366) await p.screenshot({ path: '/tmp/pop_fit.png' });
+    await p.keyboard.press('Escape'); await sleep(100); }
   ok(!p.errs.length, '오류 없음' + (p.errs.length ? ': ' + p.errs.join(' | ') : ''));
   await b.close();
   console.log('\n' + pass + ' 통과 / ' + fail + ' 실패'); process.exit(fail ? 1 : 0);
