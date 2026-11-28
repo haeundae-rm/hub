@@ -673,8 +673,8 @@ function mpSave(how, val) {
   if (how === 'esc') { mpop = null; drawMpop(); focusCmd(); return; }
   let v = val != null ? val : ((document.getElementById('mpin') || {}).value || '').trim();
   if (how === 'ok' && (kind === '룸체' || kind === '우선') && v && val == null && !mpCheck()) return;
-  let noti = null;   // 📣 🟠 우선정비로도 (11/28 소장님): 체크하면 같은 방 · 같은 시각으로 우선정비 등록 → 메이드 휴대폰 알림
-  if (kind === '우선' && v) { const o = parseHM(v); if (!o) { toast('시간을 못 읽었어요'); return; } v = o.h + '시' + (o.mi ? ' ' + o.mi + '분' : '');
+  let noti = null, pHM = '';   // 📣 🟠 우선정비로도 (11/28 소장님): 체크하면 같은 방 · 같은 시각으로 우선정비 등록 → 메이드 휴대폰 알림
+  if (kind === '우선' && v) { const o = parseHM(v); if (!o) { toast('시간을 못 읽었어요'); return; } v = o.h + '시' + (o.mi ? ' ' + o.mi + '분' : ''); pHM = ('0' + o.h).slice(-2) + ':' + ('0' + o.mi).slice(-2);
     const cb = document.getElementById('mpnoti'); if (cb) { try { localStorage.setItem('jbr_pnoti', cb.checked ? '1' : '0'); } catch (e) {} if (cb.checked) noti = ('0' + o.h).slice(-2) + ':' + ('0' + o.mi).slice(-2); } }
   if (how === 'ok' && kind === '악취' && v && !SMELLS.includes(v)) { try { const rec = JSON.parse(localStorage.getItem('jbr_smell') || '[]').filter(x => x !== v); rec.unshift(v); localStorage.setItem('jbr_smell', JSON.stringify(rec.slice(0, 4))); } catch (e) {} }
   const text = how === 'raw' ? v : how === 'del' ? '' : !v || (kind === '룸체' && idx.length > 1) ? kind : kind === '룸체' ? '룸체→' + v : kind === '우선' ? '우선 ' + v + '까지' : kind + '(' + v + ')';
@@ -692,6 +692,14 @@ function mpSave(how, val) {
     if (tgt >= 0 && !old.includes(tgt)) apply([tgt], y => { if (!y.m1) y.m1 = link; else if (!y.m2) y.m2 = link; });
   }
   let notiMsg = '';
+  // 🟠 메모로 만든 우선정비(이름 '우선') 따라가기 (11/28 소장님: 내용 지우기 해도 발광이 남음) — 메모를 지우면 그 방을 우선정비에서 빼고, 시각만 바꾸면(알림 체크 안 해도) 우선정비 시각도 같이
+  if (kind === '우선' && !noti) { const rs = idx.map(i => P.rooms[i]), L = prioList(), mine = L.filter(q => q.name === '우선' && q.rooms.some(r => rs.includes(r)));
+    if (mine.length) {
+      const hit = rs.filter(r => mine.some(q => q.rooms.includes(r)));
+      mine.forEach(q => { q.rooms = q.rooms.filter(r => !rs.includes(r)); }); for (let k = L.length - 1; k >= 0; k--) if (!L[k].rooms.length) L.splice(k, 1);
+      if (how !== 'del' && pHM) { L.push({ id: 'p' + Date.now().toString(36), name: '우선', rooms: hit, until: pHM, rank: 1, note: '', at: Date.now() }); notiMsg = ' · 🟠 우선정비 시각도 ' + pHM + '로'; }
+      else notiMsg = how === 'del' || !text.startsWith('우선 ') ? ' · 🟠 우선정비에서도 뺐어요 (발광 꺼짐)' : '';
+      prioSave(); } }
   if (noti) { const d = R(), okI = idx.filter(i => canPrio(d.rooms[i])), skip = idx.length - okI.length;
     if (!okI.length) notiMsg = ' · 📣 알림은 못 보냄 (퇴실 · 퇴실 예정 · 이월 방만)';
     else { const rs = okI.map(i => P.rooms[i]), L = prioList();
@@ -699,7 +707,7 @@ function mpSave(how, val) {
       L.push({ id: 'p' + Date.now().toString(36), name: '우선', rooms: rs, until: noti, rank: 1, note: '', at: Date.now() }); prioSave();
       notiMsg = ' · 📣 메이드 휴대폰에 알림 (🟠 우선정비 ' + noti + ')' + (skip ? ' · ' + skip + '실은 연박 · 공실 등이라 뺌' : ''); } }
   mpop = null; drawMpop();
-  if (notiMsg) { toast(idx.map(i => P.rooms[i]).slice(0, 3).join(', ') + (idx.length > 3 ? ' 외' : '') + ' → ' + text + notiMsg); focusCmd(); return; }
+  if (notiMsg) { toast(idx.map(i => P.rooms[i]).slice(0, 3).join(', ') + (idx.length > 3 ? ' 외' : '') + ' → ' + (text || '우선 메모 지움') + notiMsg); focusCmd(); return; }
   toast(text ? idx.map(i => P.rooms[i]).slice(0, 3).join(', ') + (idx.length > 3 ? ' 외' : '') + ' → ' + text + (moved ? ' · 연박 ' + moved + '실 퇴실(1)로' : '') : kind + ' 메모를 지웠어요');
   focusCmd();
 }
@@ -1385,7 +1393,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-8'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-9'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1433,6 +1441,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-8"></script>
+<script type="module" src="jbr.js?v=2026.11.28-9"></script>
 </body>
 </html>
