@@ -347,9 +347,22 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const ROY = ['3001', '3002', '3101', '3102'];
 const MEMOS = ['VIP', '르씨엘', '룸체', '당직', '악취', '조기퇴실', '미정비', '가입력', 'H/U', '시설', '우선'];
 // 🗨 룸체 · 악취 자세히 (11/28 소장님): 버튼 → 작은 창 「어디로 룸체인지?」 「무슨 냄새?」 → 「룸체→2603」 「악취(생선)」. 메이드 휴대폰엔 룸체 · 주의 표시 그대로 + 메모 글
-const DETAIL = { 룸체: { q: '어디로 룸체인지하나요?', ph: '호실 (예: 2603)' }, 악취: { q: '무슨 냄새인가요?', ph: '직접 쓰기 (예: 향수)' } };
+const DETAIL = { 룸체: { q: '어디로 룸체인지하나요?', ph: '호실 (예: 2603)' }, 악취: { q: '무슨 냄새인가요?', ph: '직접 쓰기 (예: 페인트)' },
+  시설: { q: '어떤 시설 문제인가요?', ph: '예: 에어컨 고장 · 욕실 누수' }, 우선: { q: '몇 시까지 정비할까요?', ph: '예: 2시 · 오후 8시 · 20:00 · 3시 반' } };   // 11/28 시설 · 우선도
+const PRIO_CHIPS = ['12시', '14시', '15시', '16시'];
+// ⏰ 시간 읽기 (11/28 소장님 「8시 / 오후 8시 / 20:00 / 20시 다」): 오전·오후 없으면 1~8시 = 오후 (근무 중 마감), 9~12시 = 그대로 → { h, mi } 또는 null
+function parseHM(v) {
+  let t = String(v || '').replace(/\s+/g, ''); if (!t) return null;
+  const pm = /오후|저녁|밤|pm/i.test(t), am = /오전|아침|am/i.test(t); t = t.replace(/오후|저녁|밤|오전|아침|pm|am|까지|정비/gi, '');
+  let m = /^(\d{1,2})[:시.](\d{1,2})?분?$/.exec(t) || /^(\d{1,2})시반$/.exec(t) || /^(\d{1,2})시?$/.exec(t) || /^(\d{2})(\d{2})$/.exec(t);
+  if (!m) return null; let h = +m[1], mi = /반$/.test(t) ? 30 : m[2] != null ? +m[2] : 0;
+  if (mi > 59 || h > 23) return null;
+  if (pm && h < 12) h += 12; else if (!am && !pm && h >= 1 && h <= 8) h += 12;
+  if (h < 6 || h > 23) return null; return { h, mi };
+}
+const hmText = o => (o.h < 12 ? '오전 ' + o.h : o.h === 12 ? '낮 12' : '오후 ' + (o.h - 12)) + '시' + (o.mi ? ' ' + o.mi + '분' : '') + ' (' + ('0' + o.h).slice(-2) + ':' + ('0' + o.mi).slice(-2) + ')';
 const SMELLS = ['담배', '생선', '음식', '하수구', '향수', '화장품냄새'];   // 11/28 소장님 변경
-const memoKind = m => { m = String(m || ''); return MEMOS.includes(m) ? m : /^룸체(→|\s|$)/.test(m) ? '룸체' : /^악취(\(|\s|$)/.test(m) ? '악취' : ''; };   // 버튼으로 넣은 메모 (자세히 붙은 것 포함)
+const memoKind = m => { m = String(m || ''); return MEMOS.includes(m) ? m : /^룸체(→|\s|$)/.test(m) ? '룸체' : /^악취(\(|\s|$)/.test(m) ? '악취' : /^시설(\(|\s|$)/.test(m) ? '시설' : /^우선(\s|$)/.test(m) ? '우선' : ''; };   // 버튼으로 넣은 메모 (자세히 붙은 것 포함)
 const isBtnMemo = m => !!memoKind(m);
 let mpop = null;   // { kind, idx:[] }
 const MCOL = { 재입: '#FFE36E', VIP: '#BFE8C9', 르씨엘: '#BFE8C9', 룸체: '#F9C9DD', RC: '#F9C9DD', 당직: '#CDE8F8', 악취: '#DCCBF3', 조기퇴실: '#F6B6B6', 미정비: '#D4D4D4', 가입력: '#FFF1A8', 'H/U': '#C9D6F2', 시설: '#E8DCC8', 우선: '#FFD2A6' };
@@ -613,14 +626,14 @@ function sideHtml(d, c) {
 function drawMpop(btn) {
   let o = document.getElementById('mpop'); if (o) o.remove(); if (!mpop) return;
   const K = DETAIL[mpop.kind], d = R(), one = mpop.idx.length === 1 ? d.rooms[mpop.idx[0]] : null;
-  const curM = one ? [one.m1, one.m2].find(m => memoKind(m) === mpop.kind) || '' : '', curV = curM.replace(/^룸체→?\s*|^악취\(?|\)$/g, '').trim();
+  const curM = one ? [one.m1, one.m2].find(m => memoKind(m) === mpop.kind) || '' : '', curV = curM.replace(/^(룸체→?|악취\(?|시설\(?|우선)\s*|\)$|까지$/g, '').trim();
   let rec = []; try { rec = JSON.parse(localStorage.getItem('jbr_smell') || '[]'); } catch (e) {}
-  const chips = mpop.kind === '악취' ? SMELLS.concat(rec.filter(x => !SMELLS.includes(x))).slice(0, 10) : [];
+  const chips = mpop.kind === '악취' ? SMELLS.concat(rec.filter(x => !SMELLS.includes(x))).slice(0, 10) : mpop.kind === '우선' ? PRIO_CHIPS : [];
   const multi = mpop.kind === '룸체' && mpop.idx.length > 1;
   o = document.createElement('div'); o.id = 'mpop';
   o.innerHTML = '<b>' + K.q + '</b><small>' + (mpop.idx.length > 1 ? mpop.idx.length + '실 · ' : P.rooms[mpop.idx[0]] + '호 · ') + 'Enter 저장 · 비우고 Enter = 「' + mpop.kind + '」만 · Esc 닫기</small>' +
     (chips.length ? '<div class="mpc">' + chips.map(x => '<button data-mpv="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>' : '') +
-    (multi ? '<p class="mph">여러 방은 호실 없이 「룸체」만 — 방 하나씩 고르면 호실을 적을 수 있어요</p>' : '<input id="mpin" class="inp' + (mpop.kind === '룸체' ? ' num' : '') + '" autocomplete="off" placeholder="' + K.ph + '" value="' + esc(curV) + '"' + (mpop.kind === '룸체' ? ' inputmode="numeric" maxlength="4"' : ' maxlength="20"') + '><span id="mpst" class="mph"></span>') +
+    (multi ? '<p class="mph">여러 방은 호실 없이 「룸체」만 — 방 하나씩 고르면 호실을 적을 수 있어요</p>' : '<input id="mpin" class="inp' + (mpop.kind === '룸체' ? ' num' : '') + '" autocomplete="off" placeholder="' + K.ph + '" value="' + esc(curV) + '"' + (mpop.kind === '룸체' ? ' inputmode="numeric" maxlength="4"' : ' maxlength="30"') + '><span id="mpst" class="mph"></span>') +
     '<div class="mpb">' + (curM ? '<button data-mpx="del" class="del">지우기</button>' : '') + '<button data-mpx="esc">닫기</button><button data-mpx="ok" class="ok">저장</button></div>';
   document.body.appendChild(o);
   const r = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 100, bottom: 100 };
@@ -628,7 +641,9 @@ function drawMpop(btn) {
   const i = document.getElementById('mpin'); if (i) { i.focus(); i.select(); mpCheck(); } else o.querySelector('[data-mpx="ok"]').focus();
 }
 function mpCheck() {   // 룸체 호실: 있는 방인지 · 그 방 지금 상태
-  const i = document.getElementById('mpin'), st = document.getElementById('mpst'); if (!i || !st || !mpop || mpop.kind !== '룸체') return true;
+  const i = document.getElementById('mpin'), st = document.getElementById('mpst'); if (!i || !st || !mpop) return true;
+  if (mpop.kind === '우선') { if (!i.value.trim()) { st.textContent = ''; return true; } const o = parseHM(i.value); st.innerHTML = o ? '→ <b style="color:var(--ok)">' + hmText(o) + '까지</b>' : '<b style="color:var(--bad)">시간을 못 읽었어요 (예: 2시 · 오후 8시 · 20:00)</b>'; return !!o; }
+  if (mpop.kind !== '룸체') return true;
   const v = i.value.replace(/\D/g, ''); if (i.value !== v) i.value = v; if (!v) { st.textContent = ''; return true; }
   const k = P.rooms.indexOf(v); if (k < 0) { st.innerHTML = '<b style="color:var(--bad)">없는 호실이에요</b>'; return false; }
   if (mpop.idx.includes(k)) { st.innerHTML = '<b style="color:var(--bad)">같은 방이에요</b>'; return false; }
@@ -639,9 +654,10 @@ function mpSave(how, val) {
   if (!mpop) return; const kind = mpop.kind, idx = mpop.idx;
   if (how === 'esc') { mpop = null; drawMpop(); focusCmd(); return; }
   let v = val != null ? val : ((document.getElementById('mpin') || {}).value || '').trim();
-  if (how === 'ok' && kind === '룸체' && v && !mpCheck()) return;
+  if (how === 'ok' && (kind === '룸체' || kind === '우선') && v && val == null && !mpCheck()) return;
+  if (kind === '우선' && v) { const o = parseHM(v); if (!o) { toast('시간을 못 읽었어요'); return; } v = o.h + '시' + (o.mi ? ' ' + o.mi + '분' : ''); }
   if (how === 'ok' && kind === '악취' && v && !SMELLS.includes(v)) { try { const rec = JSON.parse(localStorage.getItem('jbr_smell') || '[]').filter(x => x !== v); rec.unshift(v); localStorage.setItem('jbr_smell', JSON.stringify(rec.slice(0, 4))); } catch (e) {} }
-  const text = how === 'del' ? '' : !v || (kind === '룸체' && idx.length > 1) ? kind : kind === '룸체' ? '룸체→' + v : '악취(' + v + ')';
+  const text = how === 'del' ? '' : !v || (kind === '룸체' && idx.length > 1) ? kind : kind === '룸체' ? '룸체→' + v : kind === '우선' ? '우선 ' + v + '까지' : kind + '(' + v + ')';
   let moved = 0;
   apply(idx, x => {
     const slot = memoKind(x.m1) === kind ? 'm1' : memoKind(x.m2) === kind ? 'm2' : '';
