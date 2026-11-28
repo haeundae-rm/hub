@@ -11,7 +11,7 @@
 //   11/28(LIVE_FROM) 전엔 지난 날짜만 「실제 저장 연습 켜기」 가능 (켤 때 r0 · g0 = 켜기 전 자료 보관 → 「연습 끝내기」로 되돌림)
 import * as S from '../../rm/app/store.js';
 
-const VER = '2026.11.28-15';
+const VER = '2026.11.28-16';
 const LIVE_FROM = '2026-11-28';   // 11/27 소장님: 11/28부터 앱이 원본 (확정 = 메이드 휴대폰). 그 전 날짜는 연습(연습 끝내기 가능)
 const ROSTER_FROM = '2026-12';     // 스케줄표 명단은 12월부터 — 11월은 엑셀 설정 시트 명단 그대로 (11/27 소장님 '11월 명단 유지')
 const ROLES = [
@@ -27,6 +27,8 @@ const addD = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.ge
 const ym = (d, n) => { const y = +d.slice(0, 4), m = +d.slice(5, 7) - 1 + n; return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7); };
 const hm = t => { if (!t) return ''; const d = seoul(Number(t)); return ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2); };
 
+let BLK = [];   // 🚧 meta/blocks list
+const blockOn = ds => { const m = {}; BLK.forEach(b => { if (b.from <= ds && ds <= b.to) b.rooms.forEach(r => { m[String(r)] = b; }); }); return m; };
 let hks = [], me = '', sv = { pend: 0, fail: 0, lastOk: 0, err: '' }, role = null, login = { who: 0, err: '', busy: false }, unsub = [], docs = [], hb = null, meta = { fromCache: false, pending: 0 }, fill = '';
 
 // ---------- 사본들 → 화면 자료 (시제품 data.json 모양)
@@ -48,6 +50,13 @@ export function toP(list, sched) {
   }
   // 👥 명단 (11/27 소장님): 12월(앱 원본)부터는 룸메이드 스케줄표의 근래 주간 명단 (HK 전파 사본 rmsched_hk 의 all). 11월까지는 엑셀 설정 시트 명단 그대로
   Object.keys(months).forEach(m => { const M = months[m]; if (m >= ROSTER_FROM) { const L = schedRoster(m, M.days, sched); if (L.length) { M.roster = L; M.rsrc = 'sched'; } } });
+  // 🗓 앞날 미리 표기 (11/28 하우스키퍼 · 소장님 「엑셀처럼」): 내일 ~ 이번 달 말 (최소 14일 뒤까지) 아직 안 만든 날 = 빈 초안(전 객실 4)으로 보여 줌
+  //   표기하는 순간 그날 초안이 만들어짐 (화면 · newDay(ds, r)) · virtual:true 는 저장소에 없는 날
+  { const endM = (() => { const t = new Date(TODAY + 'T00:00:00Z'); return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).toISOString().slice(0, 10); })(), end2 = addD(TODAY, 14), end = endM > end2 ? endM : end2;
+    for (let ds = addD(TODAY, 1); ds <= end; ds = addD(ds, 1)) { const m = ds.slice(0, 7); if (months[m] && months[m].days[ds]) continue;
+      const M = months[m] = months[m] || { days: {}, roster: [], xl: { has: false, room: { per: {}, '정비수': [], '인원': [] }, bill: { '정비수': [], '인원': [], '금액': [] }, ot: {}, otT: { d: [] }, unit: {} }, virt: true };
+      M.days[ds] = { r: rooms.map(() => ['4', '', '', '', '', 0]), cards: [], groups: [], xl: {}, at: 0, file: '', src: '', asg: null, virtual: true }; }
+    const ks = Object.keys(months).sort(); ks.forEach((m, i) => { const M = months[m]; if (M.virt && m >= ROSTER_FROM) { const L = schedRoster(m, M.days, sched); if (L.length) { M.roster = L; M.rsrc = 'sched'; } } if (!M.roster.length && i) M.roster = months[ks[i - 1]].roster.slice(); }); }
   // 명단이 없는 달은 그 달 카드 이름으로
   Object.values(months).forEach(M => { if (!M.roster.length) { const s = new Set(); Object.values(M.days).forEach(x => x.cards.forEach(c => c[0] && s.add(c[0]))); M.roster = [...s]; } });
   return { rooms, months };
@@ -88,6 +97,7 @@ function watch() {
   const from = ym(TODAY, -1) + '-01';
   unsub.push(S.listenQuery('jbr', [['date', '>=', from]], (list, m) => { docs = list.map(x => x.data); meta.fromCache = !!(m && m.fromCache); push(); }, e => { $('#main').innerHTML = '<p style="padding:20px">자료를 읽지 못했어요: ' + esc(e && e.message || e) + ' (규칙 v32 게시 전이면 이렇게 보여요)</p>'; }));
   unsub.push(S.listenDoc('meta/rsync', x => { hb = x; tag(); }, () => {}));
+  unsub.push(S.listenDoc('meta/blocks', x => { BLK = ((x && x.list) || []).filter(b => b && b.from && b.to && Array.isArray(b.rooms)); if (window.JBR && window.JBR.redraw) window.JBR.redraw(); }, () => {}));   // 🚧 기간 작업 (11/28)
   // 👥 룸메이드 스케줄표 HK 전파 사본 (명단 · 앞으로 출근자 · 유닛) — 규칙 v30: 하우스키퍼 읽기 가능
   // 🏆 시상 (jbr/cfg-YYYY-MM.awards) — 이번 달 · 지난달 · 그 전 달 (이월 가져오기용)
   [ym(TODAY, 0), ym(TODAY, -1), ym(TODAY, -2)].forEach(m => unsub.push(S.listenDoc('jbr/cfg-' + m, x => { if (window.JBR && window.JBR.setCfg) window.JBR.setCfg(m, x); }, () => {})));
@@ -212,13 +222,17 @@ const SV = {
   newOk: ds => { const d = docOf(ds); return ds === SV.draftDay() && (!d || d.src !== 'app'); },
   // ↺ 초안 처음으로 (11/28 소장님: 초안에서 눌러 보다가 처음으로 못 돌아감) — 앱 원본 · 오늘이나 앞날 · 자동 배정을 아직 안 넣은 날 (넣었으면 자동 배정 창 「확정 취소」 먼저)
   canReset: ds => { const d = docOf(ds); return !!d && d.src === 'app' && ds > TODAY && !d.asg && !d.r0; },   // 11/28 11:31 사고: 오늘(작업 중) 보고서를 되돌림 → 오늘은 아예 안 됨, 앞날만
-  newDay(ds) {
+  newDay(ds, pre, preG) {   // pre = 앞날 미리 표기로 만들 때 화면에서 고친 방들 {호실: [6칸]} (11/28)
     const base = docs.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).find(x => x.rooms && x.rooms.length);
     if (!base) { window.JBR.toast('호실 목록을 찾지 못했어요 — 엑셀 사본이 하루라도 있어야 해요'); return; }
     const r = {}; base.rooms.forEach(k => { r[k] = ['4', '', '', '', 0, 0]; });
-    const d = { date: ds, src: 'app', file: '', rooms: base.rooms.slice(), r, xl: {}, cards: [], groups: [], at: S.SERVER_TIME, by: by(), made: S.SERVER_TIME };
+    // 🚧 기간 작업(meta/blocks): 그날 걸린 방에 「시설(작업명)」 메모 (11/28 소장님 「둘 다」)
+    const bon = blockOn(ds); Object.keys(bon).forEach(k => { if (r[k]) r[k][2] = '시설(' + String(bon[k].name || '작업').slice(0, 20) + ')'; });
+    if (pre) Object.keys(pre).forEach(k => { if (r[k]) r[k] = clip(pre[k]); });
+    const d = { date: ds, src: 'app', file: '', rooms: base.rooms.slice(), r, xl: {}, cards: [], groups: preG || [], at: S.SERVER_TIME, by: by(), made: S.SERVER_TIME };
     if (ds < LIVE_FROM) Object.assign(d, { r0: r, g0: [], onAt: S.SERVER_TIME, onBy: by() });   // 연습: 「연습 끝내기」 가능
-    save(ds, 'set', d, { k: 'new' });
+    save(ds, 'set', d, { k: 'new', pre: pre ? Object.keys(pre).length : 0, blk: Object.keys(bon).length });
+    if (pre) { window.JBR.toast('🗓 ' + +ds.slice(5, 7) + '/' + +ds.slice(8) + ' 초안을 만들고 미리 표기를 저장했어요' + (Object.keys(bon).length ? ' · 🚧 기간 작업 ' + Object.keys(bon).length + '실 시설 메모' : '')); return; }
     window.JBR.toast((docOf(ds) && docOf(ds).src === 'app' ? '↺ ' : '🌙 ') + +ds.slice(5, 7) + '/' + +ds.slice(8) + ' 초안을 ' + (docOf(ds) && docOf(ds).src === 'app' ? '처음으로 되돌렸어요' : '만들었어요') + ' — 전 객실 4(퇴실 예정). 연박 · 공실 · 재실을 표시한 뒤 위 「🧩 자동 배정」에서 「📋 정비보고서 앱에서 불러오기」');
   },
   rooms(ds, ch) {
@@ -291,7 +305,7 @@ const PRIOS = {
     PRL[ds] = L.map(p => Object.assign({}, p, { rooms: p.rooms.slice() }));
     track(S.set('meta/prio_' + ds, { date: ds, list: L, at: S.SERVER_TIME, by: by() })); if (window.JBR) window.JBR.redraw(); }
 };
-if (window.JBR) { window.JBR.sv = SV; window.JBR.late = Object.assign(ds => (role ? LATE.map(ds) : null), LATE); window.JBR.prio = Object.assign(ds => { if (!role) return null; prWatch(ds); return PRL[ds]; }, PRIOS); }
+if (window.JBR) { window.JBR.blocks = () => BLK; window.JBR.blockOn = blockOn; window.JBR.sv = SV; window.JBR.late = Object.assign(ds => (role ? LATE.map(ds) : null), LATE); window.JBR.prio = Object.assign(ds => { if (!role) return null; prWatch(ds); return PRL[ds]; }, PRIOS); }
 window.addEventListener('online', svPaint); window.addEventListener('offline', svPaint);
 window.addEventListener('beforeunload', e => { if (sv.pend) { e.preventDefault(); e.returnValue = ''; } });
 
