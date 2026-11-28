@@ -529,7 +529,7 @@ function hmOf(v) { const n = v && v.toMillis ? v.toMillis() : v && v.seconds ? v
 function svBar() {
   const sv = window.JBR && window.JBR.sv; if (!sv) return '';
   const lb = 'style="border:0;background:none;color:inherit;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0"';
-  if (live(day)) return '<div class="check svb" style="flex-wrap:wrap">' + (sv.canReset && sv.canReset(day) ? '<button class="rstb" data-jreset="1" title="전 객실 4(퇴실 예정)로 다시 — 지금 표시한 연박 · 공실 · 재실 · 메모가 지워져요">↺ 초안 처음으로</button>' : '') + '<label class="takeb" title="야간에 엑셀로 짠 날 → 그 날 시트 그대로 앱 정비보고서로 (이후 앱에서 고침)">📥 이 날 엑셀 → 앱 원본<input type="file" id="takeFile" accept=".xlsx" hidden></label> <b class="good">💾 저장 켜짐</b> — 고치는 즉시 저장소에 (방 하나씩) · <span id="svst">' + sv.status() + '</span> · <button data-jlog="1" ' + lb + '>📜 변경 기록</button>' +
+  if (live(day)) return '<div class="check svb" style="flex-wrap:wrap">' + (sv.canReset && sv.canReset(day) ? '<button class="rstb" data-jreset="1" title="전 객실 4(퇴실 예정)로 다시 — 지금 표시한 연박 · 공실 · 재실 · 메모가 지워져요">↺ 초안 처음으로</button>' : '') + '<label class="takeb" title="야간에 엑셀로 짠 날 → 그 날 시트 그대로 앱 정비보고서로 (이후 앱에서 고침)">📥 이 날 엑셀 → 앱 원본<input type="file" id="takeFile" accept=".xlsx" hidden></label><label class="takeb" style="background:#fff;border:1.5px solid #B23A48;color:#B23A48" title="실수로 되돌린 날: 엑셀 파일 + 오늘 고친 기록을 순서대로 다시 적용">🛟 복구<input type="file" id="restFile" accept=".xlsx" hidden></label> <b class="good">💾 저장 켜짐</b> — 고치는 즉시 저장소에 (방 하나씩) · <span id="svst">' + sv.status() + '</span> · <button data-jlog="1" ' + lb + '>📜 변경 기록</button>' +
     (sv.canOff(day) ? ' · <button data-joff="1" ' + lb + '>연습 끝내기 (켜기 전 엑셀 자료로)</button>' : '') + (sv.canBack && sv.canBack(day) ? ' · <button data-jback="1" ' + lb + ' style="border:0;background:none;color:#B23A48;text-decoration:underline;font:inherit;font-weight:800;cursor:pointer;padding:0">⚠ 비상: 엑셀로 돌아가기</button>' : '') + '</div>';
   if (sv.canOn(day)) return '<div class="check svb"><span>이 날은 보기 · 연습만</span> · <button data-jon="1" ' + lb + '>💾 이 날짜로 실제 저장 연습 켜기</button> <small>(11/28 전 지난 날짜만)</small></div>';
   return '';
@@ -1429,7 +1429,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-11'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-12'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1477,6 +1477,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-11"></script>
+<script type="module" src="jbr.js?v=2026.11.28-12"></script>
 </body>
 </html>
