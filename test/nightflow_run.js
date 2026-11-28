@@ -44,7 +44,7 @@ const asp = p => p.innerText('#asp');
   const b = await chromium.launch();
   const p = await open(b);
   console.log('① 정비보고서: 🌙 내일 초안 만들기');
-  ok(!!(await p.$('[data-jnew="' + T1 + '"]')), '「🌙 ' + T1.slice(5) + ' 초안 만들기」 단추');
+  ok(!!(await p.$('[data-jnew="' + T1 + '"]')), '「🌙 ' + T1.slice(5) + ' 초안」 단추');
   await p.click('[data-jnew="' + T1 + '"]'); await sleep(400);
   let d = await doc(p, 'jbr/' + T1);
   ok(d && d.src === 'app' && Object.values(d.r).every(x => x[0] === '4' && !x[1] && !x[5]), '전 객실 4 · 이름 없음 · 연박 없음 (' + (d ? Object.keys(d.r).length : 0) + '실)');
