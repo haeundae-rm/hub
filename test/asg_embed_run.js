@@ -21,7 +21,7 @@ const SEED = {
 };
 async function open(browser) {
   const ctx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul', viewport: { width: 1500, height: 950 } });
-  await ctx.addInitScript(s => { let ps = null; try { if (window.parent !== window) ps = window.parent.__seed; } catch (e) {} window.__seed = ps || s;   // 겹창(iframe)은 정비보고서 창과 같은 가짜 저장소
+  await ctx.addInitScript(s => { let ps = null; try { if (window.parent !== window) ps = window.parent.__seed; } catch (e) {} window.__seed = ps || (sessionStorage.getItem('__seedKeep') ? JSON.parse(sessionStorage.getItem('__seedKeep')) : s);   // 겹창(iframe)은 정비보고서 창과 같은 가짜 저장소
  window.__live = 1; sessionStorage.setItem('fu', JSON.stringify({ uid: 'nBL2QYezEmRNRmBRMXN6LNPJO2s2', anon: false, email: 'unieshaeundae+hk@gmail.com' })); }, SEED);
   await ctx.route('**/*', async route => {
     const u = route.request().url();
@@ -33,6 +33,7 @@ async function open(browser) {
     const ct = /\.js$/.test(file) ? 'application/javascript' : /\.html$/.test(file) ? 'text/html' : 'application/json';
     return route.fulfill({ status: 200, contentType: ct + '; charset=utf-8', body: fs.readFileSync(file) });
   });
+  if (new Date(Date.now() + 9 * 3600e3).getUTCHours() < 9) await ctx.clock.setFixedTime(Date.parse(TODAY + 'T10:00:00+09:00'));   // 09시 전엔 🌙 초안이 오늘 날짜라 시험 날짜(내일)에 맞춰 10시로
   const p = await ctx.newPage(); p.errs = [];
   p.on('pageerror', e => p.errs.push(String(e))); p.on('console', m => { if (m.type() === 'error' && !/Failed to load|404/.test(m.text())) p.errs.push(m.text()); });
   p.on('dialog', x => x.accept());
@@ -63,10 +64,12 @@ const doc = (p, k) => p.evaluate(k => JSON.parse(JSON.stringify(window.__seed[k]
   await fr.locator('#asp [data-as="send"]').click(); await sleep(1500);
   const d = await doc(p, 'jbr/' + T1); const named = Object.keys(d.r).filter(k => d.r[k][1]);
   ok(named.length > 30 && d.asg, '확정 → 정비보고서에 이름 ' + named.length + '실 (같은 저장소)');
-  ok(/배정표를 올렸어요|올렸어요|올리는 중/.test(await fr.locator('body').innerText()), '겹창 안에 메이드 휴대폰 올리기 상태');
+  ok(!d.asg.sentAt && !(await doc(p, 'uploads/latest')), '넣기만 — 메이드 휴대폰 올리기 안 함 (11/28 A안)');
   console.log('③ 닫기');
-  await p.click('#asgx [data-asgx]'); await sleep(400);
-  ok(await p.locator('#asgx').count() === 0, '「✕ 닫고 정비보고서로」 → 겹창 닫힘');
+  ok(await p.locator('#asgx').count() === 0, '넣기 → 겹창 저절로 닫힘 → 정비보고서 격자 (📱 보내기 띠)');
+  // 가짜 저장소는 겹창이 쓴 것을 정비보고서 창 구독에 안 알려 줌 (실제 Firestore 는 알려 줌) → 다시 읽기
+  await p.evaluate(() => { const s = window.__seed; sessionStorage.setItem('__seedKeep', JSON.stringify(s)); }); await p.reload(); await p.waitForSelector('.c[data-i]', { timeout: 8000 }); await sleep(300); await p.locator('#days button', { hasText: (+T1.slice(8)) + '일' }).first().click(); await sleep(300);
+  ok(await p.locator('.sndb.wait [data-jsend]').count() === 1, '「📱 메이드 휴대폰 보내기」 단추');
   ok((await doc(p, 'jbr/' + T1)).cards.some(c => c.n === '가람'), '정비보고서 자료에 출근 카드');
   console.log('④ 그냥 닫기(✕) → 자동으로 정비보고서로');
   await p.click('#tabs [data-asgo="asg"]'); await p.frameLocator('#asgx iframe').locator('#asp [data-as="close"]').click({ timeout: 10000 }); await sleep(600);
