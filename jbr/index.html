@@ -348,7 +348,7 @@ const ROY = ['3001', '3002', '3101', '3102'];
 const MEMOS = ['VIP', '르씨엘', '룸체', '당직', '악취', '조기퇴실', '미정비', '가입력', 'H/U', '시설', '우선'];
 // 🗨 룸체 · 악취 자세히 (11/28 소장님): 버튼 → 작은 창 「어디로 룸체인지?」 「무슨 냄새?」 → 「룸체→2603」 「악취(생선)」. 메이드 휴대폰엔 룸체 · 주의 표시 그대로 + 메모 글
 const DETAIL = { 룸체: { q: '어디로 룸체인지하나요?', ph: '호실 (예: 2603)' }, 악취: { q: '무슨 냄새인가요?', ph: '직접 쓰기 (예: 향수)' } };
-const SMELLS = ['담배', '생선', '음식', '하수구', '반려동물', '곰팡이'];
+const SMELLS = ['담배', '생선', '음식', '하수구', '향수', '화장품냄새'];   // 11/28 소장님 변경
 const memoKind = m => { m = String(m || ''); return MEMOS.includes(m) ? m : /^룸체(→|\s|$)/.test(m) ? '룸체' : /^악취(\(|\s|$)/.test(m) ? '악취' : ''; };   // 버튼으로 넣은 메모 (자세히 붙은 것 포함)
 const isBtnMemo = m => !!memoKind(m);
 let mpop = null;   // { kind, idx:[] }
@@ -1341,7 +1341,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-3'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-4'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1389,6 +1389,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-3"></script>
+<script type="module" src="jbr.js?v=2026.11.28-4"></script>
 </body>
 </html>
