@@ -249,7 +249,7 @@ async function noShow(name) {
     const to = others.slice().sort((p, q) => sc(p) - sc(q))[0];
     const a = b.slice(); a[1] = to; r[k] = a; ch[k] = { b, a }; load[to] += U(k); fl[to].push(f); (got[to] = got[to] || []).push(k); });
   const ov = Object.assign({}, d.asg.ov || {}); Object.keys(got).forEach(n => { ov[n] = (ov[n] || 0) + got[n].reduce((s, k) => s + U(k), 0); }); delete ov[name];
-  const cards = (d.cards || []).filter(c => c.n !== name).map(c => ({ n: c.n, u: load[c.n] != null ? load[c.n] : c.u, in: !!c.in }));
+  const cards = (d.cards || []).filter(c => c.n !== name).map(c => Object.assign({ n: c.n, u: load[c.n] != null ? load[c.n] : c.u, in: !!c.in }, c.h != null ? { h: c.h } : {}));
   try {
     await saveJ({ r, cards, asg: Object.assign({}, d.asg, { ov, noshow: (d.asg.noshow || []).concat([name]) }), at: H.S.SERVER_TIME }, { k: 'noshow', who: name, n: Object.keys(ch).length, ch, got: Object.keys(got).map(n => n + ' ' + got[n].join('·')).join(' / ') });
     const nd = await H.S.get('jbr/' + A.date);
@@ -528,7 +528,7 @@ async function confirmApp() {
       if (isCarry && !/미정비/.test((b[2] || '') + (b[3] || ''))) { if (!b[3]) a[3] = '미정비'; else a[3] = '미정비 · ' + b[3]; }
       if (JSON.stringify(a) !== JSON.stringify(b)) { r[k] = a; ch[k] = { b, a }; } });
     const order = Object.keys(R.workers).filter(n => R.workers[n].rooms.length).sort((a, b) => (R.workers[b].floors[0] || 0) - (R.workers[a].floors[0] || 0));
-    const cards = order.map(n => ({ n, u: R.workers[n].load, in: false }));
+    const H1 = ho(); const cards = order.map(n => ({ n, u: R.workers[n].load, in: false, h: H1[n] != null ? H1[n] : (A.hk0 && A.hk0[n] != null ? A.hk0[n] : R.workers[n].ho) }));   // h = 인계 유닛 (11/28 하우스맨: 정비보고서 카드에서 인계 대비 바로 보기)
     const ov = {}; order.forEach(n => { const base = A.hk0 && A.hk0[n] != null ? A.hk0[n] : null; if (base != null && Math.abs(R.workers[n].load - base) > 1e-9) ov[n] = Math.round((R.workers[n].load - base) * 10) / 10; });
     const data = { date: A.date, r, cards, src: 'app', at: S.SERVER_TIME, by: (H.admin() && H.admin().label) || '', asg: { at: S.SERVER_TIME, by: (H.admin() && H.admin().label) || '', edits: (A.edits || []).length, carry: [...(A.carry || [])].length, carryRooms: Object.keys(r).filter(k => /미정비/.test(r[k][3] || '') && !/미정비/.test(cur.r[k][3] || '')), live, ov, noshow: [], sentAt: null } };
     const log = { at: S.SERVER_TIME, uid: (H.user() && H.user().uid) || '', by: data.by, k: 'assign', n: Object.keys(ch).length, ch, cards: cards.map(c => c.n + ' ' + c.u).join(', ') };

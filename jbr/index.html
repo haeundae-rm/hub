@@ -62,6 +62,12 @@ main{padding:10px max(2vw,12px) 40px}
 .card.quit{background:var(--bad);color:#fff;border-color:var(--bad)}
 .card.in{background:#E3F6EA;border-color:#9ED4B4}
 .card.focus{outline:3px solid var(--org)}
+.card .hd{font:800 11px Inter,sans-serif;border-radius:6px;padding:0 5px;line-height:17px}.card .hd.up{background:#FDE3E5;color:#B3261E}.card .hd.dn{background:#DCEBFB;color:#1E5FA8}
+.card .pv{font:800 11px Inter,sans-serif;font-style:normal;display:none}.card .pv.on{display:inline;border-radius:6px;padding:0 5px;line-height:17px;outline:1.5px dashed currentColor}.card .pv.up{color:#B3261E;background:#FFF1F1}.card .pv.dn{color:#1E5FA8;background:#EEF5FD}.card .pv.ok{color:#1E7F4D;background:#E9F7EF}
+.card.off .hd,.card.quit .hd{display:none}.cards.odiff .card:not(.df){display:none}
+.pvl{flex-basis:100%;font:700 12.5px 'Noto Sans KR',sans-serif;padding:4px 2px 0;color:var(--mute)}.pvl span{margin-right:4px}.pvl .up{color:#B3261E}.pvl .dn{color:#1E5FA8}.pvl .ok{color:#1E7F4D}
+.dsum{border:1px dashed #9AA3B2;background:transparent;border-radius:10px;padding:5px 10px;font-size:12.5px;color:var(--mute);min-height:34px;cursor:pointer}.dsum.on{border-style:solid;border-color:var(--org);color:var(--ink)}.dsum .up{color:#B3261E}.dsum .dn{color:#1E5FA8}
+.ctip{display:inline-block;margin:-6px 0 12px;font-size:13px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--org);border-radius:0;padding:6px 10px}.ctip .up{color:#B3261E}.ctip .dn{color:#1E5FA8}
 .card i{font-style:normal;font-size:11px;background:var(--ok);color:#fff;border-radius:5px;padding:0 4px}
 .wrap{display:grid;grid-template-columns:minmax(0,1fr) clamp(330px,25vw,400px);gap:12px;align-items:start}
 .left{min-width:0}
@@ -378,7 +384,7 @@ function dayData(ds) {
   if (!ED[ds]) {
     const d = P.days[ds];
     ED[ds] = { rooms: d.r.map(x => x ? { st: x[0], nm: x[1], m1: x[2], m2: x[3], done: !!x[4], yl: !!x[5] } : null),
-      cards: d.cards.map(c => ({ n: c[0], u: c[1], in: !!c[2], no: c[3] })), groups: d.groups.map(g => ({ name: g[0], time: g[1], rooms: g[2] })), xl: d.xl, edited: false };
+      cards: d.cards.map(c => ({ n: c[0], u: c[1], in: !!c[2], no: c[3], h: c[4] })), groups: d.groups.map(g => ({ name: g[0], time: g[1], rooms: g[2] })), xl: d.xl, edited: false };
   }
   return ED[ds];
 }
@@ -387,6 +393,26 @@ const monOf = ds => ds.slice(0, 7), rosterOf = ds => P.months[monOf(ds)].roster;
 const TRAINEE = '교육생';   // 명단 밖이지만 실제로 쓰는 이름 — 청구 포함 여부는 설정
 const unitOf = (room, x) => { const s = /간단/.test(x.st); return ROY.includes(room) ? (s ? 1 : 2) : (s ? 0.5 : 1); };
 const people = (room, x) => room === '2901' ? x.nm.split(',').map(s => s.trim()).filter(Boolean) : [x.nm];
+// 인계 유닛: 자동 배정이 넣은 날은 카드 h, 엑셀(옮긴 날 · 사본)은 카드 숫자(엑셀 카드 윗칸)
+function handOf(k) { if (k.h != null && k.h !== '' && isFinite(+k.h)) return +k.h; if (k.u !== '' && k.u != null && isFinite(+k.u)) return +k.u; return null; }
+let onlyDiff = false;
+// 이름 입력 중 미리 보기: 고른 방이 그 분에게 가면 카드가 어떻게 바뀌는지 (받는 분 · 빠지는 분)
+function previewCards() {
+  document.querySelectorAll('.cards .card .pv').forEach(e => { e.textContent = ''; e.className = 'pv'; });
+  const q = (cmdVal || '').trim(), idx = [...sel]; if (!q || !idx.length || q.includes(',')) return;
+  const { L } = suggest(q); if (!L.length) return; const to = L[0][0], d = R(), c = calc(day), ch = {};
+  idx.forEach(i => { const x = d.rooms[i]; if (!x) return; const room = P.rooms[i], w = unitOf(room, x);
+    const was = x.nm ? people(room, x) : []; if (was.includes(to) && was.length === 1) return;
+    was.forEach(n => { ch[n] = (ch[n] || 0) - w; }); ch[to] = (ch[to] || 0) + w; });
+  const line = [];
+  Object.keys(ch).forEach(n => { if (!ch[n]) return;
+    const now = c.per[n] || 0, nx = Math.round((now + ch[n]) * 10) / 10, k = d.cards.find(z => z.n === n), ho = k ? handOf(k) : null, df = ho == null ? null : Math.round((nx - ho) * 10) / 10;
+    const t = '→' + nx + (df ? ' (' + (df > 0 ? '+' : '−') + Math.abs(df) + ')' : df === 0 ? ' ✓' : ''), cls = df > 0 ? 'up' : df < 0 ? 'dn' : 'ok';
+    line.push('<span class="' + cls + '">' + esc(n) + ' ' + now + t + '</span>');
+    const el = document.querySelector('.cards .card[data-n="' + CSS.escape(n) + '"] .pv'); if (el) { el.textContent = t; el.className = 'pv on ' + cls; } });
+  // 격자 아래쪽 방을 고치면 카드가 화면 밖 → 이름 칸 바로 아래(후보 줄)에도 같은 미리 보기
+  const sg = $('#sug'); if (sg && line.length) sg.insertAdjacentHTML('beforeend', '<div class="pvl">인계 대비 ' + line.join(' · ') + '</div>');
+}
 function calc(ds) {
   const d = dayData(ds), per = {}; let fam = 0, roy = 0, asg = 0, fin = 0, mij = 0, jae = 0, gan = 0;
   d.rooms.forEach((x, i) => {
@@ -484,11 +510,16 @@ function drawGrid() {
     (okN === 6 ? '<span class="good">엑셀 계산값과 같음 ' + okN + '/6</span> (금일 정비수 · 로얄 · 인원 · 미정비 · 재실 · 간단)' : '<span class="warn">엑셀과 다른 칸 ' + (6 - okN) + '개</span> ' + same.filter(s => !s[3]).map(s => s[0] + ' 앱 ' + s[1] + ' / 엑셀 ' + s[2]).join(', '))) + '</div>';
   h += svBar();
   h += sendBar();
-  h += '<div class="cards">' + d.cards.map((k, i) => {
+  // 인계 대비 (11/28 하우스맨 · 소장님 추천안): 같으면 아무것도 · 다르면 +1(빨강) / −1(파랑) 배지 · 누르면 말풍선 · 끝에 요약 칩(누르면 차이만)
+  const dif = d.cards.map(k => { const st = /휴/.test(k.u) ? 'off' : k.u === '퇴사' ? 'quit' : ''; const ho = handOf(k); return st || ho == null ? null : Math.round(((c.per[k.n] || 0) - ho) * 10) / 10; });
+  const nUp = dif.filter(x => x > 0).length, nDn = dif.filter(x => x < 0).length;
+  h += '<div class="cards' + (onlyDiff ? ' odiff' : '') + '">' + d.cards.map((k, i) => {
     const st = /휴/.test(k.u) ? 'off' : k.u === '퇴사' ? 'quit' : k.in ? 'in' : '';
-    const u = c.per[k.n] || 0;
-    return '<button class="card ' + st + (focus === k.n ? ' focus' : '') + '" data-card="' + i + '"><span>' + esc(k.n) + '</span><span class="u num">' + (st === 'off' ? '휴무' : st === 'quit' ? '퇴사' : u) + '</span>' + (k.in ? '<i>IN</i>' : '') + '</button>';
-  }).join('') + '</div>';
+    const u = c.per[k.n] || 0, df = dif[i];
+    return '<button class="card ' + st + (focus === k.n ? ' focus' : '') + (df ? ' df' : '') + '" data-card="' + i + '" data-n="' + esc(k.n) + '"><span>' + esc(k.n) + '</span><span class="u num">' + (st === 'off' ? '휴무' : st === 'quit' ? '퇴사' : u) + '</span>' + (df ? '<b class="hd ' + (df > 0 ? 'up' : 'dn') + '">' + (df > 0 ? '+' : '−') + Math.abs(df) + '</b>' : '') + '<em class="pv"></em>' + (k.in ? '<i>IN</i>' : '') + '</button>';
+  }).join('') + ((nUp || nDn) ? '<button class="dsum' + (onlyDiff ? ' on' : '') + '" data-odiff="1" title="누르면 인계와 다른 분만">인계 대비' + (nUp ? ' <b class="up">+' + nUp + '명</b>' : '') + (nDn ? ' <b class="dn">−' + nDn + '명</b>' : '') + (onlyDiff ? ' · 모두 보기' : '') + '</button>' : '') + '</div>';
+  if (focus) { const k = d.cards.find(x => x.n === focus); if (k) { const ho = handOf(k), u = c.per[k.n] || 0, fl = [...new Set(d.rooms.map((x, i) => x && x.nm && people(P.rooms[i], x).includes(k.n) ? Math.floor(+P.rooms[i] / 100) : 0).filter(Boolean))].sort((a, b) => b - a);
+    h += '<div class="ctip"><b>' + esc(k.n) + '</b> · ' + (ho == null ? '인계 —' : '인계 ' + ho) + ' → 배정 <b>' + u + '</b>' + (ho != null && Math.abs(u - ho) > 1e-9 ? ' <b class="' + (u > ho ? 'up' : 'dn') + '">(' + (u > ho ? '+' : '−') + Math.round(Math.abs(u - ho) * 10) / 10 + ')</b>' : '') + (fl.length ? ' · ' + fl.join('·') + 'F' : '') + '</div>'; } }
   // 격자
   let g = '<div class="g">';
   for (let f = 31; f >= 4; f--) {
@@ -897,6 +928,7 @@ document.addEventListener('click', e => {
     const g = { name, time, rooms: [...new Set(rooms)] }; if (gEdit.k < 0) d.groups.push(g); else d.groups[gEdit.k] = g;
     saveGroups(d); gEdit = null; sel = new Set(g.rooms.map(r => P.rooms.indexOf(r))); draw(); toast('「' + name + '」 ' + g.rooms.length + '실 — 격자에 색 띠가 붙었어요'); return;
   }
+  if (t.dataset.odiff) { onlyDiff = !onlyDiff; draw(); return; }
   if (t.dataset.card != null) { const k = R().cards[+t.dataset.card]; focus = focus === k.n ? '' : k.n; draw(); return; }
   const idx = [...sel];
   if (t.dataset.ask) { closeAsk(t.dataset.ask === 'yes'); return; }
@@ -974,7 +1006,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'o_tr') { OPT.trainee = e.target.checked; draw(); return; }
   if (/^o_/.test(e.target.id)) { const v = parseFloat(e.target.value); if (!isNaN(v)) { if (e.target.id === 'o_rate') OPT.rate = v; if (e.target.id === 'o_ot') OPT.ot = v; if (e.target.id === 'o_min') OPT.otMin = v; draw(); } }
 });
-document.addEventListener('input', e => { if (e.target.id === 'cmd') { cmdVal = e.target.value; const sg = $('#sug'); if (sg) sg.innerHTML = sugHtml(cmdVal); return; } if (e.target.id === 'clk') { clock = +e.target.value; draw(); const k = $('#clk'); if (k) k.focus(); } });
+document.addEventListener('input', e => { if (e.target.id === 'cmd') { cmdVal = e.target.value; const sg = $('#sug'); if (sg) sg.innerHTML = sugHtml(cmdVal); previewCards(); return; } if (e.target.id === 'clk') { clock = +e.target.value; draw(); const k = $('#clk'); if (k) k.focus(); } });
 document.addEventListener('keydown', e => {
   if (askCb) { if (e.key === 'Escape') { e.preventDefault(); closeAsk(false); } else if (e.key === 'Enter') { e.preventDefault(); closeAsk(true); } else e.preventDefault(); return; }
   if (e.target.dataset && e.target.dataset.ptime != null) { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } return; }   // 🟠 우선정비 시간 고치기
@@ -1226,7 +1258,7 @@ let X_ = null;
 async function xlOut(kind, btn, which) {
   const old = btn.textContent; btn.textContent = '만드는 중…'; btn.disabled = true;
   try {
-    const X = X_ = await import('../xlsxw.js?v=2026.11.28-1'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
+    const X = X_ = await import('../xlsxw.js?v=2026.11.28-2'), m = monOf(day), ym = (+m.slice(0, 4)) + '년 ' + (+m.slice(5)) + '월';
     let sheets, fn;
     if (kind === 'day') { sheets = [gridSheet(day, '정비보고서'), listSheet(day), cardSheet(day)]; fn = '정비보고서_' + day + '.xlsx'; }
     else if (kind === 'close') { const R = drawClose({ m }), ks = which === 'all' ? ['room', 'bill', 'ot', 'unit'] : [which]; sheets = ks.map(k => CL_SH[k](R)); fn = (which === 'all' ? '결산4종' : CL_NM[which]) + '_' + m + '.xlsx'; }
@@ -1274,6 +1306,6 @@ if (window.__jbrQ) window.JBR.set(window.__jbrQ);
 }
 </script>
 <script src="../autoreload.js"></script>
-<script type="module" src="jbr.js?v=2026.11.28-1"></script>
+<script type="module" src="jbr.js?v=2026.11.28-2"></script>
 </body>
 </html>
